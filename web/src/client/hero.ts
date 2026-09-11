@@ -17,6 +17,8 @@ export function heroMarkup(): string {
   </figure>`;
 }
 let cleanup: (() => void) | undefined;
+// Greet once per page load, rather than every time the visitor returns from a finding.
+let greeted = false;
 export function disposeHero(): void { cleanup?.(); cleanup = undefined; }
 export function mountHero(root: HTMLElement): void {
     disposeHero();
@@ -100,6 +102,7 @@ export function mountHero(root: HTMLElement): void {
     const arms: {
         shoulder: T.Group;
         elbow: T.Group;
+        wrist: T.Group;
     }[] = [], legs: {
         hip: T.Group;
         knee: T.Group;
@@ -120,7 +123,7 @@ export function mountHero(root: HTMLElement): void {
         for (let i = 0; i < 3; i++)
             box(wrist, .035, .115, .06, shell, (i - 1) * .049, -.23, .008, .015);
         box(wrist, .05, .12, .06, shell, side * .105, -.13, .035, .02).rotation.z = side * .4;
-        arms.push({ shoulder, elbow });
+        arms.push({ shoulder, elbow, wrist });
         const hip = pivot(hips, side * .205, -.13);
         ball(hip, .13);
         box(hip, .245, .53, .27, shell, 0, -.34, 0, .075);
@@ -149,6 +152,7 @@ export function mountHero(root: HTMLElement): void {
     ring.rotation.x = -Math.PI / 2;
     ring.castShadow = false;
     const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+    let greetingEnabled = !greeted && !reduced.matches;
     let paused = reduced.matches, visible = true, disposed = false, raf = 0, elapsed = 0, previous = 0, pointerX = 0, yaw = 0;
     function draw(): void {
         const sway = Math.sin(elapsed * .85);
@@ -161,9 +165,32 @@ export function mountHero(root: HTMLElement): void {
             arms[i].shoulder.rotation.x = .08 + Math.sin(elapsed * .85 + side) * .075;
             arms[i].shoulder.rotation.z = side * (.15 + sway * .025);
             arms[i].elbow.rotation.x = -.22 + Math.sin(elapsed * .85 + side) * .055;
+            arms[i].elbow.rotation.z = 0;
+            arms[i].wrist.rotation.z = 0;
             legs[i].hip.rotation.x = -.045 + Math.sin(elapsed * .85 + side) * .018;
             legs[i].knee.rotation.x = .1;
             legs[i].ankle.rotation.x = -.055;
+        }
+        // Ease the right arm up, give three small waves, then blend back into the idle pose.
+        // Uses the animation clock so pausing, a hidden tab, or scrolling offscreen also pauses
+        // the greeting. No timers or additional animation loops survive navigation.
+        if (greetingEnabled && elapsed < 3.8) {
+            const lift = T.MathUtils.smoothstep(elapsed, .25, 1.05);
+            const lower = 1 - T.MathUtils.smoothstep(elapsed, 2.95, 3.8);
+            const blend = lift * lower;
+            const waveWindow = T.MathUtils.smoothstep(elapsed, 1.05, 1.3)
+                * (1 - T.MathUtils.smoothstep(elapsed, 2.7, 2.95));
+            const wave = Math.sin((elapsed - 1.05) * Math.PI * 3.2) * waveWindow;
+            const arm = arms[1];
+            arm.shoulder.rotation.z = T.MathUtils.lerp(arm.shoulder.rotation.z, .95, blend);
+            arm.shoulder.rotation.x = T.MathUtils.lerp(arm.shoulder.rotation.x, -.18, blend);
+            arm.elbow.rotation.x = T.MathUtils.lerp(arm.elbow.rotation.x, 0, blend);
+            arm.elbow.rotation.z = (1.8 + wave * .16) * blend;
+            arm.wrist.rotation.z = wave * .25 * blend;
+            head.rotation.z = -.055 * blend;
+            if (blend > 0) greeted = true;
+        } else {
+            head.rotation.z = 0;
         }
         yaw += (pointerX * .23 - yaw) * .055;
         robot.rotation.y = -.18 + yaw;
@@ -184,7 +211,11 @@ export function mountHero(root: HTMLElement): void {
             raf = requestAnimationFrame(frame);
     }
     const onPause = () => { paused = !paused; sync(); };
-    const onMotion = () => { paused = reduced.matches; sync(); };
+    const onMotion = () => {
+        paused = reduced.matches;
+        if (reduced.matches) { greetingEnabled = false; draw(); }
+        sync();
+    };
     const onPointer = (e: PointerEvent) => {
         if (e.pointerType === 'touch' || reduced.matches || paused) return;
         const bounds = host.getBoundingClientRect();
