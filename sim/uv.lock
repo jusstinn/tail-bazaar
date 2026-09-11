@@ -859,6 +859,7 @@ dependencies = [
     { name = "numpy" },
     { name = "pillow" },
     { name = "pycryptodome" },
+    { name = "pyyaml" },
 ]
 
 [package.metadata]
@@ -870,6 +871,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.5.3" },
     { name = "pillow", specifier = ">=12.3.0" },
     { name = "pycryptodome", specifier = ">=3.23.0" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
 ]
 
 [[package]]

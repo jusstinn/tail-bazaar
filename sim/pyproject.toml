@@ -10,4 +10,5 @@ dependencies = [
     "numpy>=2.5.3",
     "pillow>=12.3.0",
     "pycryptodome>=3.23.0",
+    "pyyaml>=6.0.3",
 ]

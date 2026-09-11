@@ -1,0 +1,217 @@
+# Tail Bazaar target #2 — the operating envelope (theta) the humanoid hunter searches, published in
+# the same axis shape GUARD uses in configs/guard_theta.yaml, and in the same shape as this project's
+# cart envelope in sim/envelope.yaml. Machine-readable copy of
+# sim/tailbazaar_sim/humanoid/envelope.py; the Python file stays authoritative.
+#
+# This file is ADDITIVE. It does not replace, extend or renumber sim/envelope.yaml: the cart target
+# (envelope_id tb-envelope-1) is unchanged and keeps working exactly as it did. A run document says
+# which target it belongs to in its own top-level `target_id` field.
+#
+# EVERYTHING HERE IS AN ILLUSTRATIVE ASSUMPTION for a demonstration. None of these bounds is measured
+# on a physical robot. The "robot" is Gymnasium's 42.116 kg MuJoCo humanoid mannequin and the
+# "controller" is somebody else's published reinforcement-learning checkpoint; the bounds are chosen
+# to bracket the nominal operating point widely enough that "where does this stop working?" has an
+# answer inside them, and each one carries the reasoning that picked it.
+#
+# NO DISTRIBUTION D IS STATED. As with the cart: GUARD's `marginal` and `scale` describe the
+# deployment distribution its estimator prices against. Tail Bazaar does not estimate a probability;
+# it runs bounded deterministic searches and sells individual reproducible failures. The two fields
+# are present for schema compatibility and left null. Adversarially selected failures are not failure
+# frequencies.
+#
+# Axis groups (GUARD's vocabulary):
+#   physical  — forces on the body, the ground it stands on, and the mass it carries
+#   systems   — latency and noise in the actuation path, the axis real deployments have
+#   visual    — not modelled; there is no perception stack. The policy reads the environment's
+#               proprioceptive/inertial observation vector directly.
+#
+# `published_conditions` is not a GUARD field. It plays the role the cart envelope's `tuned_range`
+# plays: it records the conditions the target's PUBLISHER evaluated the policy under, so a reader can
+# see immediately whether a finding sits inside the conditions the artefact was published for or
+# outside them. The searched envelope is deliberately wider. Where the publisher says nothing, the
+# value is "not stated" rather than an invented bound.
+
+envelope_id: tb-humanoid-envelope-1
+envelope_revision: tb-humanoid-envelope-1.0
+target_id: humanoid-balance-sac-v1
+scene_id: gymnasium-humanoid-v5
+scene_revision: 1
+control_tick_ms: 15          # Gymnasium's Humanoid-v5: MuJoCo timestep 0.003 s with frame_skip 5
+physics_timestep_ms: 3
+episode_length_s: 15.0       # 1000 control ticks, the episode limit Gymnasium registers for this env
+push_duration_s: 0.15        # 10 control ticks; fixed and documented, NOT an axis
+duplicate_rule: >-
+  same failure-class set AND same init_seed AND normalized L-infinity distance < 0.05 over the seven
+  continuous axes (push_heading_deg the short way round the circle; push_heading_deg and push_time_s
+  skipped when either side has no push, because an impulse of magnitude zero has no direction or
+  timing and the two runs are byte-identical)
+distribution_D: null         # not stated, not estimated
+
+target:
+  kind: pretrained_policy
+  what: a humanoid balance/locomotion policy somebody else trained and published; nothing here trains
+  repo_id: farama-minari/Humanoid-v5-SAC-expert
+  repo_revision: f9130b25c70584670ceac33eb1d06fbc418d691a
+  archive: humanoid-v5-sac-expert.zip
+  archive_sha256: 5a7b38be61afb41cfe37acdc70e9997f29415a833684d91773c6049951a18cd6
+  weights_member: policy.pth
+  weights_sha256: 6437d3dd02bc2fc92f5f2bcbf5d48eac0e5db209d4aae3bb7d039f14df3e18ef
+  algo: SAC (stable-baselines3 2.4.0a10), MLP 348 -> 256 -> 256 -> 17, relu, tanh-squashed
+  publisher_claim: mean_reward 8127.00 +/- 46.46 over 10 deterministic episodes
+  licence: >-
+    NOT DECLARED by the model repository — no license tag in its card metadata and no LICENSE file.
+    Published by the Farama Foundation's Minari project, whose source projects are MIT, but that
+    licence is not restated on the model repo, so none is asserted here. The weights are downloaded
+    at run time, never vendored, never modified, never redistributed by this project; only their
+    sha256 digests are published. See evidence/humanoid/README.md.
+
+continuous:
+  # --- physical ---------------------------------------------------------------
+  # An external shove applied to the torso's centre of mass as a constant world-frame force held for
+  # push_duration_s. 120 N*s is 2.85 m/s of velocity change on the 42.116 kg body: hard enough that
+  # surviving it would be surprising, so the upper bound does not hide the interesting region. The
+  # measured boundary turned out to be near the BOTTOM of this axis (4 N*s survives every heading,
+  # 8 N*s topples it from three of eight), which is why the push grid only searches up to 40 N*s.
+  - name: push_impulse_ns
+    low: 0.0
+    high: 120.0
+    nominal: 0.0
+    marginal: null
+    scale: null
+    units: N*s
+    group: physical
+    places: 2
+    published_conditions: "= 0 (the publisher evaluated an unpushed humanoid)"
+  # Direction of that force in the world horizontal plane; 0 deg = +x, the direction the policy runs.
+  # CIRCULAR: distances are measured the short way round, and the axis is skipped entirely when the
+  # impulse is zero, because it then describes the direction of a force that does not exist.
+  - name: push_heading_deg
+    low: 0.0
+    high: 360.0
+    nominal: 0.0
+    marginal: null
+    scale: null
+    units: deg
+    group: physical
+    places: 1
+    circular: true
+    published_conditions: "not stated"
+  # When the push starts. Must be an exact multiple of the 15 ms control tick so a scenario names one
+  # unambiguous tick; the bounds are themselves tick multiples (0.6 s = tick 40, 7.8 s = tick 520).
+  # The lower bound lets the gait settle out of the reset pose; the upper leaves >= 7 s of episode.
+  - name: push_time_s
+    low: 0.6
+    high: 7.8
+    nominal: 2.1
+    marginal: null
+    scale: null
+    units: s
+    group: physical
+    places: 3
+    step: 0.015
+    published_conditions: "not stated"
+  # Coulomb sliding coefficient written into geom_friction[0] of EVERY geom. MuJoCo combines a contact
+  # pair's friction with the maximum of the two geoms, so lowering only the floor would change nothing
+  # while the feet still carry 1.0. Gymnasium's humanoid.xml ships 1.0 everywhere, so writing one
+  # value everywhere reproduces the stock scene exactly at the nominal point. 0.4 is a hard, slick
+  # floor; 1.4 a grippy rubber mat.
+  - name: floor_friction
+    low: 0.4
+    high: 1.4
+    nominal: 1.0
+    marginal: null
+    scale: null
+    units: coefficient
+    group: physical
+    places: 3
+    published_conditions: "= 1.0 (the value the shipped model compiles with)"
+  # Multiplier on every body mass AND the matching diagonal inertia, so the mass DISTRIBUTION and
+  # every principal-axis ratio are unchanged and only the scale moves. -20 %/+25 % covers carrying a
+  # payload or building a lighter variant of the same machine.
+  - name: body_mass_scale
+    low: 0.8
+    high: 1.25
+    nominal: 1.0
+    marginal: null
+    scale: null
+    units: "1"
+    group: physical
+    places: 3
+    published_conditions: "= 1.0 (stock masses)"
+
+  # --- systems ----------------------------------------------------------------
+  # Standard deviation of zero-mean Gaussian noise added to each applied action, as a fraction of the
+  # half-width of the actuator's own [-0.4, 0.4] control range, drawn once per control tick and then
+  # clipped back into range. The generator is seeded from the scenario's own canonical commitment, so
+  # a scenario always replays identically.
+  - name: actuator_noise_frac
+    low: 0.0
+    high: 0.3
+    nominal: 0.0
+    marginal: null
+    scale: null
+    units: "1"
+    group: systems
+    places: 3
+    published_conditions: "= 0 (noiseless actuation)"
+  # The action computed at tick k is applied from tick k + control_latency_ms/15; until the first
+  # action arrives the actuators hold zero torque (zero-order hold). Quantized to the control tick the
+  # same way GUARD's SystemsWrapper quantizes latency against the control period, so a delay is always
+  # an integer number of ticks and never lands between two control decisions.
+  - name: control_latency_ms
+    low: 0
+    high: 90
+    nominal: 0
+    marginal: null
+    scale: null
+    units: ms
+    group: systems
+    step: 15
+    published_conditions: "= 0 (the environment applies the action in the same tick it is computed)"
+
+# Stratified axis, in GUARD's `discrete` slot. Gymnasium's reset(seed=s) perturbs the initial qpos and
+# qvel by uniform noise of scale 0.01, so each seed is a genuinely different initial state rather than
+# a coordinate. Two runs from different initial states are never duplicates of each other, and a
+# finding's distance to nominal is measured WITHIN its own stratum.
+discrete:
+  - name: init_seed
+    values: [0, 1, 2, 3, 4, 5, 6, 7]
+    nominal: 0
+    units: "1"
+    group: physical
+
+# Failure class. Decided by GYMNASIUM'S OWN health predicate, not by anything this project wrote:
+# simulate.py reads the `terminated` flag off the unmodified environment and cross-checks it against
+# the environment's own `is_healthy` property at every control tick. The cross-check count is
+# published in every run document and in every hunt document.
+failure_classes:
+  - name: FELL
+    detected_by: >-
+      gymnasium.envs.mujoco.humanoid_v5.HumanoidEnv: terminated when NOT
+      (healthy_z_range[0] < data.qpos[2] < healthy_z_range[1]), i.e. the torso height left
+      [1.0, 2.0] m. This project implements no fall detector of its own.
+    severity_proxy: torso_impact_speed_mps
+    severity_proxy_secondary: peak_torso_accel_mps2
+
+# Severity, directly measured. No biomechanical tier, no monetary value, no damage or injury estimate
+# is assigned anywhere — the same position the cart envelope takes on ISO/TS 15066 thresholds.
+severity:
+  torso_impact_speed_mps: >-
+    magnitude of the torso body's world-frame linear velocity (mujoco.mj_objectVelocity) at the first
+    contact between the floor and a geom that is not a foot, looked for only AFTER the health
+    predicate has fired — a running humanoid brushes the floor with a hand now and then, so that
+    contact is only the fall's impact once the environment has already declared the torso unhealthy
+  peak_torso_accel_mps2: >-
+    largest control-tick finite difference |v_k - v_(k-1)| / dt of that same velocity after the
+    predicate fired
+  fall_time_s: the time the predicate fired
+  survival_time_s: how long the policy lasted, capped at the 15 s episode
+
+outcomes:
+  conclusive: [SURVIVED, FELL]
+  inconclusive: [DIVERGED, INVALID_INITIAL_STATE, REJECTED_OUT_OF_ENVELOPE]
+
+verdicts:
+  VALID: re-simulated by the verifier and bound to the delivered evidence; pays the seller
+  INVALID: rejected — not reproducible, out of envelope, duplicate, or evidence not bound to the verified run
+  INCONCLUSIVE: numerical divergence, an invalid initial state, or out-of-envelope parameters; never pays
