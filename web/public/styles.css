@@ -136,7 +136,10 @@ input[type=password], input[type=text] { flex: 1; min-width: 240px; padding: 12p
 
 /* ---------------------------------------------------------------- range bars */
 .rb-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 34px 48px; margin-top: 40px; }
+/* The head keeps clear of the marker's own value label, which floats above the track: with the
+   marker at either end of the axis the two used to collide with the axis name. */
 .rb-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+.rb.has-find .rb-head { margin-bottom: 26px; }
 .rb-name { font-size: 13px; color: var(--ink); }
 .rb-group { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--ink-3); }
 .rb-track { position: relative; height: 10px; background: #EDEBE8; border-radius: 999px; }

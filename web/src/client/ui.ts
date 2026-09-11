@@ -79,7 +79,7 @@ export function rangeBar(axis: Axis, tuned: TunedSpec, finding?: number | null, 
   const hasFinding = typeof finding === "number" && Number.isFinite(finding);
   const ok = hasFinding ? inTuned(finding as number, tuned) : true;
   const unit = axis.units === "coefficient" ? "" : axis.units;
-  return `<div class="rb reveal">
+  return `<div class="rb reveal${hasFinding ? " has-find" : ""}">
     <div class="rb-head"><span class="mono rb-name">${esc(axis.name)}</span><span class="rb-group">${esc(axis.group)}</span></div>
     <div class="rb-track">
       ${stated ? `<div class="rb-tuned" style="left:${left.toFixed(2)}%;width:${width.toFixed(2)}%"></div>` : ""}
