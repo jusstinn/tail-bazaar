@@ -1,0 +1,14 @@
+{
+  "control_decimation": 10,
+  "control_dt_s": 0.02,
+  "engine": "mujoco",
+  "engine_version": "3.13.0",
+  "numpy_version": "2.5.3",
+  "physics_timestep_s": 0.002,
+  "platform": "Darwin-arm64",
+  "policy_backend": "torchscript-cpu",
+  "python_version": "3.14.4",
+  "threads": 1,
+  "torch_version": "2.14.0",
+  "uv_lock_sha256": "ffe7062881f0235aab36bf067ce8f6ac8fc107d962d08bb89a5ce9eaf1ee4a7a"
+}

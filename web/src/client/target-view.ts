@@ -217,7 +217,76 @@ const ARM: TargetView = {
   },
 };
 
-const VIEWS: Record<string, TargetView> = { cart: CART, humanoid: HUMANOID, arm: ARM };
+// --------------------------------------------------------------------------------------- the G1
+const G1: TargetView = {
+  id: "g1",
+  renderer: rendererFor("g1-3d"),
+  baselineLabel: "Baseline · publisher's deployment configuration",
+  failureLabel: "Purchased scenario",
+  headline: "The G1 was supposed to keep walking.<br>Under these conditions it went down.",
+
+  narrate(pkg, baseline, p) {
+    const push = ev(pkg, "push_start");
+    const fell = ev(pkg, "fall_predicate_fired");
+    const hit = ev(pkg, "ground_contact");
+    const zLine = Number.isFinite(Number(fell?.fall_z_m)) ? Number(fell.fall_z_m) : 0.462;
+    const tiltLine = Number.isFinite(Number(fell?.fall_tilt_deg)) ? Number(fell.fall_tilt_deg) : 60;
+    const latency = Number(pkg.scenario.control_latency_ms ?? 0);
+    const noise = Number(pkg.scenario.actuator_noise_frac ?? 0);
+    const cmd = Number(pkg.scenario.cmd_vx_mps ?? 0.5);
+    const causes: string[] = [];
+    if (push) causes.push(`a single <span class="mono">${num(push.impulse_ns, 1)} N·s</span> shove on the pelvis at <span class="mono">${num(push.t_s, 2)} s</span>, held for <span class="mono">${num(push.duration_s, 2)} s</span> from heading <span class="mono">${num(push.heading_deg, 0)}°</span>`);
+    if (latency > 0) causes.push(`<span class="mono">${latency} ms</span> of actuation delay — ${Math.round(latency / 20)} control tick${latency === 20 ? "" : "s"} between a joint target being computed and applied`);
+    if (noise > 0) causes.push(`joint-target noise at <span class="mono">${num(noise * 100, 0)} %</span> of the policy's action scale`);
+    if (Number(pkg.scenario.floor_friction) !== 1) causes.push(`floor friction <span class="mono">${num(pkg.scenario.floor_friction, 2)}</span> instead of the default 1.00`);
+    if (Number(pkg.scenario.body_mass_scale) !== 1) causes.push(`every body mass scaled by <span class="mono">×${num(pkg.scenario.body_mass_scale, 2)}</span>`);
+    if (cmd !== 0.5) causes.push(`a forward command of <span class="mono">${num(cmd, 2)} m/s</span> instead of the shipped 0.5`);
+    const cause = causes.length ? `What changed: ${causes.join("; ")}.` : "Nothing outside the publisher's deployment configuration was changed.";
+    const by = String(fell?.detected_by ?? "");
+    const which = by.includes("pelvis_height") && by.includes("tilt") ? "both the height and the tilt conditions" : by.includes("tilt") ? "the tilt condition" : "the height condition";
+    const fall = fell
+      ? ` This project's own fall predicate fired at <span class="mono">${num(fell.t_s, 3)} s</span> on ${which}: the pelvis was at <span class="mono">${num(fell.pelvis_z_m, 3)} m</span> against a <span class="mono">${zLine.toFixed(3)} m</span> line and tilted <span class="mono">${num(fell.tilt_deg, 1)}°</span> against a <span class="mono">${tiltLine.toFixed(0)}°</span> line, moving at <span class="mono">${num(fell.pelvis_speed_mps, 2)} m/s</span>. Unitree's runner has no fall flag; the rule is stated in the run document and is ours.`
+      : "";
+    const impact = hit
+      ? ` It reached the ground <span class="mono">${num(hit.t_s - (fell?.t_s ?? hit.t_s), 3)} s</span> later, ${hit.body ? `first on <span class="mono">${esc(String(hit.body))}</span>, ` : ""}with the pelvis moving at <span class="mono">${num(hit.pelvis_impact_speed_mps, 3)} m/s</span>.`
+      : "";
+    const base = ` The same policy at the publisher's configuration walked the full <span class="mono">${num(m(baseline, "survival_time_s") ?? m(baseline, "duration_s"), 2)} s</span> episode, covering <span class="mono">${num(m(baseline, "distance_travelled_x_m"), 2)} m</span> against <span class="mono">${num(m(pkg, "distance_travelled_x_m"), 2)} m</span> here.`;
+    return `${cause}${fall}${impact}${base}`;
+  },
+
+  metrics(baseline, pkg) {
+    return [
+      ["outcome", m(baseline, "outcome"), m(pkg, "outcome")],
+      ["survival time (s)", num(m(baseline, "survival_time_s"), 2), num(m(pkg, "survival_time_s"), 2)],
+      ["distance walked (m)", num(m(baseline, "distance_travelled_x_m"), 2), num(m(pkg, "distance_travelled_x_m"), 2)],
+      ["mean forward speed (m/s)", num(m(baseline, "mean_forward_speed_mps"), 3), num(m(pkg, "mean_forward_speed_mps"), 3)],
+      ["commanded forward speed (m/s)", num(m(baseline, "commanded_forward_speed_mps"), 2), num(m(pkg, "commanded_forward_speed_mps"), 2)],
+      ["minimum pelvis height (m)", num(m(baseline, "pelvis_min_z_m"), 3), num(m(pkg, "pelvis_min_z_m"), 3)],
+      ["largest tilt (°)", num(m(baseline, "max_tilt_deg"), 1), num(m(pkg, "max_tilt_deg"), 1)],
+      ["which condition fired", "—", m(pkg, "fall_detected_by") ?? "—"],
+      ["pelvis height when the predicate fired (m)", "—", num(m(pkg, "pelvis_z_at_fall_m"), 3)],
+      ["tilt when the predicate fired (°)", "—", num(m(pkg, "tilt_at_fall_deg"), 1)],
+      ["fall time (s)", "—", num(m(pkg, "fall_time_s"), 3)],
+      ["ground contact (s)", "—", num(m(pkg, "ground_contact_t_s"), 3)],
+      ["first part to hit the floor", "—", m(pkg, "ground_contact_body") ?? "—"],
+      ["pelvis impact speed (m/s)", "—", num(m(pkg, "pelvis_impact_speed_mps"), 3)],
+      ["peak pelvis acceleration (m/s²)", "—", num(m(pkg, "peak_pelvis_accel_mps2"), 2)],
+      ["top pelvis speed (m/s)", num(m(baseline, "pelvis_max_speed_mps"), 2), num(m(pkg, "pelvis_max_speed_mps"), 2)],
+    ];
+  },
+
+  stats(pkg, baseline, p) {
+    const out: (Stat | null)[] = [
+      severityTile(p),
+      { label: "survived for", value: m(pkg, "survival_time_s"), unit: "s", dec: 2, note: "until this project's fall predicate fired" },
+      { label: "baseline walked", value: m(baseline, "distance_travelled_x_m"), unit: "m", dec: 2, note: "in the full episode, at the publisher's configuration" },
+      { label: "peak pelvis acceleration", value: m(pkg, "peak_pelvis_accel_mps2"), unit: "m/s²", dec: 1, note: "largest control-tick change in pelvis velocity after the fall" },
+    ];
+    return out.filter((x): x is Stat => x !== null);
+  },
+};
+
+const VIEWS: Record<string, TargetView> = { cart: CART, humanoid: HUMANOID, arm: ARM, g1: G1 };
 
 /** The view for a target id. Anything unknown — including a listing registered before the
  *  marketplace became multi-target — is the cart, which was then the only target. */

@@ -13,9 +13,10 @@ import path from "node:path";
 import * as cart from "./envelope.js";
 import * as humanoid from "./envelope-humanoid.js";
 import * as arm from "./envelope-arm.js";
+import * as g1 from "./envelope-g1.js";
 import { GRAVITY_MPS2, SIM_POSITION_BOUND_M, timingFrom, type ReplayLimits } from "./plausibility.js";
 
-export type TargetId = "cart" | "humanoid" | "arm";
+export type TargetId = "cart" | "humanoid" | "arm" | "g1";
 export type Scenario = Record<string, number>;
 
 /** The artefact under test, as the simulator itself hashes it. The verifier binds a claim to this. */
@@ -68,7 +69,7 @@ export type TargetSpec = {
   failure_outcomes: string[];
   conclusive_outcomes: string[];
   severity: { proxy: string; units: string };
-  replay_renderer: "cart-3d" | "humanoid-3d" | "arm-3d";
+  replay_renderer: "cart-3d" | "humanoid-3d" | "arm-3d" | "g1-3d";
   nominal_scenario: Scenario;
   checkAdmissible: (scn: Record<string, unknown>) => string[];
   isDuplicate: (a: Scenario, b: Scenario) => boolean;
@@ -150,6 +151,28 @@ function armEnvelopeDoc(): ReturnType<typeof cartEnvelopeDoc> {
     failure_classes: [
       { id: "DROPPED", label: "Dropped", severity_proxy: "object_impact_speed_mps", severity_units: "m/s", detected_by: `a mechanical predicate over MuJoCo's OWN contact list: the block was touching both gripper pads and was more than ${arm.AIRBORNE_MARGIN_M} m above the table, then was not, and was not at the goal — confirmed over three further ticks, so one momentary lost contact while the part is still pinched is never sold as a drop. This is the one predicate this project owns: the environment scores placement, not custody.` },
       { id: "NOT_PLACED", label: "Not placed", severity_proxy: "none", severity_units: "", detected_by: "Gymnasium-Robotics' own success flag: info[\"is_success\"] is false at the environment's own episode horizon, with no drop on the way. This project implements no placement detector. This class has no severity proxy: nothing was dropped and nothing hit anything." },
+    ],
+    verdicts: { VALID: "re-simulated and bound to the delivered evidence", INVALID: "rejected (not reproducible, out of envelope, duplicate, or evidence not bound to the verified run)", INCONCLUSIVE: "numerical divergence, an environment the verifier cannot match, or metrics outside tolerance; never pays" },
+  };
+}
+
+function g1EnvelopeDoc(): ReturnType<typeof cartEnvelopeDoc> {
+  return {
+    target_id: "g1" as TargetId,
+    envelope_id: g1.ENVELOPE_ID,
+    yaml: "sim/envelope-g1.yaml (same axis shape as GUARD configs/guard_theta.yaml)",
+    axes: g1.ENVELOPE_AXES as unknown as (typeof cart.ENVELOPE_AXES)[number][],
+    nominal_scenario: g1.NOMINAL_SCENARIO as unknown as Record<string, number>,
+    control_tick_ms: g1.DT_CTRL_MS,
+    duplicate_rule: g1.DUPLICATE_RULE_PROSE,
+    controller_tuned_range: { label: "the publisher's own deployment configuration", verb: "deployed at", unstated: "the publisher states nothing about this axis", prose: g1.PUBLISHED_CONDITIONS_PROSE, source: g1.PUBLISHED_CONDITIONS_SOURCE, per_parameter: g1.PUBLISHED_CONDITIONS },
+    searched_envelope: { prose: g1.SEARCHED_ENVELOPE_PROSE },
+    product_question: g1.PRODUCT_QUESTION,
+    note: g1.OPERATING_CONTEXT_NOTE,
+    distribution: "No distribution D over these axes is stated or estimated. The search is a bounded deterministic grid; adversarially selected failures are not failure frequencies.",
+    severity: { proxy: "pelvis_impact_speed_mps", units: "m/s", definition: g1.SEVERITY_BAND_DEFINITION },
+    failure_classes: [
+      { id: "FELL", label: "Fell", severity_proxy: "pelvis_impact_speed_mps", severity_units: "m/s", detected_by: `THIS PROJECT'S predicate, stated because Unitree's runner has no fall flag of its own: FELL when the pelvis drops below ${g1.FALL_Z_M} m (${g1.FALL_HEIGHT_FRACTION} x the measured nominal standing height of ${g1.NOMINAL_PELVIS_Z_M} m) or tilts more than ${g1.FALL_TILT_DEG} degrees from vertical, whichever first, checked every 20 ms control tick; the run document records which condition fired and when.` },
     ],
     verdicts: { VALID: "re-simulated and bound to the delivered evidence", INVALID: "rejected (not reproducible, out of envelope, duplicate, or evidence not bound to the verified run)", INCONCLUSIVE: "numerical divergence, an environment the verifier cannot match, or metrics outside tolerance; never pays" },
   };
@@ -480,8 +503,94 @@ const ARM: TargetSpec = {
   claimKind: "the pick-and-place policy drops the part, or fails to place it, under admissible conditions inside the published envelope",
 };
 
-export const TARGETS: Record<TargetId, TargetSpec> = { cart: CART, humanoid: HUMANOID, arm: ARM };
-export const TARGET_IDS: TargetId[] = ["cart", "humanoid", "arm"];
+const G1_ENVELOPE = g1EnvelopeDoc();
+
+const G1: TargetSpec = {
+  id: "g1",
+  label: "Unitree G1 walking policy",
+  short_label: "G1",
+  machine: "a 32 kg Unitree G1 humanoid walking under Unitree's own pretrained policy",
+  one_liner: "Unitree's pretrained G1 walking policy is supposed to keep walking. A sideways shove or four control ticks of actuation delay can put it on the floor.",
+  subject_noun: "policy checkpoint",
+  subject_label: "Policy",
+  envelope_id: g1.ENVELOPE_ID,
+  envelope_yaml: "sim/envelope-g1.yaml",
+  envelope_doc: G1_ENVELOPE,
+  sim: {
+    module: "tailbazaar_sim.g1.cli",
+    cli: "uv run python -m tailbazaar_sim.g1.cli --out DIR run|hunt|nominal|repeat|policy|selfcheck ...",
+    hunt_mode: "grid-push",
+    hunt_modes: ["grid-push", "grid-systems", "grid-terrain", "random"],
+    hunt_n: 60,
+    hunt_seed: 7,
+    huntFile: (outDir, mode, seed) => path.join(outDir, `hunt-${mode}${mode.startsWith("grid") ? "" : `-seed${seed}`}.json`),
+  },
+  fingerprint_fields: ["engine", "engine_version", "torch_version", "numpy_version", "python_version", "platform", "physics_timestep_s", "control_dt_s", "control_decimation", "threads", "policy_backend", "uv_lock_sha256"],
+  failure_classes: G1_ENVELOPE.failure_classes,
+  failure_outcomes: ["FELL"],
+  conclusive_outcomes: ["FELL", "SURVIVED"],
+  severity: { proxy: "pelvis_impact_speed_mps", units: "m/s" },
+  replay_renderer: "g1-3d",
+  nominal_scenario: g1.NOMINAL_SCENARIO as unknown as Scenario,
+  checkAdmissible: g1.checkAdmissible,
+  isDuplicate: g1.isDuplicate,
+  scenarioDistance: g1.scenarioDistance,
+  severityBand: g1.severityBand,
+  rangePosition: g1.rangePosition,
+  // The policy is one TorchScript file pinned by digest and checked at load time, so the sha256 of
+  // those bytes is what a claim is bound to: a real fall of one checkpoint cannot be sold under another.
+  subjectOf: (run) => ({ id: String(run?.target?.policy?.policy_id ?? run?.target_id ?? ""), hash: String(run?.target?.policy?.policy_file_sha256 ?? "") }),
+  claimFromRun: (run) => {
+    const m = (run?.metrics ?? {}) as Record<string, unknown>;
+    const sev = run?.severity as { value?: unknown } | null | undefined;
+    const value = typeof sev?.value === "number" ? sev.value : typeof m.pelvis_impact_speed_mps === "number" ? (m.pelvis_impact_speed_mps as number) : null;
+    return {
+      outcome: String(run?.outcome ?? "UNKNOWN"),
+      failure_class: String(m.primary_failure_class ?? run?.outcome ?? "UNKNOWN"),
+      severity_proxy: "pelvis_impact_speed_mps",
+      severity_value: value,
+      severity_units: "m/s",
+      moment_t_s: typeof m.fall_time_s === "number" ? (m.fall_time_s as number) : null,
+      severity_band: g1.severityBand(value).band,
+    };
+  },
+  changedConditions: (scn) =>
+    (g1.PARAM_ORDER as readonly string[])
+      .filter((k) => Number(scn[k]) !== Number((g1.NOMINAL_SCENARIO as Record<string, number>)[k]))
+      .map((k) => ({ parameter: k, nominal: (g1.NOMINAL_SCENARIO as Record<string, number>)[k], value: Number(scn[k]), unit: g1.ENVELOPE[k].unit })),
+  reproduceCommand: (scn) => `uv run python -m tailbazaar_sim.g1.cli --out OUT run --name finding --scenario '${JSON.stringify(scn)}'`,
+  /** Speed ceiling, the humanoid's construction with this scene's own numbers: the largest velocity
+   *  change the push axis can impart to the lightest admissible body, plus the fastest anything can be
+   *  moving after accelerating at (1 + mu_max) g over the simulator's 100 m divergence bound, plus a
+   *  free fall from the top of the standing robot (the publisher's 0.793 m pelvis height plus the head's
+   *  reach above the pelvis, both read off the run's own scene block). About 76 m/s; an honest fall
+   *  peaks near 4 m/s, and a teleport of one body length inside one 20 ms frame implies more than 60. */
+  replayLimitsFrom: (run) => {
+    const scene = (run?.scene ?? {}) as Record<string, unknown>;
+    const mass = Number.isFinite(Number(scene.total_mass_kg)) ? Number(scene.total_mass_kg) : g1.TOTAL_MASS_KG;
+    const z0 = Number.isFinite(Number(scene.pelvis_z0_m)) ? Number(scene.pelvis_z0_m) : g1.PELVIS_Z0_M;
+    const head = Number.isFinite(Number(scene.head_reach_above_pelvis_m)) ? Number(scene.head_reach_above_pelvis_m) : g1.HEAD_REACH_ABOVE_PELVIS_M;
+    const muMax = g1.ENVELOPE.floor_friction.max;
+    const jMax = g1.ENVELOPE.push_impulse_ns.max;
+    const scaleMin = g1.ENVELOPE.body_mass_scale.min;
+    const dvPush = jMax / (mass * scaleMin);
+    const aMax = (1 + muMax) * GRAVITY_MPS2;
+    const hStand = z0 + head;
+    const ceiling = dvPush + Math.sqrt(2 * aMax * SIM_POSITION_BOUND_M) + Math.sqrt(2 * GRAVITY_MPS2 * hStand);
+    const { dt_s, max_span_s } = timingFrom(run ?? {}, 0.02, 15);
+    return {
+      dt_s, max_span_s,
+      speed_ceiling_mps: ceiling,
+      position_bound_m: SIM_POSITION_BOUND_M,
+      derivation: `J_max/(m*s_min) + sqrt(2*(1+mu_max)*g*d_max) + sqrt(2*g*h_stand) with J_max=${jMax} N*s (largest impulse the published envelope admits), m=${mass} kg and s_min=${scaleMin} (lightest admissible body), mu_max=${muMax} (largest surface friction the envelope admits), g=${GRAVITY_MPS2} m/s^2, d_max=${SIM_POSITION_BOUND_M} m (the simulator's divergence bound) and h_stand=${hStand.toFixed(3)} m (the publisher's initial pelvis height plus the head's reach above the pelvis, both from the run's own scene)`,
+    };
+  },
+  normalizeHunt: (doc) => normalizeHunt(doc, "pelvis_impact_speed_mps", ["FELL"]),
+  claimKind: "the walking policy falls over under admissible conditions inside the published envelope",
+};
+
+export const TARGETS: Record<TargetId, TargetSpec> = { cart: CART, humanoid: HUMANOID, arm: ARM, g1: G1 };
+export const TARGET_IDS: TargetId[] = ["cart", "humanoid", "arm", "g1"];
 export const DEFAULT_TARGET: TargetId = "cart";
 
 export function isTargetId(x: unknown): x is TargetId {

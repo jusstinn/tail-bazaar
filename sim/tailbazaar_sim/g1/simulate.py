@@ -386,6 +386,16 @@ def run_scenario(scenario: dict[str, Any], record_frames: bool = True) -> dict[s
             data.ctrl[:] = policy_mod.pd_torque(applied_target, q, dq)
             mujoco.mj_step(model, data)
             counter += 1
+        # After mj_step the derived quantities (xpos, xquat, cvel, the contact list) still describe the
+        # pose BEFORE the last integration: MuJoCo computes them at the top of the step. Recompute them
+        # from the state now in qpos/qvel so the recorded frames, the impact speed and the contact list
+        # are the same instant the predicate reads. These four stages touch neither the state nor the
+        # solver's warmstart (mj_forward would), and the next mj_step overwrites them with identical
+        # values, so the trajectory is exactly the publisher's runner's.
+        mujoco.mj_kinematics(model, data)
+        mujoco.mj_comPos(model, data)
+        mujoco.mj_comVel(model, data)
+        mujoco.mj_collision(model, data)
 
         # --- the policy, exactly where deploy_mujoco.py evaluates it ---------------------------
         obs = np.zeros(policy_mod.NUM_OBS, dtype=np.float32)
@@ -447,12 +457,16 @@ def run_scenario(scenario: dict[str, Any], record_frames: bool = True) -> dict[s
                 if ob in foot_bids:
                     continue
                 impact_t = float(data.time)
-                impact_body = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, ob)
+                # The 12-dof model folds the torso, arms and head into the pelvis body, so the body name
+                # alone can say "pelvis" when a hand hit the floor; the geom's mesh says which part did.
+                is_mesh = int(model.geom_type[other]) == int(mujoco.mjtGeom.mjGEOM_MESH)
+                mesh_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_MESH, int(model.geom_dataid[other])) if is_mesh else None
+                impact_body = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, ob) + (f"/{mesh_name}" if mesh_name else f"/geom{other}")
                 impact_speed = float(np.linalg.norm(_body_linvel(model, data, pelvis_id)))
                 impact_z = float(data.qpos[2])
                 events.append({
                     "t_s": round(impact_t, 6), "type": "ground_contact",
-                    "body": impact_body, "geom_index": other,
+                    "body": impact_body, "geom_index": other, "geom_mesh": mesh_name,
                     "pelvis_impact_speed_mps": round(impact_speed, 6),
                     "pelvis_z_m": round(impact_z, 6),
                     "after_fall_predicate": True,

@@ -358,13 +358,15 @@ export function createReplay(host: HTMLElement, opts: ReplayOptions): Replay {
 /** The renderer a run's target declares. Unknown ids fall back to the cart, which is the renderer
  *  every record written before the marketplace became multi-target implies. */
 export function rendererFor(id: string | undefined | null): SceneRenderer {
-  return id === "humanoid-3d" ? HUMANOID : id === "arm-3d" ? ARM : CART;
+  return id === "humanoid-3d" ? HUMANOID : id === "arm-3d" ? ARM : id === "g1-3d" ? G1 : CART;
 }
 
 import { CART_RENDERER as CART } from "./replay-cart.js";
 import { HUMANOID_RENDERER as HUMANOID } from "./replay-humanoid.js";
 import { ARM_RENDERER as ARM } from "./replay-arm.js";
+import { G1_RENDERER as G1 } from "./replay-g1.js";
 export { CART_RENDERER } from "./replay-cart.js";
 export { HUMANOID_RENDERER } from "./replay-humanoid.js";
 export { ARM_RENDERER } from "./replay-arm.js";
+export { G1_RENDERER } from "./replay-g1.js";
 export const GHOST_LANE_OFFSET_M = CART.ghostLaneOffset;
