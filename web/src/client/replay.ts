@@ -27,6 +27,7 @@ const SLOW_WINDOW_S = 0.22;   // sim seconds either side of the failure moment
 const SLOW_FACTOR = 0.18;     // played at ~1/5 speed through it
 const FREEZE_S = 0.65;        // wall seconds held the first time the playhead crosses the moment
 const RING_GROW_S = 0.5;      // sim seconds for the contact ring to expand
+const LEAD_MAX_M = 0.4;       // how far the surviving run may lead the purchased subject in the framing
 
 export type Anchor = { x: number; y: number; z: number };
 
@@ -143,6 +144,8 @@ export type Replay = {
   setTime(t: number): void; play(): void; pause(): void; toggle(): boolean; playThrough(from: number, to: number): void;
   setSpeed(s: number): void; setMode(m: ViewMode): void; mode(): ViewMode; duration: number; time(): number;
   isPlaying(): boolean; onTime(cb: (t: number) => void): void; visibility(): Visibility[]; snapshot(t: number, width?: number): string; dispose(): void;
+  /** Camera state of the purchased-run viewport, for capture tooling and framing checks. */
+  debug(): { t: number; anchor: Anchor; cam: { pos: number[]; look: number[] }; cameraPos: number[]; aspect: number; fov: number; size: number[] };
 };
 
 export type ReplayOptions = {
@@ -218,11 +221,19 @@ export function createReplay(host: HTMLElement, opts: ReplayOptions): Replay {
    *  what makes them comparable — and the two subjects stay inside one frame. */
   function anchor(): Anchor {
     const each = tracks.map((tr) => R.anchor(tr.frames, Math.min(t, tr.duration)));
-    return { x: Math.max(...each.map((a) => a.x)), y: each[FAILURE].y, z: each[FAILURE].z };
+    // The surviving run may lead the framing, but only by so much: the purchased subject is the
+    // evidence, and once the humanoid is down the ghost keeps walking away from it.
+    const xf = each[FAILURE].x;
+    const lead = Math.max(...each.map((a) => a.x)) - xf;
+    return { x: xf + Math.min(Math.max(lead, 0), LEAD_MAX_M), y: each[FAILURE].y, z: each[FAILURE].z };
   }
 
   function draw(): void {
-    const w = renderer.domElement.width, h = renderer.domElement.height;
+    // Viewport and scissor are given in CSS pixels: three.js multiplies them by the pixel ratio
+    // itself. Passing the drawing buffer's size here doubled them on a Retina display, and the
+    // visible canvas then showed the bottom-left quarter of the intended frame at twice the size.
+    const pr = renderer.getPixelRatio();
+    const w = renderer.domElement.width / pr, h = renderer.domElement.height / pr;
     const shown = activeTracks();
     const a = anchor();
     const cam = R.camera(a);
@@ -291,7 +302,9 @@ export function createReplay(host: HTMLElement, opts: ReplayOptions): Replay {
     isPlaying: () => playing,
     mode: () => mode,
     setMode(m) { if (m !== mode) { mode = m; applyMode(); firstDraw = true; } },
-    setTime(v) { t = Math.min(Math.max(v, 0), duration); stopAt = null; listeners.forEach((cb) => cb(t)); },
+    // A jump in time snaps the camera and draws at once: a scrub must show its frame even where the
+    // animation loop is throttled (a background tab, a headless capture), not on the next tick.
+    setTime(v) { t = Math.min(Math.max(v, 0), duration); stopAt = null; firstDraw = true; draw(); listeners.forEach((cb) => cb(t)); },
     play() { if (t >= duration) { t = 0; frozeOnce = false; } playing = true; last = performance.now(); },
     pause() { playing = false; stopAt = null; },
     toggle() { playing ? this.pause() : this.play(); return playing; },
@@ -302,6 +315,8 @@ export function createReplay(host: HTMLElement, opts: ReplayOptions): Replay {
       frozeOnce = t > (momentAt ?? Infinity);
       playing = true;
       last = performance.now();
+      firstDraw = true;
+      draw();
       listeners.forEach((cb) => cb(t));
     },
     setSpeed(s) { speed = s; },
@@ -333,6 +348,10 @@ export function createReplay(host: HTMLElement, opts: ReplayOptions): Replay {
       return url;
     },
     dispose() { cancelAnimationFrame(raf); ro.disconnect(); renderer.dispose(); wrap.remove(); },
+    debug() {
+      const a = anchor(); const cam = R.camera(a); const c = tracks[FAILURE].camera;
+      return { t, anchor: a, cam: { pos: [...cam.pos], look: [...cam.look] }, cameraPos: [c.position.x, c.position.y, c.position.z], aspect: c.aspect, fov: c.fov, size: [renderer.domElement.width, renderer.domElement.height] };
+    },
   };
 }
 

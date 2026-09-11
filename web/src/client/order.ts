@@ -376,7 +376,9 @@ function replayDuration(pkg: Pkg): number {
 function mountReplay(host: HTMLElement, baseline: RunLike, failureRun: RunLike, pkg: Pkg, p: FailurePresentation, view: TargetView): void {
   const viewport = host.querySelector<HTMLElement>("#viewport")!;
   try {
+    // exposed for the headless capture tooling and framing checks; it holds no private data beyond the page's own
     replay = createReplay(viewport, { renderer: view.renderer, baseline, failure: failureRun, failureFrames: pkg.replay.frames, presentation: p, mode: "overlay", reducedMotion: reducedMotion(), baselineLabel: view.baselineLabel, failureLabel: view.failureLabel });
+    (window as unknown as { tbReplay?: unknown }).tbReplay = replay;
   } catch (e) {
     viewport.innerHTML = `<div class="note bad">The 3D replay is unavailable in this browser (${esc((e as Error)?.message ?? e)}). The recorded transforms are still in the package; every metric and hash below is unaffected.</div>`;
     host.querySelector(".timeline")?.remove();
