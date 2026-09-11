@@ -60,9 +60,22 @@ function findingCard(l: Listing, order: Order | undefined, drive: Drive): string
       <div class="finding-buy"><button class="btn small" data-buy="${esc(l.listing_id)}" ${drive.ok ? "" : "disabled"}>Buy for ${esc(eth(l.price_wei))}</button>${drive.ok ? "" : `<span class="muted">${esc(drive.note)}</span>`}</div>
     </div>`;
   }
-  return `<a class="finding reveal" data-target="${esc(t)}" href="#/orders/${esc(order?.order_id ?? "")}" ${order ? "" : 'aria-disabled="true"'}>${inner}
-    <span class="finding-go">${order ? "Open the finding" : "No order yet"} <i>→</i></span>
-  </a>`;
+  // A card is a div, never an anchor: the seller address and the on-chain status inside it are links
+  // on a public chain, and an anchor inside an anchor makes the browser split the card apart. The
+  // whole card still opens the finding through a delegated click (wireCards).
+  const href = order ? `#/orders/${esc(order.order_id)}` : "";
+  return `<div class="finding reveal${order ? " is-link" : ""}" data-target="${esc(t)}" ${order ? `data-href="${href}" role="link" tabindex="0"` : 'aria-disabled="true"'}>${inner}
+    ${order ? `<a class="finding-go" href="${href}">Open the finding <i>→</i></a>` : `<span class="finding-go">No order yet <i>→</i></span>`}
+  </div>`;
+}
+
+/** Whole-card navigation for settled findings, unless the click landed on an inner link or button. */
+function wireCards(root: ParentNode): void {
+  root.querySelectorAll<HTMLElement>(".finding.is-link[data-href]").forEach((card) => {
+    const go = () => { location.hash = card.dataset.href!; };
+    card.addEventListener("click", (e) => { if ((e.target as HTMLElement).closest("a, button")) return; go(); });
+    card.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+  });
 }
 
 /** HOSTED MODE: the operator token that unlocks the Buy and List buttons. Same storage as the order
@@ -139,7 +152,7 @@ export async function renderMarket(view: HTMLElement, st: Status, opts: { showFl
           <div class="metric reveal"><div class="metric-v">${counter(listings.length, "", 0)}</div><div class="metric-k">findings listed</div><div class="metric-n">across ${esc(shown.length)} robot${shown.length === 1 ? "" : "s"}</div></div>
           <div class="metric reveal"><div class="metric-v">${counter(market.search_cost_total.simulations, "", 0)}</div><div class="metric-k">simulations run by hunters</div><div class="metric-n">${esc(market.search_cost_total.hunts)} sweeps, ${esc(market.search_cost_total.sim_steps.toLocaleString())} physics steps</div></div>
           <div class="metric reveal"><div class="metric-v">${counter(settledTotal, "", 0)}</div><div class="metric-k">valid settlements</div><div class="metric-n">on-chain counter for this seller</div></div>
-          <div class="metric reveal"><div class="metric-v">${counter(priceEth, "ETH", 3)}</div><div class="metric-k">price per finding</div><div class="metric-n">${esc(st.chain_label)}</div></div>
+          <div class="metric reveal"><div class="metric-v">${counter(priceEth, "ETH", priceEth > 0 && priceEth < 0.001 ? 4 : 3)}</div><div class="metric-k">price per finding</div><div class="metric-n">${esc(st.chain_label)}</div></div>
         </div>
       </div>
     </section>`;
@@ -220,7 +233,7 @@ export async function renderMarket(view: HTMLElement, st: Status, opts: { showFl
         <div class="stat-strip">
           <div class="metric reveal"><div class="metric-v">${counter(listings.length, "", 0)}</div><div class="metric-k">findings listed</div><div class="metric-n">across ${esc(shown.length)} robot${shown.length === 1 ? "" : "s"}</div></div>
           <div class="metric reveal"><div class="metric-v">${counter(settledTotal, "", 0)}</div><div class="metric-k">valid settlements</div><div class="metric-n">on-chain counter for this seller</div></div>
-          <div class="metric reveal"><div class="metric-v">${counter(priceEth, "ETH", 3)}</div><div class="metric-k">price per finding</div><div class="metric-n">${esc(st.chain_label)}</div></div>
+          <div class="metric reveal"><div class="metric-v">${counter(priceEth, "ETH", priceEth > 0 && priceEth < 0.001 ? 4 : 3)}</div><div class="metric-k">price per finding</div><div class="metric-n">${esc(st.chain_label)}</div></div>
         </div>
       </div>
     </section>`;
@@ -238,6 +251,7 @@ export async function renderMarket(view: HTMLElement, st: Status, opts: { showFl
   armPage(view);
   if (mode === "landing") { mountHero(view); wireEnvelopePanes(view); return; }
   wireFilters(view);
+  wireCards(view);
   wireDrive(view, st);
   if (liveFlow && liveFlow.kind === "list") {
     const host = view.querySelector<HTMLElement>(`.live-host[data-live-for="${liveFlow.target_id}"]`);

@@ -297,14 +297,14 @@ export function mountHero(root: HTMLElement): void {
     const lost = (e: Event) => { e.preventDefault(); disposeHero(); };
     renderer.domElement.addEventListener('webglcontextlost', lost);
     if (entrance && hero) {
-        intro = document.createElement('div');
-        intro.className = 'hero-intro';
-        intro.setAttribute('aria-hidden', 'true');
-        intro.innerHTML = '<span class="hero-intro-orbit"><i></i></span><span>TAIL BAZAAR</span>';
-        hero.prepend(intro);
+        // The wordmark overlay that used to sit over the hero during the entrance is gone: on some
+        // layouts it landed at the left edge of the viewport and stayed there. The copy still fades in.
         hero.classList.add('hero-enter');
         host.disabled = true;
         hero.addEventListener('animationend', onEntranceEnd);
+        // If the animationend never reaches us (a throttled tab, a stylesheet that dropped the
+        // animation), finish anyway so the copy is visible and the wave button works.
+        window.setTimeout(() => { if (hero.classList.contains('hero-enter')) finishEntrance(true); }, 2600);
     }
     draw();
     sync();
