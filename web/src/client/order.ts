@@ -60,7 +60,7 @@ async function renderPurchaseInProgress(view: HTMLElement, orderId: string, live
   view.innerHTML = `
     <section class="band hero order-hero">
       <div class="wrap">
-        <div class="eyebrow reveal"><a href="#/">Marketplace</a> <span>/</span> Finding · <span class="mono">${esc(short(orderId, 10, 6))}</span></div>
+        <div class="eyebrow reveal"><a href="#/market">Marketplace</a> <span>/</span> Finding · <span class="mono">${esc(short(orderId, 10, 6))}</span></div>
         <h1 class="display reveal">Buying this finding,<br>one transaction at a time.</h1>
         <p class="lede reveal">A buyer is paying <strong>${esc(eth(l.price_wei))}</strong> into escrow for a sealed ${esc(s.failure_class?.label?.toLowerCase() ?? "failure")} finding on the ${esc(s.target?.label?.toLowerCase() ?? "warehouse cart")} — without seeing the conditions. The steps below land on chain as they happen; the full story of the order takes this page over when they are done.</p>
         <div class="cta-row reveal">
@@ -106,7 +106,7 @@ export async function renderOrder(view: HTMLElement, orderId: string, st: Status
   view.innerHTML = `
     <section class="band hero order-hero">
       <div class="wrap">
-        <div class="eyebrow reveal"><a href="#/">Marketplace</a> <span>/</span> Finding · <span class="mono">${esc(short(o.order_id, 10, 6))}</span></div>
+        <div class="eyebrow reveal"><a href="#/market">Marketplace</a> <span>/</span> Finding · <span class="mono">${esc(short(o.order_id, 10, 6))}</span></div>
         <h1 class="display reveal">${headline}</h1>
         <p class="lede reveal">${lede}</p>
         <div class="cta-row reveal">

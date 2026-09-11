@@ -94,7 +94,10 @@ function targetCard(t: MarketDoc["targets"][number], envs: EnvelopesDoc): string
   </div>`;
 }
 
-export async function renderMarket(view: HTMLElement, st: Status, opts: { showFlow?: Flow | null } = {}): Promise<void> {
+export type MarketMode = "landing" | "market";
+
+export async function renderMarket(view: HTMLElement, st: Status, opts: { showFlow?: Flow | null; mode?: MarketMode } = {}): Promise<void> {
+  const mode: MarketMode = opts.mode ?? "landing";
   const [listings, orders, demo, envs, market, flows] = await Promise.all([
     getJSON<Listing[]>("/api/listings"),
     getJSON<Order[]>("/api/orders"),
@@ -115,7 +118,7 @@ export async function renderMarket(view: HTMLElement, st: Status, opts: { showFl
   const shown = live.length ? live : market.targets;
   const counts = new Map(shown.map((t) => [t.target_id, listings.filter((l) => targetOf(l) === t.target_id).length]));
 
-  view.innerHTML = `
+  const heroHtml = `
     <section class="band hero market-hero">
       <div class="wrap">
         <div class="hero-layout">
@@ -125,7 +128,8 @@ export async function renderMarket(view: HTMLElement, st: Status, opts: { showFl
             <p class="lede reveal">A hunter finds the conditions that break a robot. A verifier reproduces the failure. You buy the recipe sealed — with your payment held in escrow until the delivered evidence matches the seal.</p>
             <div class="hero-targets reveal">${shown.map((t) => `<span class="badge target target-${esc(t.target_id)}">${esc(t.short_label)}</span>`).join("")}<span class="hero-target-note">${esc(shown.length)} robots. Real simulation evidence.</span></div>
             <div class="cta-row reveal">
-              ${firstOrder ? `<a class="btn" href="#/orders/${esc(firstOrder.order_id)}">See a settled finding <span aria-hidden="true">↗</span></a>` : ""}
+              <a class="btn" href="#/market">Browse the marketplace <span aria-hidden="true">→</span></a>
+              ${firstOrder ? `<a class="btn ghost" href="#/orders/${esc(firstOrder.order_id)}">See a settled finding</a>` : ""}
               <a class="btn ghost" href="#/how-it-works">How settlement works</a>
             </div>
           </div>
@@ -138,42 +142,38 @@ export async function renderMarket(view: HTMLElement, st: Status, opts: { showFl
           <div class="metric reveal"><div class="metric-v">${counter(priceEth, "ETH", 3)}</div><div class="metric-k">price per finding</div><div class="metric-n">${esc(st.chain_label)}</div></div>
         </div>
       </div>
-    </section>
-
-    ${band({
+    </section>`;
+  const robotsHtml = `${band({
       id: "robots", eyebrow: "What is on the market", inner: `
       <h2 class="section-title reveal">${esc(countWord(shown.length).replace(/^./, (x) => x.toUpperCase()))} robots. ${esc(countWord(shown.length).replace(/^./, (x) => x.toUpperCase()))} different meanings of "it failed".</h2>
-      <p class="prose reveal">Almost none of these failure classes is invented here. The cart's collision is the simulator's own contact flag; the humanoid's fall is Gymnasium's own health predicate; the arm's <em>not placed</em> is Gymnasium-Robotics' own success flag at its own episode horizon — all read straight off the environment. The two exceptions are stated rather than hidden: the arm's <em>dropped</em> is this project's own predicate, because the environment scores placement and not custody, and the Unitree G1's <em>fell</em> is this project's own predicate too, because Unitree's runner has no fall flag at all — it steps until the clock runs out. Both are mechanical (MuJoCo's own contact list; the pelvis height and tilt the policy itself observes), and the cards below say exactly what they are so a reader can disagree with them on the evidence.</p>
+      <p class="prose reveal">Each robot has its own definition of failure, and its card says who decides it: the simulator, the environment's own predicate, or this project.</p>
       <div class="tcards">${shown.map((t) => targetCard(t, envs)).join("")}</div>
       <p class="fineprint reveal">${esc(market.note)}</p>`,
-    })}
-
-    ${band({
+    })}`;
+  const howHtml = `${band({
       id: "how", eyebrow: "The mechanism", tone: "quiet", inner: `
       <h2 class="section-title reveal">Four steps, no trust in the seller.</h2>
       <ol class="steps">${STEPS.map(([t, d], i) => `<li class="reveal"><span class="step-n">${i + 1}</span><div><h3>${esc(t)}</h3><p>${esc(d)}</p></div></li>`).join("")}</ol>
       <p class="after reveal"><a class="link-go" href="#/how-it-works">What the verifier checks, and what each verdict does to the money <i>→</i></a></p>`,
-    })}
-
-    ${band({
+    })}`;
+  const questionHtml = `${band({
       id: "question", eyebrow: "What this market answers", inner: `
       <div class="seg seg-wide reveal" role="group" aria-label="robot">${shown.map((t, i) => `<button data-env="${esc(t.target_id)}" class="${i === 0 ? "on" : ""}">${esc(t.short_label)}</button>`).join("")}</div>
       ${shown.map((t, i) => {
         const env = envelopeFor(envs, t.target_id);
         return `<div class="envpane" data-env="${esc(t.target_id)}"${i === 0 ? "" : " hidden"}>
           <blockquote class="pull reveal">${esc(env.product_question)}</blockquote>
-          <p class="prose reveal">Its author documented the conditions it was built for. The hunter searches a deliberately <em>wider</em> range. So a finding outside those conditions is not a claim that it is broken where it was designed to work — it is a measured boundary of how far the operating range can be widened before it stops working.</p>
+          <p class="prose reveal">The controller's author states the conditions it was built for. The hunter searches a wider range. A finding outside the stated conditions is a measured boundary, not a claim that the controller is broken where it was designed to work.</p>
           ${rangeBars(env, null)}
           <p class="fineprint reveal">Source: ${esc(env.controller_tuned_range.source)}. ${esc(env.note)}</p>
         </div>`;
       }).join("")}`,
-    })}
-
-    ${band({
+    })}`;
+  const findingsHtml = `${band({
       id: "findings", eyebrow: "Findings for sale", tone: "quiet", inner: `
       <h2 class="section-title reveal">What a buyer can see before paying.</h2>
-      <p class="prose reveal">The robot, the failure class, the version hash of the controller or policy checkpoint, the envelope, the verifier's verdict and method, a coarse severity band and the seller's settled-order history. The exact conditions, the trajectory, the replay frames and the hunt that found it stay in the private package.</p>
-      <p class="prose reveal">Every unsold finding has a <strong>Buy</strong> button, and every robot a <strong>List a new finding</strong> button: each runs the real agents against the chain while you watch, one transaction at a time.</p>
+      <p class="prose reveal">Before paying, a buyer sees the robot, the failure class, the policy's version hash, the verdict, a coarse severity band, the price and the seller's settled history. The conditions, the trajectory and the replay stay sealed until the escrow settles.</p>
+      <p class="prose reveal"><strong>Buy</strong> funds the escrow and runs delivery, retrieval, verification and settlement while you watch. <strong>List a new finding</strong> runs a hunt and the verifier's re-run, then registers the listing on chain.</p>
       ${tokenBox(st)}
       ${liveFlow && liveFlow.kind === "buy" ? `<p class="prose reveal">A purchase is running right now — <a class="link-go" href="#/orders/${esc(liveFlow.listing_id ?? "")}">watch it on the finding's page <i>→</i></a></p>` : ""}
       ${listings.length === 0 ? `<p class="prose muted reveal">No listings yet — list a finding for a robot below, or run the whole demonstration pipeline further down.</p>` : `
@@ -189,23 +189,21 @@ export async function renderMarket(view: HTMLElement, st: Status, opts: { showFl
           ${mine.length ? `<div class="findings">${mine.map((l) => findingCard(l, orders.find((o) => o.listing_id === l.listing_id), drive)).join("")}</div>` : `<p class="tgroup-empty reveal">No findings listed for this robot yet.</p>`}
         </div>`;
       }).join("")}`,
-    })}
-
-    ${band({
+    })}`;
+  const pipelineHtml = `${band({
       id: "pipeline", eyebrow: "Run it yourself", inner: `
       <h2 class="section-title reveal">The whole workflow, end to end, on this machine.</h2>
-      <p class="prose reveal">The seller, verifier and buyer agents run server-side against <strong>${esc(st.chain_label)}</strong>: a bounded hunt over each robot's envelope with that robot's own simulator, verification by re-simulation, listings registered on chain for every target, a buyer that shops target by target under a budget, and settlement. One delivery is deliberately tampered so the refund path is visible too.</p>
+      <p class="prose reveal">Runs every robot end to end on <strong>${esc(st.chain_label)}</strong>: hunt, verify, list, buy, deliver, settle. Every transaction is real.</p>
       <div class="row reveal">
         <button id="run-demo" class="btn" ${st.demo_trigger_enabled ? "" : "disabled"}>Run the pipeline</button>
         <span id="demo-state" class="muted">${demo.run ? `last run ${esc(short(demo.run.run_id, 10, 6))} — ${esc(demo.run.status)}` : "no run yet"}</span>
       </div>
       ${disclosure("Show the pipeline log", `<pre id="demo-log" class="log">${demo.run ? esc(demo.run.log.map((l) => l.msg).join("\n")) : "no run yet"}</pre>`, demo.log_redacted ? "operator only on this host" : "every step the agents took")}`,
-    })}
-
-    ${band({
+    })}`;
+  const beliefHtml = `${band({
       eyebrow: "Read this before you believe any of it", tone: "quiet", inner: `
       <div class="two-col">
-        <p class="prose reveal">Adversarially selected failures do not estimate real-world failure frequency. The physics is a simplified cart, a 42 kg Gymnasium mannequin, a mocap-welded Fetch arm carrying a 5 cm cube and Unitree's own 12-dof MuJoCo model of the G1, all in illustrative envelopes; severity is an uncalibrated kinematic proxy, and simulation needs calibration against physical robots before it can support an underwriting decision. Two of the three pretrained policy checkpoints — the humanoid's and the arm's — declare no licence, and neither does any alternative that was checked; the G1's is BSD-3-Clause from Unitree and is vendored with its licence text. Nothing here is audited, Sybil-resistant or production-ready.</p>
+        <p class="prose reveal">Adversarially selected failures do not estimate real-world failure frequency. The physics is uncalibrated research simulation. Nothing here is a safety certification, and the contract is unaudited.</p>
         <div>
           ${disclosure("Show who holds which key", `<p class="prose">In this demonstration all three role keys are test-only keys held by the server: verifier ${addrCell(st.roles.verifier, st.chain_mode)}, seller ${addrCell(st.roles.seller, st.chain_mode)}, buyer ${addrCell(st.roles.buyer, st.chain_mode)}. A deployed version keeps only the verifier key server-side; buyers and sellers sign with their own wallets, and automated spending is bounded by per-key budgets, an allowlist of contracts and selectors, and rate limits.</p><p class="prose">Mode: ${esc(st.mode)}</p>`)}
           ${disclosure("Show provenance", `<dl class="facts"><dt>Escrow</dt><dd>${st.escrow_address ? addrCell(st.escrow_address, st.chain_mode) : "not configured"}</dd><dt>Chain</dt><dd>${esc(st.chain_label)}</dd><dt>Envelopes</dt><dd class="mono">${esc((st.provenance.envelope_ids ?? [st.provenance.envelope_id]).join(", "))} · ${esc(short(st.provenance.envelope_config_hash, 14, 6))}</dd><dt>Build</dt><dd class="mono">${esc(st.provenance.git_sha ? short(st.provenance.git_sha, 10, 0) : "unknown")}${st.provenance.git_dirty ? " (dirty)" : ""}</dd><dt>Captured</dt><dd class="mono">${esc(st.provenance.captured_at)}</dd></dl>`)}
@@ -213,14 +211,37 @@ export async function renderMarket(view: HTMLElement, st: Status, opts: { showFl
       </div>`,
     })}`;
 
+  const marketHead = `
+    <section class="band hero market-head">
+      <div class="wrap">
+        <div class="eyebrow reveal">Marketplace</div>
+        <h1 class="display reveal">Findings for sale.</h1>
+        <p class="lede reveal">Sealed failure scenarios for ${esc(shown.length)} robots. Buy one and watch the escrow settle, or list a new one and watch the verifier re-run it.</p>
+        <div class="stat-strip">
+          <div class="metric reveal"><div class="metric-v">${counter(listings.length, "", 0)}</div><div class="metric-k">findings listed</div><div class="metric-n">across ${esc(shown.length)} robot${shown.length === 1 ? "" : "s"}</div></div>
+          <div class="metric reveal"><div class="metric-v">${counter(settledTotal, "", 0)}</div><div class="metric-k">valid settlements</div><div class="metric-n">on-chain counter for this seller</div></div>
+          <div class="metric reveal"><div class="metric-v">${counter(priceEth, "ETH", 3)}</div><div class="metric-k">price per finding</div><div class="metric-n">${esc(st.chain_label)}</div></div>
+        </div>
+      </div>
+    </section>`;
+  const teaserHtml = band({
+    id: "go", tone: "quiet", eyebrow: "Findings for sale", inner: `
+      <h2 class="section-title reveal">${esc(listings.length)} sealed findings across ${esc(shown.length)} robots.</h2>
+      <p class="prose reveal">Every unsold finding can be bought from the page, and every robot can be hunted for a new one, with each transaction shown as it lands.</p>
+      <p class="after reveal"><a class="btn" href="#/market">Open the marketplace <span aria-hidden="true">→</span></a></p>`,
+  });
+
+  view.innerHTML = mode === "market"
+    ? marketHead + findingsHtml + pipelineHtml
+    : heroHtml + robotsHtml + teaserHtml + howHtml + questionHtml + beliefHtml;
+
   armPage(view);
-  mountHero(view);
-  wireEnvelopePanes(view);
+  if (mode === "landing") { mountHero(view); wireEnvelopePanes(view); return; }
   wireFilters(view);
   wireDrive(view, st);
   if (liveFlow && liveFlow.kind === "list") {
     const host = view.querySelector<HTMLElement>(`.live-host[data-live-for="${liveFlow.target_id}"]`);
-    if (host) mountLive(host, liveFlow, st, (f) => { renderMarket(view, st, { showFlow: f }).catch(() => {}); });
+    if (host) mountLive(host, liveFlow, st, (f) => { renderMarket(view, st, { showFlow: f, mode }).catch(() => {}); });
   }
 
   const btn = document.getElementById("run-demo") as HTMLButtonElement | null;
@@ -252,7 +273,7 @@ function wireDrive(view: HTMLElement, st: Status): void {
     view.querySelectorAll<HTMLButtonElement>("button[data-list]").forEach((x) => { x.disabled = true; });
     try {
       const r = await postJSON<{ flow_id: string; flow: Flow }>(`/api/targets/${t}/list`, {});
-      mountLive(host, r.flow, st, (f) => { renderMarket(view, st, { showFlow: f }).catch(() => {}); });
+      mountLive(host, r.flow, st, (f) => { renderMarket(view, st, { showFlow: f, mode: "market" }).catch(() => {}); });
     } catch (e) {
       view.querySelectorAll<HTMLButtonElement>("button[data-list]").forEach((x) => { x.disabled = false; });
       host.innerHTML = `<p class="live-note bad">${esc(plainError(e))}</p>`;

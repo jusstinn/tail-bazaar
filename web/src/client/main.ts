@@ -12,7 +12,7 @@ import { armPage, badge } from "./ui.js";
 const view = document.getElementById("view")!;
 let status: Status | null = null;
 
-const NAV: [string, string][] = [["#/", "Marketplace"], ["#/how-it-works", "How it works"]];
+const NAV: [string, string][] = [["#/", "Home"], ["#/market", "Marketplace"], ["#/how-it-works", "How it works"]];
 
 async function loadStatus(): Promise<Status> {
   if (!status) status = await getJSON<Status>("/api/status");
@@ -45,8 +45,9 @@ async function route(): Promise<void> {
   const order = hash.match(/^#\/orders\/(0x[0-9a-fA-F]{64})$/);
   if (order) { paintShell(""); await renderOrder(view, order[1], st); return; }
   if (hash.startsWith("#/how-it-works")) { paintShell("#/how-it-works"); await renderRules(view, st); return; }
+  if (hash.startsWith("#/market")) { paintShell("#/market"); await renderMarket(view, st, { mode: "market" }); return; }
   paintShell("#/");
-  await renderMarket(view, st);
+  await renderMarket(view, st, { mode: "landing" });
 }
 
 function go(): void { route().catch(showError); }

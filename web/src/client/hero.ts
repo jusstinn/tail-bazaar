@@ -3,26 +3,26 @@ import * as T from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 export function heroMarkup(): string {
     return `<figure class="robot-study" aria-label="Illustrative humanoid robot motion study">
-    <div class="study-heading"><span>FIG. 01 / HUMANOID STUDY</span><span class="study-live"><i></i>FORM + MOTION</span></div>
+    <div class="study-heading"><span>FIG. 01 / HUMANOID STUDY</span><span class="study-live"><i></i>TAP TO WAVE</span></div>
     <div class="study-stage">
       <svg class="study-fallback" viewBox="0 0 460 480" aria-hidden="true">
         <g fill="none" stroke="#c6c0b5"><ellipse cx="230" cy="412" rx="155" ry="40"/><path d="M48 412h364M230 50v398" stroke-dasharray="4 6"/></g>
         <g fill="#eeebe4" stroke="#77736b" stroke-width="2" stroke-linejoin="round"><rect x="201" y="62" width="58" height="63" rx="20"/><path d="M207 136h46l24 28-15 97h-64l-15-97z"/><rect x="210" y="259" width="40" height="28" rx="8"/><path d="m187 158-25 5-19 77 20 5 24-56m86-31 25 5 19 77-20 5-24-56M150 248l-9 68 17 2 11-68m131-2 9 68-17 2-11-68M200 285l-9 62 25 3 11-63m7 0 11 63 25-3-9-62M193 356l-7 55h31l1-56m28 0 1 56h31l-7-55"/></g>
         <path d="M212 87h36" stroke="#403f3a" stroke-width="12" stroke-linecap="round"/><circle cx="231" cy="185" r="7" fill="#bb703a"/>
-      </svg><div class="study-render" aria-hidden="true"></div>
-      <span class="study-annotation study-annotation-top">01 — articulated form</span><span class="study-annotation study-annotation-bottom">02 — balance in motion</span>
+      </svg><button type="button" class="study-render" aria-label="Make the robot wave" disabled></button>
+      <span class="study-annotation study-annotation-top">01 — tap to say hello</span><span class="study-annotation study-annotation-bottom">02 — balance in motion</span>
     </div>
     <div class="study-controls"><div class="study-modes" role="group" aria-label="Robot appearance"><button type="button" data-study-mode="solid" aria-pressed="true">Solid</button><button type="button" data-study-mode="sketch" aria-pressed="false">Sketch</button></div><button type="button" class="study-pause" aria-label="Pause robot animation">Pause <span aria-hidden="true">Ⅱ</span></button></div>
     <figcaption>Procedural motion study · illustrative, not a simulation replay</figcaption>
   </figure>`;
 }
 let cleanup: (() => void) | undefined;
-// Greet once per page load, rather than every time the visitor returns from a finding.
-let greeted = false;
+// Play the entrance once per page load; taps can request another greeting at any time.
+let entered = false;
 export function disposeHero(): void { cleanup?.(); cleanup = undefined; }
 export function mountHero(root: HTMLElement): void {
     disposeHero();
-    const host = root.querySelector<HTMLElement>('.study-render'), figure = root.querySelector<HTMLElement>('.robot-study');
+    const host = root.querySelector<HTMLButtonElement>('.study-render'), figure = root.querySelector<HTMLElement>('.robot-study');
     if (!host || !figure)
         return;
     const pause = figure.querySelector<HTMLButtonElement>('.study-pause')!;
@@ -43,7 +43,9 @@ export function mountHero(root: HTMLElement): void {
     renderer.toneMappingExposure = 1.2;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = T.PCFSoftShadowMap;
+    renderer.domElement.setAttribute('aria-hidden', 'true');
     host.append(renderer.domElement);
+    host.disabled = false;
     figure.classList.add('study-ready');
     const scene = new T.Scene(), camera = new T.PerspectiveCamera(30, 1, .1, 50);
     // The replay changes the global default to z-up. Keep this study explicitly y-up.
@@ -152,7 +154,12 @@ export function mountHero(root: HTMLElement): void {
     ring.rotation.x = -Math.PI / 2;
     ring.castShadow = false;
     const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-    let greetingEnabled = !greeted && !reduced.matches;
+    const hero = root.querySelector<HTMLElement>('.market-hero');
+    const entrance = !!hero && !entered && !reduced.matches;
+    entered = true;
+    let waveStart: number | null = null;
+    let queuedWave = false, restAfterWave = false;
+    let intro: HTMLElement | null = null;
     let paused = reduced.matches, visible = true, disposed = false, raf = 0, elapsed = 0, previous = 0, pointerX = 0, yaw = 0;
     function draw(): void {
         const sway = Math.sin(elapsed * .85);
@@ -174,13 +181,14 @@ export function mountHero(root: HTMLElement): void {
         // Ease the right arm up, give three small waves, then blend back into the idle pose.
         // Uses the animation clock so pausing, a hidden tab, or scrolling offscreen also pauses
         // the greeting. No timers or additional animation loops survive navigation.
-        if (greetingEnabled && elapsed < 3.8) {
-            const lift = T.MathUtils.smoothstep(elapsed, .25, 1.05);
-            const lower = 1 - T.MathUtils.smoothstep(elapsed, 2.95, 3.8);
+        const waveTime = waveStart === null ? -1 : elapsed - waveStart;
+        if (waveTime >= 0 && waveTime < 3.8) {
+            const lift = T.MathUtils.smoothstep(waveTime, .25, 1.05);
+            const lower = 1 - T.MathUtils.smoothstep(waveTime, 2.95, 3.8);
             const blend = lift * lower;
-            const waveWindow = T.MathUtils.smoothstep(elapsed, 1.05, 1.3)
-                * (1 - T.MathUtils.smoothstep(elapsed, 2.7, 2.95));
-            const wave = Math.sin((elapsed - 1.05) * Math.PI * 3.2) * waveWindow;
+            const waveWindow = T.MathUtils.smoothstep(waveTime, 1.05, 1.3)
+                * (1 - T.MathUtils.smoothstep(waveTime, 2.7, 2.95));
+            const wave = Math.sin((waveTime - 1.05) * Math.PI * 3.2) * waveWindow;
             const arm = arms[1];
             arm.shoulder.rotation.z = T.MathUtils.lerp(arm.shoulder.rotation.z, .95, blend);
             arm.shoulder.rotation.x = T.MathUtils.lerp(arm.shoulder.rotation.x, -.18, blend);
@@ -188,7 +196,6 @@ export function mountHero(root: HTMLElement): void {
             arm.elbow.rotation.z = (1.8 + wave * .16) * blend;
             arm.wrist.rotation.z = wave * .25 * blend;
             head.rotation.z = -.055 * blend;
-            if (blend > 0) greeted = true;
         } else {
             head.rotation.z = 0;
         }
@@ -196,24 +203,65 @@ export function mountHero(root: HTMLElement): void {
         robot.rotation.y = -.18 + yaw;
         renderer.render(scene, camera);
     }
-    function frame(now: number): void { raf = 0; if (disposed || paused || !visible || document.hidden) {
-        previous = 0;
-        return;
-    } if (previous)
-        elapsed += Math.min((now - previous) / 1000, .05); previous = now; draw(); raf = requestAnimationFrame(frame); }
-    function sync(): void {
+    function paintPause(): void {
         pause.innerHTML = paused ? 'Play <span aria-hidden="true">▷</span>' : 'Pause <span aria-hidden="true">Ⅱ</span>';
         pause.setAttribute('aria-label', paused ? 'Play robot animation' : 'Pause robot animation');
+    }
+    function frame(now: number): void {
+        raf = 0;
+        if (disposed || paused || !visible || document.hidden) { previous = 0; return; }
+        if (previous) elapsed += Math.min((now - previous) / 1000, .05);
+        previous = now;
+        if (waveStart !== null && elapsed - waveStart >= 3.8) {
+            waveStart = queuedWave ? elapsed : null;
+            queuedWave = false;
+            if (waveStart === null && restAfterWave) {
+                paused = true;
+                restAfterWave = false;
+                paintPause();
+            }
+        }
+        draw();
+        if (!paused) raf = requestAnimationFrame(frame);
+    }
+    function sync(): void {
+        paintPause();
         cancelAnimationFrame(raf);
         raf = 0;
         previous = 0;
-        if (!paused && visible && !document.hidden && !disposed)
-            raf = requestAnimationFrame(frame);
+        if (!paused && visible && !document.hidden && !disposed) raf = requestAnimationFrame(frame);
     }
-    const onPause = () => { paused = !paused; sync(); };
+    function finishEntrance(greet: boolean): void {
+        hero?.removeEventListener('animationend', onEntranceEnd);
+        hero?.querySelectorAll('.reveal').forEach(node => node.classList.add('in'));
+        hero?.classList.remove('hero-enter');
+        intro?.remove();
+        intro = null;
+        host!.disabled = false;
+        if (greet && !reduced.matches) waveStart = elapsed;
+    }
+    function onEntranceEnd(event: AnimationEvent): void {
+        if (event.animationName === 'hero-content-in' && event.target === hero?.querySelector('.stat-strip')) finishEntrance(true);
+    }
+    const onWave = () => {
+        // Coalesce taps during a gesture into one more full wave, without snapping the raised arm.
+        if (waveStart !== null) queuedWave = true;
+        else waveStart = elapsed;
+        // Explicitly requested motion is allowed, but return to rest if the visitor had paused it
+        // or requested reduced motion. A click never permanently opts them into idle animation.
+        restAfterWave ||= paused || reduced.matches;
+        paused = false;
+        sync();
+    };
+    const onPause = () => { paused = !paused; restAfterWave = false; sync(); };
     const onMotion = () => {
         paused = reduced.matches;
-        if (reduced.matches) { greetingEnabled = false; draw(); }
+        if (reduced.matches) {
+            finishEntrance(false);
+            waveStart = null;
+            queuedWave = restAfterWave = false;
+            draw();
+        }
         sync();
     };
     const onPointer = (e: PointerEvent) => {
@@ -228,6 +276,7 @@ export function mountHero(root: HTMLElement): void {
         modes.forEach(button => button.setAttribute('aria-pressed', String((button.dataset.studyMode === 'sketch') === sketch)));
         draw();
     };
+    host.addEventListener('click', onWave);
     pause.addEventListener('click', onPause);
     modes.forEach(b => b.addEventListener('click', onMode));
     host.addEventListener('pointermove', onPointer);
@@ -247,6 +296,16 @@ export function mountHero(root: HTMLElement): void {
     intersection.observe(figure);
     const lost = (e: Event) => { e.preventDefault(); disposeHero(); };
     renderer.domElement.addEventListener('webglcontextlost', lost);
+    if (entrance && hero) {
+        intro = document.createElement('div');
+        intro.className = 'hero-intro';
+        intro.setAttribute('aria-hidden', 'true');
+        intro.innerHTML = '<span class="hero-intro-orbit"><i></i></span><span>TAIL BAZAAR</span>';
+        hero.prepend(intro);
+        hero.classList.add('hero-enter');
+        host.disabled = true;
+        hero.addEventListener('animationend', onEntranceEnd);
+    }
     draw();
     sync();
     cleanup = () => {
@@ -254,6 +313,8 @@ export function mountHero(root: HTMLElement): void {
         cancelAnimationFrame(raf);
         resize.disconnect();
         intersection.disconnect();
+        finishEntrance(false);
+        host.removeEventListener('click', onWave);
         pause.removeEventListener('click', onPause);
         modes.forEach(b => b.removeEventListener('click', onMode));
         host.removeEventListener('pointermove', onPointer);
@@ -272,6 +333,7 @@ export function mountHero(root: HTMLElement): void {
         renderer.dispose();
         renderer.domElement.remove();
         figure.classList.remove('study-ready');
+        host.disabled = true;
         pause.disabled = true;
         modes.forEach(b => b.disabled = true);
     };

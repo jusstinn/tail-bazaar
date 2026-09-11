@@ -20,7 +20,8 @@ orders**, one of them deliberately refunded. Open these six tabs:
 
 | # | Tab | URL |
 |---|---|---|
-| 1 | Marketplace | `http://127.0.0.1:3100/#/` |
+| 1 | Landing page (hero, robots, mechanism) | `http://127.0.0.1:3100/#/` |
+| 1b | Marketplace (the listings, Buy and List buttons) | `http://127.0.0.1:3100/#/market` |
 | 2 | Cart finding, valid | `#/orders/<cart order that SETTLED_VALID>` |
 | 3 | Cart finding, refunded | `#/orders/<cart order that SETTLED_INVALID>` |
 | 4 | Humanoid finding | `#/orders/<humanoid order>` |
@@ -35,7 +36,7 @@ finding page autoplays through its own failure when it loads.
 
 ---
 
-## 0:00 — the sentence (tab 1, top of the marketplace)
+## 0:00 — the sentence (tab 1, top of the landing page)
 
 The hero reads **"Every robot has a breaking point."** next to the animated humanoid; let it wave once, then say:
 
@@ -162,9 +163,9 @@ Open the G1 finding. The replay opens before the shove and plays through the fal
 > mannequin: one tick of latency, an 8 newton-second shove. Same market, two very different robots,
 > and the market prices exactly that difference."
 
-## 3:00 — buy one yourself (tab 1, marketplace) — *the market, live*
+## 3:00 — buy one yourself (tab 1b, the Marketplace tab) — *the market, live*
 
-Click **List a new finding** under the warehouse cart. The live panel shows the hunter searching, the
+Open the Marketplace tab (or click **Browse the marketplace** on the landing page). Click **List a new finding** under the warehouse cart. The live panel shows the hunter searching, the
 verifier re-running the finding and the listing being registered on chain (about 30 s on anvil).
 
 > "A seller's hunter just found a new failure. The verifier reproduced it in its own simulator and
@@ -178,7 +179,7 @@ escrow settling and the seller withdrawing (about 15 s on anvil).
 > "Every one of those was a real transaction. The money left the buyer's wallet before it saw anything,
 > and reached the seller only after the verifier confirmed the bytes matched the seal."
 
-## 3:50 — close (tab 1, the limits band)
+## 3:50 — close (tab 1, the landing page's last band)
 
 > "Why a market at all? The team that tuned a controller for 40 milliseconds of sensor delay is the
 > team that never tests 200. The team that would test payload mass is the team that finds 48 out of
