@@ -74,6 +74,21 @@ test("hosted mode: every private-data route refuses an unauthenticated request",
   hosted(false);
 });
 
+test("hosted mode: the pipeline log is operator-only, its run status stays public", async () => {
+  getDb().prepare("INSERT OR REPLACE INTO pipeline_runs(run_id, started_at, status, log) VALUES (?,?,?,?)")
+    .run("run-test", new Date().toISOString(), "done", JSON.stringify([{ ts: "t", msg: "seller: re-ran finding-1: COLLISION, impact 0.414745 m/s, trajectory 0xdeadbeef" }]));
+  assert.match(JSON.stringify(await (await app.request("/api/demo/status")).json()), /0.414745/, "local mode shows the full log");
+  hosted(true);
+  const doc = (await (await app.request("/api/demo/status")).json()) as any;
+  assert.equal(doc.log_redacted, true);
+  assert.deepEqual(doc.run.log, []);
+  assert.equal(doc.run.status, "done", "the run status is still public");
+  process.env.OPERATOR_TOKEN = "op";
+  assert.match(JSON.stringify(await (await app.request("/api/demo/status", auth("op"))).json()), /0.414745/, "the operator still sees the log");
+  delete process.env.OPERATOR_TOKEN;
+  hosted(false);
+});
+
 test("hosted mode: the buyer session issued by the signed-challenge retrieval unlocks the package", async () => {
   const session = issueSession(ORDER, BUYER);
   hosted(true);

@@ -171,7 +171,17 @@ export function buildApp() {
     }
   });
 
-  app.get("/api/demo/status", (c) => c.json({ enabled: demoTriggerEnabled, run: pipelineStatus() }));
+  // The pipeline log is the demo's "show your work" panel. It carries no package bytes, scenario
+  // parameters or salts, but it does print a finding's exact impact speed and trajectory hash (and,
+  // for a REJECTED submission, the admissibility problem, which names a parameter value). That is
+  // finer-grained than the public summary, so in hosted mode the log itself is operator-only; the run
+  // id and status stay public so the page still shows whether a run is in progress.
+  app.get("/api/demo/status", (c) => {
+    const run = pipelineStatus();
+    const access = privateAccess(c, null, true);
+    if (run && !access.ok) return c.json({ enabled: demoTriggerEnabled, run: { ...run, log: [], error: null }, log_redacted: true });
+    return c.json({ enabled: demoTriggerEnabled, run });
+  });
   app.post("/api/demo/run", async (c) => {
     if (!demoTriggerEnabled) return c.json({ error: "demo trigger disabled on this host" }, 403);
     // Not a data leak, but in hosted mode it spends the operator's test ETH and writes to the chain.

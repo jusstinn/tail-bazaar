@@ -129,7 +129,7 @@ scripts/export-abi.sh                  # contracts/out -> web/abi/FailureEscrow.
 scripts/anvil-start.sh                 # anvil on :8545, funds the three test addresses (local ether)
 scripts/local-deploy.sh                # writes ESCROW_ADDRESS_LOCAL into .env
 scripts/local-flow.sh                  # whole state machine with cast (valid + invalid), before any web code
-(cd web && npm ci && npm run build && npm test)                       # 22 unit tests (canonical JSON, envelope,
+(cd web && npm ci && npm run build && npm test)                       # 23 unit tests (canonical JSON, envelope,
                                        # hosted-mode auth, verifier evidence binding; the last group re-runs the
                                        # simulator, so uv must be on PATH — no chain and no keys needed)
 (cd web && npm run demo -- --reset --evidence ../evidence/local)      # seller -> verifier -> chain -> buyer, 2 orders
@@ -149,7 +149,7 @@ The UI has a "Run pipeline" button that does what `npm run demo` does, with a li
 - Simulator: nominal suite 6/6 SUCCESS (clearance 0.318–0.394 m, target 0.40 ± 0.15); grid hunt 144
   runs, 101 SUCCESS, 43 COLLISION, 0 inconclusive; bitwise repeatability across in-process and
   subprocess runs in the pinned environment (`evidence/milestone/repeatability-*.json`).
-- Web: 22 unit tests — canonical JSON (byte-identical re-serialization of Python-written run files and
+- Web: 23 unit tests — canonical JSON (byte-identical re-serialization of Python-written run files and
   reproduction of their trajectory hashes), envelope and the published tuned range (which cannot drift
   from `controller.py` or `sim/envelope.yaml` without failing), hosted-mode access control, and the
   verifier's evidence binding (a mislabelled controller and altered replay frames behind an intact
@@ -268,13 +268,14 @@ no operator path exists and only buyer sessions open anything.
 | `GET /api/runs/baseline` (a full recorded trajectory) | open | any live buyer session, or operator token; otherwise **401** |
 | `POST /api/retrieve` | signed challenge | signed challenge (unchanged) |
 | `POST /api/demo/run` (spends the operator's test ETH) | open unless `DEMO_TRIGGER_ENABLED=0` | **operator token only** |
+| `GET /api/demo/status` (pipeline log: a finding's exact impact speed and trajectory hash) | full log | run id and status stay public, **the log is operator-only** |
 | listings, orders, events, verifier checks, `GET /api/envelope`, status, balances | public projections only | unchanged |
 
 The gate is `privateAccess()` in `web/src/server/index.ts`; every route in that file was audited
 against it. The browser keeps a pasted token in `localStorage` and sends it as a bearer header to this
 app only; the order page shows an "authentication required" panel instead of the replay when it has
-none (`evidence/ui/hosted-reveal-locked.png`). Eight tests cover this
-(seven in `web/src/server/__tests__/hosted-auth.test.ts`, plus one end-to-end case in the integration suite):
+none (`evidence/ui/hosted-reveal-locked.png`). Nine tests cover this
+(eight in `web/src/server/__tests__/hosted-auth.test.ts`, plus one end-to-end case in the integration suite):
 unauthenticated reveal → 401 with no bytes in the body, junk token → 401, session bound to another
 order → 401, expired session → 401, operator token → 200, and the same reveal → 200 once a real signed
 retrieval hands back a session. `DEMO_BUYER_CONSOLE=0` removes the reveal route entirely.

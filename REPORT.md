@@ -88,7 +88,10 @@ was chosen: the same signed-challenge buyer session used by the retrieval route*
 Audit of every route in `web/src/server/index.ts`: `/api/orders/:id/reveal` (package bytes) and
 `/api/runs/baseline` (a full recorded trajectory) are the two that could return private data; both are
 now behind `privateAccess()`. `POST /api/demo/run` is operator-only in hosted mode because it spends
-the operator's test ETH. Everything else returns public projections only (`publicListing` /
+the operator's test ETH, and `GET /api/demo/status` keeps its run id and status public but serves the
+pipeline **log** only to the operator: the log carries no parameters, bytes or salts, but it prints a
+finding's exact impact speed and trajectory hash, which is finer-grained than the public summary.
+Everything else returns public projections only (`publicListing` /
 `publicOrder` / the verifier's public summary / the published envelope), which the integration suite
 asserts. Verified against a running server, not only in tests:
 
@@ -98,6 +101,7 @@ asserts. Verified against a running server, not only in tests:
 | `GET /api/orders/<id>/reveal` (no header) | **401**, body carries no package bytes |
 | `GET /api/runs/baseline` (no header) | **401** |
 | `POST /api/demo/run` (no header) | **401** |
+| `GET /api/demo/status` (no header) | 200 with `log_redacted: true`, empty log |
 | `GET /api/orders/<id>/reveal` with the operator token | **200**, 125 038 bytes |
 | `GET /api/listings` | 0 occurrences of `sensor_delay_ms`, `floor_friction`, `salt_hex` |
 
@@ -169,7 +173,7 @@ docstring.
 | Command | Result |
 |---|---|
 | `cd contracts && forge test` | **22 passed, 0 failed** (unchanged; no contract source was touched) |
-| `cd web && npm test` | **22 passed, 0 failed** (7 pre-existing + 7 hosted-mode access control + 3 verifier evidence binding + 3 published-range/YAML anti-drift + 2 cleanup) |
+| `cd web && npm test` | **23 passed, 0 failed** (7 pre-existing + 8 hosted-mode access control + 3 verifier evidence binding + 3 published-range/YAML anti-drift + 2 cleanup) |
 | `cd web && CHAIN_MODE=local npm run test:integration` | **7 passed, 0 failed** (5 pre-existing + hosted-mode reveal end to end + the published envelope endpoint) |
 | `cd web && npm run demo -- --reset --evidence ../evidence/local` | 144 sims, 43 collisions; order 1 VERIFIED/VALID → seller paid (all six binding checks ok); order 2 tampered → COMMITMENT MISMATCH → recheck → INVALID → buyer refunded; `ledger.json` written (2 findings, VALID 2; delivery verdicts VALID and INVALID) |
 | `npm run ledger` | 2 findings over 144 search simulations, written to `evidence/local/ledger.json` |
