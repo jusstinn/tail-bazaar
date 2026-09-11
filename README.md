@@ -10,7 +10,7 @@
 >
 > **One important limitation.** Adversarially selected failures are not failure frequencies: the hunters are built to find failures, so nothing here says how often anything fails in the field, and the simulations are uncalibrated research models. The contract is unaudited. Full section: [Limitations, stated plainly](#limitations-stated-plainly).
 >
-> **Live:** https://tail.170-9-57-94.sslip.io · **Contract:** `FailureEscrow` at [`0xfadf11662C46c0214B0A40938a26FB8f0CD785A3`](https://sepolia.basescan.org/address/0xfadf11662C46c0214B0A40938a26FB8f0CD785A3) on Base Sepolia (chain id 84532), source verified · **Video script:** `DEMO_SCRIPT.md`.
+> **Live:** https://tailbazaar.duckdns.org (the same host also answers at https://tailbazaar.duckdns.org) · **Contract:** `FailureEscrow` at [`0xfadf11662C46c0214B0A40938a26FB8f0CD785A3`](https://sepolia.basescan.org/address/0xfadf11662C46c0214B0A40938a26FB8f0CD785A3) on Base Sepolia (chain id 84532), source verified · **Video script:** `DEMO_SCRIPT.md`.
 
 > **Read this first.** Adversarially selected failures do not estimate real-world failure frequency.
 > Simulation requires calibration against physical robots before supporting underwriting decisions.
