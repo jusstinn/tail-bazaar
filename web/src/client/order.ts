@@ -22,10 +22,10 @@ const STAGES: [string, string][] = [
 
 const EVENT_STORY: Record<string, string> = {
   verified: "The verifier re-simulated the claim in its own pinned environment and accepted it.",
-  registered: "The verifier registered the listing on chain, sealing the commitment to the evidence and the terms of the sale.",
-  funded: "The buyer's agent funded the escrow with the exact price — still without seeing the scenario.",
+  registered: "The verifier registered the listing on chain. That sealed the commitment to the evidence and the terms of the sale.",
+  funded: "The buyer's agent funded the escrow with the exact price, still without seeing the scenario.",
   delivered: "The seller marked the package delivered and served the bytes.",
-  retrieved: "The buyer signed a single-use challenge with the key the escrow records as the buyer, and retrieved the package.",
+  retrieved: "The buyer signed a single-use challenge with the key the escrow records as the buyer. Then it retrieved the package.",
   recheck_requested: "The buyer disputed the delivery. This emits an event and moves no money.",
   settled_valid: "The verifier settled VALID. The price was credited to the seller.",
   settled_invalid: "The verifier settled INVALID. The full price was credited back to the buyer.",
@@ -62,7 +62,7 @@ async function renderPurchaseInProgress(view: HTMLElement, orderId: string, live
       <div class="wrap">
         <div class="eyebrow reveal"><a href="#/market">Marketplace</a> <span>/</span> Finding · <span class="mono">${esc(short(orderId, 10, 6))}</span></div>
         <h1 class="display reveal">Buying this finding,<br>one transaction at a time.</h1>
-        <p class="lede reveal">A buyer is paying <strong>${esc(eth(l.price_wei))}</strong> into escrow for a sealed ${esc(s.failure_class?.label?.toLowerCase() ?? "failure")} finding on the ${esc(s.target?.label?.toLowerCase() ?? "warehouse cart")} — without seeing the conditions. The steps below land on chain as they happen; the full story of the order takes this page over when they are done.</p>
+        <p class="lede reveal">A buyer is paying <strong>${esc(eth(l.price_wei))}</strong> into escrow for a sealed ${esc(s.failure_class?.label?.toLowerCase() ?? "failure")} finding on the ${esc(s.target?.label?.toLowerCase() ?? "warehouse cart")}. It has not seen the conditions. The steps below land on chain as they happen, and the full order takes over this page when they are done.</p>
         <div class="cta-row reveal">
           ${badge(s.target?.label ?? "Warehouse cart", "target target-" + esc(targetId))}
           ${badge(st.chain_mode === "testnet" ? "Base Sepolia" : "Local anvil", st.chain_mode === "testnet" ? "testnet" : "local")}
@@ -100,8 +100,8 @@ export async function renderOrder(view: HTMLElement, orderId: string, st: Status
 
   const headline = valid ? tv.headline : "The seller delivered bytes<br>that did not match the seal.";
   const lede = valid
-    ? `A hunter agent found conditions inside the published operating range where this ${esc(s.target?.subject_label?.toLowerCase() ?? "controller")} fails, and a verifier re-ran them with the same simulator and agreed. A buyer paid <strong>${esc(eth(l.price_wei))}</strong> into escrow before being allowed to look at any of it. Everything below is what happened next, in the order it happened.`
-    : `A buyer paid <strong>${esc(eth(l.price_wei))}</strong> into escrow for this finding. What the seller then served did not hash to the commitment registered on chain, so the verifier settled the order invalid and the escrow refunded the buyer in full. This is the refund path, demonstrated deliberately.`;
+    ? `A hunter agent found conditions inside the published operating range where this ${esc(s.target?.subject_label?.toLowerCase() ?? "controller")} fails. A verifier re-ran them with the same simulator and agreed. A buyer paid <strong>${esc(eth(l.price_wei))}</strong> into escrow before it was allowed to look, and the stages below are what happened next, in order.`
+    : `A buyer paid <strong>${esc(eth(l.price_wei))}</strong> into escrow for this finding, and the seller then served bytes that did not hash to the commitment registered on chain. The verifier settled INVALID and the escrow refunded the buyer in full. This is the refund path, demonstrated deliberately.`;
 
   view.innerHTML = `
     <section class="band hero order-hero">
@@ -124,7 +124,7 @@ export async function renderOrder(view: HTMLElement, orderId: string, st: Status
     <nav class="rail" id="rail"><div class="wrap">${STAGES.map(([id, t], i) => `<button data-goto="stage-${id}"><span>${i + 1}</span>${esc(t)}</button>`).join("")}</div></nav>
 
     ${band({ id: "stage-claim", inner: `
-      ${stageHead("claim", 1, "The sealed claim", `This is everything the buyer was allowed to see before paying. It names the robot, what failed and who decides that, the version hash of the ${esc((s.target?.subject_label ?? "controller").toLowerCase())} and the verdict — and deliberately says nothing that would let anyone reconstruct the scenario.`)}
+      ${stageHead("claim", 1, "The sealed claim", "Everything the buyer could see before paying, and nothing that would let anyone reconstruct the scenario.")}
       <div class="two-col">
         <div>
           ${facts([
@@ -141,7 +141,7 @@ export async function renderOrder(view: HTMLElement, orderId: string, st: Status
         <div>
           <h3 class="sub reveal">What stayed hidden until payment</h3>
           <p class="prose reveal">${esc(s.hidden)}.</p>
-          <p class="prose reveal">The buyer knew the question it was buying an answer to — <em>${esc(ctx.question)}</em> — and that the ${esc(ctx.controller_tuned_range_label ?? "range it was tuned for")} is ${esc(ctx.controller_tuned_range)} while the hunter searched ${esc(ctx.searched_envelope)}. Those two ranges are the same for every listing of this robot, so stating them reveals nothing about this one.</p>
+          <p class="prose reveal">The buyer also knew the question it was buying an answer to: <em>${esc(ctx.question)}</em>. It knew the ${esc(ctx.controller_tuned_range_label ?? "range it was tuned for")} is ${esc(ctx.controller_tuned_range)}, and that the hunter searched ${esc(ctx.searched_envelope)}. Both ranges are the same for every listing of this robot, so stating them reveals nothing about this one.</p>
           ${disclosure("Show the sealed summary and its hashes", `${facts([
             ["Commitment", `<span class="mono">${esc(l.commitment)}</span><div class="sub-mono">keccak256 of the canonical private package, which carries a random 32-byte salt</div>`],
             ["Terms hash", `<span class="mono">${esc(l.terms_hash)}</span><div class="sub-mono">keccak256 of this public summary; listing id = keccak256(commitment ‖ terms hash)</div>`],
@@ -154,7 +154,7 @@ export async function renderOrder(view: HTMLElement, orderId: string, st: Status
       </div>` })}
 
     ${band({ id: "stage-purchase", tone: "quiet", inner: `
-      ${stageHead("purchase", 2, "The purchase", "The buyer's agent funded the escrow with the exact price. From that moment two deadlines were fixed and could not be changed by anyone.")}
+      ${stageHead("purchase", 2, "The purchase", "The buyer's agent funded the escrow with the exact price, which fixed two deadlines nobody could change.")}
       <div class="two-col">
         <div>${facts([
           ["Buyer", addrCell(o.buyer, o.chain_mode)],
@@ -164,7 +164,7 @@ export async function renderOrder(view: HTMLElement, orderId: string, st: Status
         ])}</div>
         <div>
           <p class="prose reveal">${o.on_chain?.delivery_deadline
-            ? `The seller had until <strong>${esc(when(new Date(o.on_chain.delivery_deadline * 1000).toISOString()))}</strong> to deliver, and the verifier until <strong>${esc(when(new Date(o.on_chain.settlement_deadline! * 1000).toISOString()))}</strong> to settle. If either had gone quiet, anyone could have called <span class="mono">claimTimeout</span> after the deadline and the buyer would have been refunded in full.`
+            ? `The seller had until <strong>${esc(when(new Date(o.on_chain.delivery_deadline * 1000).toISOString()))}</strong> to deliver. The verifier had until <strong>${esc(when(new Date(o.on_chain.settlement_deadline! * 1000).toISOString()))}</strong> to settle. Had either gone quiet, anyone could have called <span class="mono">claimTimeout</span> after the deadline and the buyer would have been refunded in full.`
             : `Both deadlines are fixed at funding from the contract's immutable windows. If either party goes quiet, anyone may call <span class="mono">claimTimeout</span> after the deadline and the buyer is refunded in full.`}</p>
           <p class="prose reveal"><a class="link-go" href="#/how-it-works">Why silence resolves in the buyer's favour <i>→</i></a></p>
         </div>
@@ -176,8 +176,8 @@ export async function renderOrder(view: HTMLElement, orderId: string, st: Status
 
     ${band({ id: "stage-evidence", inner: `
       ${stageHead("evidence", 4, "The evidence", valid
-        ? "The verifier checked the delivered bytes against the commitment it had registered on chain, and the buyer checked them independently. Both agreed."
-        : "The verifier checked the delivered bytes against the commitment it had registered on chain. They did not match, and the buyer's own check reached the same conclusion.")}
+        ? "Verifier and buyer each checked the delivered bytes against the commitment the verifier registered on chain. Both agreed."
+        : "The delivered bytes did not match the commitment the verifier registered on chain. The buyer's own check reached the same conclusion.")}
       <div class="verdict-strip reveal">
         <div class="vs-side"><div class="vs-label">Verifier</div>${o.delivery_check ? `<div class="vs-v ${o.delivery_check.valid ? "ok" : "bad"}">${o.delivery_check.valid ? "VALID" : "INVALID"}</div><p class="prose">${esc(o.delivery_check.reason)}</p>` : `<div class="vs-v">pending</div>`}</div>
         <div class="vs-side"><div class="vs-label">Buyer's own check</div>${o.buyer_check ? `<div class="vs-v ${o.buyer_check.ok ? "ok" : "bad"}">${o.buyer_check.ok ? "PASSED" : "FAILED"}</div><p class="prose">${esc(o.buyer_check.reason)}</p>` : `<div class="vs-v">pending</div>`}</div>
@@ -192,8 +192,8 @@ export async function renderOrder(view: HTMLElement, orderId: string, st: Status
 
     ${band({ id: "stage-settlement", tone: "quiet", inner: `
       ${stageHead("settlement", 5, "The settlement", valid
-        ? `The verifier settled valid. The escrow credited the seller, who withdrew the payment. The buyer keeps the evidence.`
-        : `The verifier settled invalid. The escrow credited the buyer, who withdrew a full refund. The seller was paid nothing and the buyer does not get the package.`)}
+        ? `The verifier settled VALID. The escrow credited the seller, who withdrew the payment, and the buyer keeps the evidence.`
+        : `The verifier settled INVALID. The escrow credited the buyer, who withdrew a full refund. The seller was paid nothing and the buyer does not get the package.`)}
       <ol class="story">${events.map((e) => `<li class="reveal">
         <div class="story-dot"></div>
         <div class="story-body">
@@ -239,8 +239,8 @@ async function renderRevealStage(host: HTMLElement, o: Order, env: EnvelopeDoc, 
   if (!o.revealed_in_buyer_console) {
     host.innerHTML = `${stageHead("reveal", 3, "The reveal", valid
       ? "This order's package was not retrieved by the buyer agent on this instance, so there is nothing to replay here."
-      : "No package was retrieved for this order on this instance, and a refunded order cannot be retrieved afterwards: once the escrow settles invalid, the delivery route refuses the buyer's signature. The buyer paid, the delivery failed the verifier's check, and the money came back.")}
-      <div class="sealed reveal"><div class="sealed-mark">sealed</div><p class="prose">The private package for this order is not served. What anyone can still read is the public summary, every check the verifier ran, and the complete on-chain record below.</p></div>`;
+      : "No package was retrieved for this order on this instance, and a refunded order cannot be retrieved afterwards.")}
+      <div class="sealed reveal"><div class="sealed-mark">sealed</div>${valid ? "" : `<p class="prose">Once the escrow settles INVALID, the delivery route refuses the buyer's signature. The buyer paid, the delivery failed the verifier's check, and the money came back.</p>`}<p class="prose">The private package for this order is not served. Still public: the summary, every check the verifier ran, and the complete on-chain record below.</p></div>`;
     armPage(host);
     return;
   }
@@ -257,16 +257,17 @@ async function renderRevealStage(host: HTMLElement, o: Order, env: EnvelopeDoc, 
 /** HOSTED MODE: the paid evidence is not public. Only the buyer session issued by a signed-challenge
  *  retrieval (or the operator token) unlocks it, and the token is held by this browser alone. */
 function renderLocked(host: HTMLElement, o: Order, env: EnvelopeDoc): void {
-  host.innerHTML = `${stageHead("reveal", 3, "The reveal", "This instance is hosted at a public URL, so the paid evidence is not served to anonymous visitors. The exact conditions, the recorded trajectory, the replay frames and the salt stay closed until you prove you are this order's buyer.")}
+  host.innerHTML = `${stageHead("reveal", 3, "The reveal", "This instance is hosted at a public URL, so the paid evidence is not served to anonymous visitors.")}
     <div class="locked reveal">
       <div class="locked-head">${badge("authentication required", "bad")}</div>
-      <p class="prose">Unlock it with the <strong>buyer session</strong> the retrieval route hands back — <span class="mono">POST /api/challenges</span>, sign the message with the buyer key, <span class="mono">POST /api/retrieve</span> returns the token in the <span class="mono">x-tb-session</span> header — or with the operator token, if the operator of this host configured one.</p>
+      <p class="prose">The exact conditions, the recorded trajectory, the replay frames and the salt stay closed until you prove you are this order's buyer.</p>
+      <p class="prose">Unlock it with the <strong>buyer session</strong> the retrieval route hands back, or with the operator token if the operator of this host configured one. To get a session: <span class="mono">POST /api/challenges</span>, sign the message with the buyer key, then <span class="mono">POST /api/retrieve</span> returns the token in the <span class="mono">x-tb-session</span> header.</p>
       <div class="row">
         <input id="tok" type="password" placeholder="paste session or operator token" autocomplete="off">
         <button id="tok-go" class="btn">Unlock</button>
         ${getToken() ? `<button id="tok-clear" class="btn ghost">Forget stored token</button>` : ""}
       </div>
-      <p class="fineprint">The token stays in this browser and is sent to this app only. Public either way: the summary, every verifier check, the on-chain record, and both published ranges — ${esc(env.controller_tuned_range.prose)} versus a searched envelope of ${esc(env.searched_envelope.prose)}.</p>
+      <p class="fineprint">The token stays in this browser and is sent to this app only. Public either way: the summary, every verifier check, the on-chain record, and both published ranges. Those are ${esc(env.controller_tuned_range.prose)} versus a searched envelope of ${esc(env.searched_envelope.prose)}.</p>
     </div>`;
   armPage(host);
   const input = document.getElementById("tok") as HTMLInputElement;
@@ -294,11 +295,12 @@ function searchCostBlock(pkg: Pkg, p: FailurePresentation): string {
   if (!h) return "";
   const k = h.counts.by_class?.[p.class_id];
   const cost = h.search_cost;
-  const rate = cost.simulations > 0 && typeof k === "number" ? ` — ${((k / cost.simulations) * 100).toFixed(0)} % of the sweep` : "";
+  const rate = cost.simulations > 0 && typeof k === "number" ? `, ${((k / cost.simulations) * 100).toFixed(0)} % of the sweep` : "";
   return `<div class="searchcost reveal">
     <div class="sc-head">What this finding cost to find</div>
-    <p class="prose">The hunter ran <strong>${esc(cost.simulations)} simulations</strong> in this sweep${typeof k === "number" ? `, and <strong>${esc(k)}</strong> of them produced <span class="mono">${esc(p.class_id)}</span>${rate}` : ""}. ${esc(cost.sim_steps.toLocaleString())} physics steps, ${esc(cost.wall_time_s)} s of wall time, ${esc(h.distinct_findings)} distinct findings after the duplicate rule and ${esc(h.near_duplicates)} near-duplicates dropped. Search mode <span class="mono">${esc(h.mode)}</span>, hunter <span class="mono">${esc(h.id)}</span>.</p>
-    <p class="fineprint">This is an aggregate over the whole sweep, published after purchase. It says nothing about which conditions were tried: a count of simulations narrows no scenario. Adversarially selected failures are not failure frequencies — this ratio describes the hunter's search, not how often anything fails in the field.</p>
+    <p class="prose">The hunter ran <strong>${esc(cost.simulations)} simulations</strong> in this sweep${typeof k === "number" ? `, and <strong>${esc(k)}</strong> of them produced <span class="mono">${esc(p.class_id)}</span>${rate}` : ""}. That took ${esc(cost.sim_steps.toLocaleString())} physics steps and ${esc(cost.wall_time_s)} s of wall time. It left ${esc(h.distinct_findings)} distinct findings after the duplicate rule, with ${esc(h.near_duplicates)} near-duplicates dropped.</p>
+    <p class="prose">Search mode <span class="mono">${esc(h.mode)}</span>, hunter <span class="mono">${esc(h.id)}</span>.</p>
+    <p class="fineprint">This aggregate over the whole sweep is published after purchase and says nothing about which conditions were tried: a count of simulations narrows no scenario. Adversarially selected failures are not failure frequencies. This ratio describes the hunter's search, not how often anything fails in the field.</p>
   </div>`;
 }
 
@@ -322,8 +324,8 @@ function renderReveal(host: HTMLElement, pkg: Pkg, baseline: RunLike, o: Order, 
 
   const honest = o.delivery_check ? o.delivery_check.valid : true;
   const revealLede = honest
-    ? `This is the run the buyer paid for, played back from the body transforms recorded when it was simulated. Nothing is re-simulated in your browser. <strong>${esc(p.sentence)}</strong>`
-    : `These are the bytes the seller actually served. They do <strong>not</strong> hash to the commitment registered on chain, so the verifier refused them and the buyer was refunded — what follows is the rejected delivery, not certified evidence. It is played back from its own recorded transforms; nothing is re-simulated in your browser.`;
+    ? `The run the buyer paid for, played back from the body transforms recorded when it was simulated. Nothing is re-simulated in your browser. <strong>${esc(p.sentence)}</strong>`
+    : `These are the bytes the seller actually served, and they do <strong>not</strong> hash to the commitment registered on chain. The verifier refused them and the buyer was refunded, so this is the rejected delivery, not certified evidence. It is played back from its own recorded transforms; nothing is re-simulated in your browser.`;
   // A reader who opens the public URL cold gets this order's evidence without a token. Say so on the
   // page, next to the evidence itself, so nobody mistakes a published fixture for a hole in the gate.
   const fixtureNote = o.public_demo_fixture
@@ -377,15 +379,15 @@ function renderReveal(host: HTMLElement, pkg: Pkg, baseline: RunLike, o: Order, 
       <div>
         <h3 class="sub reveal">What was different</h3>
         ${changedChips(pkg)}
-        <p class="prose reveal">${view.narrate(pkg, baseline, p)}</p>
+        ${view.narrate(pkg, baseline, p)}
         ${p.quantities.length || p.severity_quantities.length ? `<p class="fineprint reveal">Recorded at ${esc(p.moment_label)}: ${p.quantities.map((q) => `${esc(q.label)} ${esc(q.text)}`).join(" · ")}${p.severity_moment ? `; at ${esc(p.severity_label)}: ${p.severity_quantities.map((q) => `${esc(q.label)} ${esc(q.text)}`).join(" · ")}` : ""}${p.attributes.length ? ` · ${p.attributes.map((a) => `${esc(a.label)} ${esc(a.value)}`).join(" · ")}` : ""}. Failure class <span class="mono">${esc(p.classes.join(", "))}</span>, read from the run document.</p>` : ""}
-        ${p.also.length ? `<p class="prose reveal">This run failed in more than one way. ${p.also.map((a) => `<strong>${esc(a.label)}</strong>${a.t_s !== null ? ` at <span class="mono">${num(a.t_s, 3)} s</span>` : ""}`).join(", ")} — marked on the timeline above alongside ${esc(p.moment_label)}.</p>` : ""}
+        ${p.also.length ? `<p class="prose reveal">This run failed in more than one way. Also marked on the timeline above, alongside ${esc(p.moment_label)}: ${p.also.map((a) => `<strong>${esc(a.label)}</strong>${a.t_s !== null ? ` at <span class="mono">${num(a.t_s, 3)} s</span>` : ""}`).join(", ")}.</p>` : ""}
       </div>
       <div>
         <h3 class="sub reveal">Where this finding sits</h3>
         <p class="prose reveal">${outsideAxes(pkg, env).length === 0
           ? `Every parameter of this scenario is inside the ${esc(env.controller_tuned_range.label)}: this failure is inside its own published assumptions.`
-          : `Outside the ${esc(env.controller_tuned_range.label)} on ${outsideAxes(pkg, env).map((n) => `<span class="mono">${esc(n)}</span>`).join(" and ")}, and inside the published searched envelope on every axis. It is a measured boundary of how far the operating range can be widened — not evidence that it is broken where it was designed to work.`}</p>
+          : `Outside the ${esc(env.controller_tuned_range.label)} on ${outsideAxes(pkg, env).map((n) => `<span class="mono">${esc(n)}</span>`).join(" and ")}, and inside the published searched envelope on every axis. It is a measured boundary of how far the operating range can be widened. It is not evidence that it is broken where it was designed to work.`}</p>
       </div>
     </div>
     ${rangeBars(env, pkg.scenario)}
