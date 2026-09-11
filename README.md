@@ -776,7 +776,7 @@ no operator path exists and only buyer sessions open anything.
 | Route | Local demonstration mode (`PUBLIC_BASE_URL` unset) | Hosted mode |
 |---|---|---|
 | `GET /api/orders/:id/reveal` (package bytes) | open to anyone who can reach the host | buyer session for **that order**, or operator token; otherwise **401** — unless this order id is on the published demonstration list below |
-| `GET /api/runs/baseline` (a full recorded trajectory) | open | any live buyer session, or operator token; otherwise **401** — open when this host publishes any demonstration fixture, because it is the surviving run their replay draws behind the failure |
+| `GET /api/runs/baseline` (a full recorded trajectory) | open | any live buyer session, or operator token; otherwise **401** — open for the *robots* whose fixtures this host publishes, and only those, because it is the surviving run their replay draws behind the failure |
 | `POST /api/retrieve` | signed challenge | signed challenge (unchanged) |
 | `POST /api/demo/run` (spends the operator's test ETH) | open unless `DEMO_TRIGGER_ENABLED=0` | **operator token only** |
 | `GET /api/demo/status` (pipeline log: a finding's exact impact speed and trajectory hash) | full log | run id and status stay public, **the log is operator-only** |
@@ -812,8 +812,9 @@ reader earned access. The shape of the exception is deliberately narrow:
 - it is **per order id**, checked against the published list — a listed order returns 200 with
   `x-access-via: public-demo-fixture`, and **every other order still returns 401** with nothing of the
   package in the body;
-- it opens the reveal route and the nominal baseline run, and **nothing else**: the pipeline log stays
-  operator-only and `POST /api/demo/run` still requires the operator token, both asserted by a test;
+- it opens the reveal route and the nominal baseline run **of that robot**, and nothing else: a robot
+  with no published fixture keeps its 401 on the baseline route too, the pipeline log stays
+  operator-only, and `POST /api/demo/run` still requires the operator token — all asserted by tests;
 - the **pre-purchase summary is untouched** — a test compares the sealed summary's keys with fixtures
   published and unpublished and requires them to be identical, because those bytes are what the terms
   hash on chain commits to;

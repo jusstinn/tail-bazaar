@@ -1,25 +1,25 @@
 {
   "order": {
-    "order_id": "0x385db144b62e683dbb74071c9748b7d6c4ff77a2abd3b26865a15950acf42a02",
-    "listing_id": "0x385db144b62e683dbb74071c9748b7d6c4ff77a2abd3b26865a15950acf42a02",
+    "order_id": "0x317f01ebc2886c928b66a8653bbc144429418c564e060d267cb599ac6db00b6f",
+    "listing_id": "0x317f01ebc2886c928b66a8653bbc144429418c564e060d267cb599ac6db00b6f",
     "buyer": "0x1B27C90FcD738E960D3D505682EC2732A08c7f99",
     "price_wei": "1000000000000000",
     "status": "SETTLED_INVALID",
-    "fund_tx": "0xb9d03ff91badb2fff04475b063aed3234cd28031bfb307e3b1dfefbe576792b0",
-    "deliver_tx": "0xcc92d9ddd034981505f7a4281327e80ed7a8f401b00c33207177a7904f433822",
-    "recheck_tx": "0x6ff75304a86ec103ac99b0649e803b11c95e2b49e03e1ff298b7441a4a817d59",
-    "settle_tx": "0x6f4a29e4a9e7bf074d29164154c9c244e78ed4d00544e6f9bd43dd14e18e2eae",
-    "withdraw_tx": "0x898e10e3441cb3f7ab46a7c906d9ae090bd70491ee4174a8edd1ee1c5821c0e9",
+    "fund_tx": "0x45388062182da33339264f635ac161f371a30c82a36ac4b15e8f6f640bd6ca41",
+    "deliver_tx": "0x208e494eb964816520127cfbaf09c3f1c8b74bcc4fc0bd82b4cc3939257cf667",
+    "recheck_tx": "0xd08adb36a52a0a58db4bb5c6e81c413c458408ca95a78075bceafef995b02c3b",
+    "settle_tx": "0x350ff6914351a95b039fc367797ea634b4e063fd35803923db130659e7170eb7",
+    "withdraw_tx": "0x9ef84799eea9d2bbd9a3c01608f3cb990dccf3768e33c2d06c3dce000f92f0c0",
     "timeout_tx": null,
-    "delivery_hash": "0xe6a6fe0f8b9340bb697497294e49486fd78325b1e8b16057e2319956c5462fad",
-    "retrieved_at": "2026-09-11T08:49:26.355Z",
+    "delivery_hash": "0xa709f532adac632f630838456e6d8633a9a8888423381d7d9385fea36363d425",
+    "retrieved_at": "2026-09-11T10:00:25.999Z",
     "delivery_check": {
       "valid": false,
       "verdict": "INVALID",
       "reason": "COMMITMENT MISMATCH: delivered bytes do not hash to the on-chain commitment",
-      "on_chain_commitment": "0xe6a6fe0f8b9340bb697497294e49486fd78325b1e8b16057e2319956c5462fad",
-      "delivered_hash": "0x0e455ef2106c571381dffcfcebafa7e95add529e37049bc9df11b3220e30a2ef",
-      "asserted_delivery_hash": "0xe6a6fe0f8b9340bb697497294e49486fd78325b1e8b16057e2319956c5462fad",
+      "on_chain_commitment": "0xa709f532adac632f630838456e6d8633a9a8888423381d7d9385fea36363d425",
+      "delivered_hash": "0x9c79f406065d032c760984bceed73bb8722fac60ed2e84ae3f3fda7b5ff45eb0",
+      "asserted_delivery_hash": "0xa709f532adac632f630838456e6d8633a9a8888423381d7d9385fea36363d425",
       "checks": [
         {
           "name": "on-chain-status-delivered",
@@ -29,17 +29,17 @@
         {
           "name": "delivered-bytes-present",
           "ok": true,
-          "detail": "144075 bytes"
+          "detail": "144089 bytes"
         },
         {
           "name": "delivered-hash-equals-commitment",
           "ok": false,
-          "detail": "keccak256(delivered) 0x0e455ef2106c... vs on-chain commitment 0xe6a6fe0f8b93..."
+          "detail": "keccak256(delivered) 0x9c79f406065d... vs on-chain commitment 0xa709f532adac..."
         },
         {
           "name": "seller-asserted-hash-honest",
           "ok": false,
-          "detail": "seller asserted 0xe6a6fe0f8b93..."
+          "detail": "seller asserted 0xa709f532adac..."
         },
         {
           "name": "package-content",
@@ -47,18 +47,18 @@
           "detail": "skipped: commitment mismatch"
         }
       ],
-      "checked_at": "2026-09-11T08:49:30.421Z"
+      "checked_at": "2026-09-11T10:00:30.059Z"
     },
     "buyer_check": {
       "ok": false,
       "reason": "delivered package does not hash to the on-chain commitment",
-      "delivered_hash": "0x0e455ef2106c571381dffcfcebafa7e95add529e37049bc9df11b3220e30a2ef",
-      "on_chain_commitment": "0xe6a6fe0f8b9340bb697497294e49486fd78325b1e8b16057e2319956c5462fad",
+      "delivered_hash": "0x9c79f406065d032c760984bceed73bb8722fac60ed2e84ae3f3fda7b5ff45eb0",
+      "on_chain_commitment": "0xa709f532adac632f630838456e6d8633a9a8888423381d7d9385fea36363d425",
       "checks": [
         {
           "name": "hash-equals-on-chain-commitment",
           "ok": false,
-          "detail": "0x0e455ef2106c... vs 0xe6a6fe0f8b93..."
+          "detail": "0x9c79f406065d... vs 0xa709f532adac..."
         },
         {
           "name": "target-subject-and-envelope-match-summary",
@@ -74,18 +74,18 @@
         }
       ]
     },
-    "created_at": "2026-09-11T08:49:22.288Z"
+    "created_at": "2026-09-11T10:00:21.928Z"
   },
   "listing": {
-    "listing_id": "0x385db144b62e683dbb74071c9748b7d6c4ff77a2abd3b26865a15950acf42a02",
+    "listing_id": "0x317f01ebc2886c928b66a8653bbc144429418c564e060d267cb599ac6db00b6f",
     "chain_mode": "local",
     "chain_id": 31337,
     "escrow_address": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3",
     "target_id": "cart",
     "seller": "0x28dAA9F3F9468382fFeD53cc339418403337cDeD",
     "price_wei": "1000000000000000",
-    "commitment": "0xe6a6fe0f8b9340bb697497294e49486fd78325b1e8b16057e2319956c5462fad",
-    "terms_hash": "0x3068116195ebe090db429980bda7f93e8b80a3d1dbe4fa296f723350a5aa0e54",
+    "commitment": "0xa709f532adac632f630838456e6d8633a9a8888423381d7d9385fea36363d425",
+    "terms_hash": "0xa6a87021ba82c21b5c40c40f0994a96e8b63b69b17f6a73c2445b4ba5c52a034",
     "public_summary": {
       "admissible": true,
       "chain": {
@@ -117,7 +117,7 @@
       "price_wei": "1000000000000000",
       "schema": "tb-summary-2",
       "seller": "0x28dAA9F3F9468382fFeD53cc339418403337cDeD",
-      "seller_settled_orders_at_listing": 5,
+      "seller_settled_orders_at_listing": 13,
       "severity": {
         "band": "medium",
         "definition": "impact speed band: low < 0.5 m/s, medium 0.5-1.0 m/s, high > 1.0 m/s (proxy only, not a damage estimate)",
@@ -136,21 +136,21 @@
         "method": "exact-trajectory-hash",
         "status": "VERIFIED",
         "verdict": "VALID",
-        "verified_at": "2026-09-11T08:48:54.413Z",
+        "verified_at": "2026-09-11T09:59:42.988Z",
         "verifier": "0xe592C7DA96Cc42344952C452377eBCc7Cc0982AE",
         "verifier_version": "tb-verifier-2"
       }
     },
     "status": "SETTLED_INVALID",
-    "register_tx": "0xe0ebaefc4b4e722dad4c64e75c0abaca138d60e0ab126e184275227e350a6c89",
-    "created_at": "2026-09-11T08:48:58.431Z",
+    "register_tx": "0x7ef01d5779b61bbed782f0923834fb57be6f54d3478910bda95510a3722580f6",
+    "created_at": "2026-09-11T09:59:47.006Z",
     "demo_note": "LOCAL DEMONSTRATION: the seller agent is configured to deliver a tampered package for this listing"
   },
   "events": [
     {
       "id": 3,
-      "listing_id": "0x385db144b62e683dbb74071c9748b7d6c4ff77a2abd3b26865a15950acf42a02",
-      "ts": "2026-09-11T08:48:58.434Z",
+      "listing_id": "0x317f01ebc2886c928b66a8653bbc144429418c564e060d267cb599ac6db00b6f",
+      "ts": "2026-09-11T09:59:47.010Z",
       "actor": "verifier",
       "kind": "verified",
       "detail": "{\"target\":\"cart\",\"status\":\"VERIFIED\",\"method\":\"exact-trajectory-hash\",\"reason\":\"identical trajectory hash in a matching pinned environment; the controller and the delivered replay frames are bound to the verifier's own re-run, and the frames are a physically possible trajectory of this scene\",\"checks\":24}",
@@ -160,79 +160,79 @@
     },
     {
       "id": 4,
-      "listing_id": "0x385db144b62e683dbb74071c9748b7d6c4ff77a2abd3b26865a15950acf42a02",
-      "ts": "2026-09-11T08:48:58.434Z",
+      "listing_id": "0x317f01ebc2886c928b66a8653bbc144429418c564e060d267cb599ac6db00b6f",
+      "ts": "2026-09-11T09:59:47.010Z",
       "actor": "verifier",
       "kind": "registered",
-      "detail": "{\"seller\":\"0x28dAA9F3F9468382fFeD53cc339418403337cDeD\",\"price_wei\":\"1000000000000000\",\"commitment\":\"0xe6a6fe0f8b9340bb697497294e49486fd78325b1e8b16057e2319956c5462fad\",\"terms_hash\":\"0x3068116195ebe090db429980bda7f93e8b80a3d1dbe4fa296f723350a5aa0e54\",\"block\":10902}",
-      "tx_hash": "0xe0ebaefc4b4e722dad4c64e75c0abaca138d60e0ab126e184275227e350a6c89",
-      "block_number": 10902,
+      "detail": "{\"seller\":\"0x28dAA9F3F9468382fFeD53cc339418403337cDeD\",\"price_wei\":\"1000000000000000\",\"commitment\":\"0xa709f532adac632f630838456e6d8633a9a8888423381d7d9385fea36363d425\",\"terms_hash\":\"0xa6a87021ba82c21b5c40c40f0994a96e8b63b69b17f6a73c2445b4ba5c52a034\",\"block\":15150}",
+      "tx_hash": "0x7ef01d5779b61bbed782f0923834fb57be6f54d3478910bda95510a3722580f6",
+      "block_number": 15150,
       "chain_mode": "local"
     },
     {
-      "id": 9,
-      "listing_id": "0x385db144b62e683dbb74071c9748b7d6c4ff77a2abd3b26865a15950acf42a02",
-      "ts": "2026-09-11T08:49:22.288Z",
+      "id": 13,
+      "listing_id": "0x317f01ebc2886c928b66a8653bbc144429418c564e060d267cb599ac6db00b6f",
+      "ts": "2026-09-11T10:00:21.930Z",
       "actor": "buyer",
       "kind": "funded",
-      "detail": "{\"buyer\":\"0x1B27C90FcD738E960D3D505682EC2732A08c7f99\",\"price_wei\":\"1000000000000000\",\"block\":10925}",
-      "tx_hash": "0xb9d03ff91badb2fff04475b063aed3234cd28031bfb307e3b1dfefbe576792b0",
-      "block_number": 10925,
+      "detail": "{\"buyer\":\"0x1B27C90FcD738E960D3D505682EC2732A08c7f99\",\"price_wei\":\"1000000000000000\",\"block\":15185}",
+      "tx_hash": "0x45388062182da33339264f635ac161f371a30c82a36ac4b15e8f6f640bd6ca41",
+      "block_number": 15185,
       "chain_mode": "local"
     },
     {
-      "id": 10,
-      "listing_id": "0x385db144b62e683dbb74071c9748b7d6c4ff77a2abd3b26865a15950acf42a02",
-      "ts": "2026-09-11T08:49:26.329Z",
+      "id": 14,
+      "listing_id": "0x317f01ebc2886c928b66a8653bbc144429418c564e060d267cb599ac6db00b6f",
+      "ts": "2026-09-11T10:00:25.973Z",
       "actor": "seller",
       "kind": "delivered",
-      "detail": "{\"asserted_delivery_hash\":\"0xe6a6fe0f8b9340bb697497294e49486fd78325b1e8b16057e2319956c5462fad\",\"bytes\":144075,\"tampered_demo\":true,\"block\":10929}",
-      "tx_hash": "0xcc92d9ddd034981505f7a4281327e80ed7a8f401b00c33207177a7904f433822",
-      "block_number": 10929,
+      "detail": "{\"asserted_delivery_hash\":\"0xa709f532adac632f630838456e6d8633a9a8888423381d7d9385fea36363d425\",\"bytes\":144089,\"tampered_demo\":true,\"block\":15189}",
+      "tx_hash": "0x208e494eb964816520127cfbaf09c3f1c8b74bcc4fc0bd82b4cc3939257cf667",
+      "block_number": 15189,
       "chain_mode": "local"
     },
     {
-      "id": 11,
-      "listing_id": "0x385db144b62e683dbb74071c9748b7d6c4ff77a2abd3b26865a15950acf42a02",
-      "ts": "2026-09-11T08:49:26.383Z",
+      "id": 15,
+      "listing_id": "0x317f01ebc2886c928b66a8653bbc144429418c564e060d267cb599ac6db00b6f",
+      "ts": "2026-09-11T10:00:26.024Z",
       "actor": "buyer",
       "kind": "retrieved",
-      "detail": "{\"bytes\":144075,\"signer\":\"0x1B27C90FcD738E960D3D505682EC2732A08c7f99\",\"local_check_ok\":false,\"reason\":\"delivered package does not hash to the on-chain commitment\"}",
+      "detail": "{\"bytes\":144089,\"signer\":\"0x1B27C90FcD738E960D3D505682EC2732A08c7f99\",\"local_check_ok\":false,\"reason\":\"delivered package does not hash to the on-chain commitment\"}",
       "tx_hash": null,
       "block_number": null,
       "chain_mode": "local"
     },
     {
-      "id": 12,
-      "listing_id": "0x385db144b62e683dbb74071c9748b7d6c4ff77a2abd3b26865a15950acf42a02",
-      "ts": "2026-09-11T08:49:30.405Z",
+      "id": 16,
+      "listing_id": "0x317f01ebc2886c928b66a8653bbc144429418c564e060d267cb599ac6db00b6f",
+      "ts": "2026-09-11T10:00:30.045Z",
       "actor": "buyer",
       "kind": "recheck_requested",
-      "detail": "{\"reason\":\"delivered package does not hash to the on-chain commitment\",\"block\":10934}",
-      "tx_hash": "0x6ff75304a86ec103ac99b0649e803b11c95e2b49e03e1ff298b7441a4a817d59",
-      "block_number": 10934,
+      "detail": "{\"reason\":\"delivered package does not hash to the on-chain commitment\",\"block\":15193}",
+      "tx_hash": "0xd08adb36a52a0a58db4bb5c6e81c413c458408ca95a78075bceafef995b02c3b",
+      "block_number": 15193,
       "chain_mode": "local"
     },
     {
-      "id": 13,
-      "listing_id": "0x385db144b62e683dbb74071c9748b7d6c4ff77a2abd3b26865a15950acf42a02",
-      "ts": "2026-09-11T08:49:34.463Z",
+      "id": 17,
+      "listing_id": "0x317f01ebc2886c928b66a8653bbc144429418c564e060d267cb599ac6db00b6f",
+      "ts": "2026-09-11T10:00:34.097Z",
       "actor": "verifier",
       "kind": "settled_invalid",
-      "detail": "{\"reason\":\"COMMITMENT MISMATCH: delivered bytes do not hash to the on-chain commitment\",\"credited_to\":\"0x1B27C90FcD738E960D3D505682EC2732A08c7f99\",\"block\":10938}",
-      "tx_hash": "0x6f4a29e4a9e7bf074d29164154c9c244e78ed4d00544e6f9bd43dd14e18e2eae",
-      "block_number": 10938,
+      "detail": "{\"reason\":\"COMMITMENT MISMATCH: delivered bytes do not hash to the on-chain commitment\",\"credited_to\":\"0x1B27C90FcD738E960D3D505682EC2732A08c7f99\",\"block\":15197}",
+      "tx_hash": "0x350ff6914351a95b039fc367797ea634b4e063fd35803923db130659e7170eb7",
+      "block_number": 15197,
       "chain_mode": "local"
     },
     {
-      "id": 14,
-      "listing_id": "0x385db144b62e683dbb74071c9748b7d6c4ff77a2abd3b26865a15950acf42a02",
-      "ts": "2026-09-11T08:49:38.502Z",
+      "id": 18,
+      "listing_id": "0x317f01ebc2886c928b66a8653bbc144429418c564e060d267cb599ac6db00b6f",
+      "ts": "2026-09-11T10:00:38.136Z",
       "actor": "buyer",
       "kind": "refund_withdrawn",
-      "detail": "{\"amount_wei\":\"1000000000000000\",\"block\":10942}",
-      "tx_hash": "0x898e10e3441cb3f7ab46a7c906d9ae090bd70491ee4174a8edd1ee1c5821c0e9",
-      "block_number": 10942,
+      "detail": "{\"amount_wei\":\"1000000000000000\",\"block\":15201}",
+      "tx_hash": "0x9ef84799eea9d2bbd9a3c01608f3cb990dccf3768e33c2d06c3dce000f92f0c0",
+      "block_number": 15201,
       "chain_mode": "local"
     }
   ]

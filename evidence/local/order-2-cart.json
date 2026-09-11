@@ -1,25 +1,25 @@
 {
   "order": {
-    "order_id": "0x6259e4aba2d543cc567060f7aef67202d1a0b71d40dc6116aa974dd4367dcbfd",
-    "listing_id": "0x6259e4aba2d543cc567060f7aef67202d1a0b71d40dc6116aa974dd4367dcbfd",
+    "order_id": "0x25bc05ae4be93971ebd06649d4e3b5bb1bbeb1678c9810d50828596e814ec302",
+    "listing_id": "0x25bc05ae4be93971ebd06649d4e3b5bb1bbeb1678c9810d50828596e814ec302",
     "buyer": "0x1B27C90FcD738E960D3D505682EC2732A08c7f99",
     "price_wei": "1000000000000000",
     "status": "SETTLED_VALID",
-    "fund_tx": "0x7fe6335e0e586030ed321d177c739e83d913c28ec5bbe9b9854a93037ffbd135",
-    "deliver_tx": "0x76bd445aca8271aa558a9dca0f15cbe18665c9431d8c7dadfccfad9017aabafe",
+    "fund_tx": "0xce6ff00d8dbb336afd72f3de8ad3f2cad91d7ecfd62085ae4dc788055d0879f7",
+    "deliver_tx": "0xcaf8b915c83c3dbaf02498bda2e870e30c2b8e35d2a4470a15cc84c23c00c96e",
     "recheck_tx": null,
-    "settle_tx": "0x361cb60ee11f2b683a08a42512069a499c69eb6f340169ad859d97e080c8065f",
-    "withdraw_tx": "0xf53889922c3efba50750d5ff17cf17eb55b7cfbb0627c4bbefaa301cfa999645",
+    "settle_tx": "0xda56a11a497bad616131033107b493f34fb3222485e0d4e6214f1fc12c28580d",
+    "withdraw_tx": "0x0360aa485e6848d37d19fb886bca80effba402db24a3e06620c9b790256d8b89",
     "timeout_tx": null,
-    "delivery_hash": "0x75154fd68827b5fa20c094090415f90df38d141e6c7dfbfdc660d2ed63933112",
-    "retrieved_at": "2026-09-11T08:49:46.596Z",
+    "delivery_hash": "0x6341d6147eb204b3dd5225e2b4a21a1ef0937450ccdcd6b1e0565820d10712cb",
+    "retrieved_at": "2026-09-11T10:00:46.241Z",
     "delivery_check": {
       "valid": true,
       "verdict": "VALID",
       "reason": "delivered package hashes to the on-chain commitment, matches the advertised terms, and its replay frames are a physically possible trajectory that hashes to the run the verifier itself re-ran",
-      "on_chain_commitment": "0x75154fd68827b5fa20c094090415f90df38d141e6c7dfbfdc660d2ed63933112",
-      "delivered_hash": "0x75154fd68827b5fa20c094090415f90df38d141e6c7dfbfdc660d2ed63933112",
-      "asserted_delivery_hash": "0x75154fd68827b5fa20c094090415f90df38d141e6c7dfbfdc660d2ed63933112",
+      "on_chain_commitment": "0x6341d6147eb204b3dd5225e2b4a21a1ef0937450ccdcd6b1e0565820d10712cb",
+      "delivered_hash": "0x6341d6147eb204b3dd5225e2b4a21a1ef0937450ccdcd6b1e0565820d10712cb",
+      "asserted_delivery_hash": "0x6341d6147eb204b3dd5225e2b4a21a1ef0937450ccdcd6b1e0565820d10712cb",
       "checks": [
         {
           "name": "on-chain-status-delivered",
@@ -29,17 +29,17 @@
         {
           "name": "delivered-bytes-present",
           "ok": true,
-          "detail": "144957 bytes"
+          "detail": "144971 bytes"
         },
         {
           "name": "delivered-hash-equals-commitment",
           "ok": true,
-          "detail": "keccak256(delivered) 0x75154fd68827... vs on-chain commitment 0x75154fd68827..."
+          "detail": "keccak256(delivered) 0x6341d6147eb2... vs on-chain commitment 0x6341d6147eb2..."
         },
         {
           "name": "seller-asserted-hash-honest",
           "ok": true,
-          "detail": "seller asserted 0x75154fd68827..."
+          "detail": "seller asserted 0x6341d6147eb2..."
         },
         {
           "name": "package-target-matches-summary",
@@ -89,18 +89,18 @@
           "detail": "no recorded body exceeds the 67.071 m/s this scene can produce (sqrt(2*(1+mu_max)*g*d_max) + sqrt(2*g*h_obstacle) with mu_max=1 (largest surface friction the published envelope admits), g=9.81 m/s^2, d_max=100 m (the simulator's divergence bound) and h_obstacle=1 m (the scene's tallest structure))"
         }
       ],
-      "checked_at": "2026-09-11T08:49:46.635Z"
+      "checked_at": "2026-09-11T10:00:46.281Z"
     },
     "buyer_check": {
       "ok": true,
       "reason": "package matches commitment and advertised terms",
-      "delivered_hash": "0x75154fd68827b5fa20c094090415f90df38d141e6c7dfbfdc660d2ed63933112",
-      "on_chain_commitment": "0x75154fd68827b5fa20c094090415f90df38d141e6c7dfbfdc660d2ed63933112",
+      "delivered_hash": "0x6341d6147eb204b3dd5225e2b4a21a1ef0937450ccdcd6b1e0565820d10712cb",
+      "on_chain_commitment": "0x6341d6147eb204b3dd5225e2b4a21a1ef0937450ccdcd6b1e0565820d10712cb",
       "checks": [
         {
           "name": "hash-equals-on-chain-commitment",
           "ok": true,
-          "detail": "0x75154fd68827... vs 0x75154fd68827..."
+          "detail": "0x6341d6147eb2... vs 0x6341d6147eb2..."
         },
         {
           "name": "target-subject-and-envelope-match-summary",
@@ -116,18 +116,18 @@
         }
       ]
     },
-    "created_at": "2026-09-11T08:49:42.542Z"
+    "created_at": "2026-09-11T10:00:42.179Z"
   },
   "listing": {
-    "listing_id": "0x6259e4aba2d543cc567060f7aef67202d1a0b71d40dc6116aa974dd4367dcbfd",
+    "listing_id": "0x25bc05ae4be93971ebd06649d4e3b5bb1bbeb1678c9810d50828596e814ec302",
     "chain_mode": "local",
     "chain_id": 31337,
     "escrow_address": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3",
     "target_id": "cart",
     "seller": "0x28dAA9F3F9468382fFeD53cc339418403337cDeD",
     "price_wei": "1000000000000000",
-    "commitment": "0x75154fd68827b5fa20c094090415f90df38d141e6c7dfbfdc660d2ed63933112",
-    "terms_hash": "0xd3ea096f3269e5ab7554c6496b95db5a27196605f5dda5589d92ae591ef7150f",
+    "commitment": "0x6341d6147eb204b3dd5225e2b4a21a1ef0937450ccdcd6b1e0565820d10712cb",
+    "terms_hash": "0xabb8f2b88e19154cf564fbc5805f9fa095f215f95099be896c02b3ffc4f5f32b",
     "public_summary": {
       "admissible": true,
       "chain": {
@@ -159,7 +159,7 @@
       "price_wei": "1000000000000000",
       "schema": "tb-summary-2",
       "seller": "0x28dAA9F3F9468382fFeD53cc339418403337cDeD",
-      "seller_settled_orders_at_listing": 5,
+      "seller_settled_orders_at_listing": 13,
       "severity": {
         "band": "low",
         "definition": "impact speed band: low < 0.5 m/s, medium 0.5-1.0 m/s, high > 1.0 m/s (proxy only, not a damage estimate)",
@@ -178,21 +178,21 @@
         "method": "exact-trajectory-hash",
         "status": "VERIFIED",
         "verdict": "VALID",
-        "verified_at": "2026-09-11T08:48:50.017Z",
+        "verified_at": "2026-09-11T09:59:38.620Z",
         "verifier": "0xe592C7DA96Cc42344952C452377eBCc7Cc0982AE",
         "verifier_version": "tb-verifier-2"
       }
     },
     "status": "SETTLED_VALID",
-    "register_tx": "0x9e1178f3b62875bd7cc4a76290bda3c7daa8adaeaecc924467ebcbb4579cf558",
-    "created_at": "2026-09-11T08:48:54.051Z",
+    "register_tx": "0x7e34a8425f6f3e2492640923f9bc0ba468b9e63f86d9e60602ce6d4b33af2191",
+    "created_at": "2026-09-11T09:59:42.645Z",
     "demo_note": null
   },
   "events": [
     {
       "id": 1,
-      "listing_id": "0x6259e4aba2d543cc567060f7aef67202d1a0b71d40dc6116aa974dd4367dcbfd",
-      "ts": "2026-09-11T08:48:54.054Z",
+      "listing_id": "0x25bc05ae4be93971ebd06649d4e3b5bb1bbeb1678c9810d50828596e814ec302",
+      "ts": "2026-09-11T09:59:42.648Z",
       "actor": "verifier",
       "kind": "verified",
       "detail": "{\"target\":\"cart\",\"status\":\"VERIFIED\",\"method\":\"exact-trajectory-hash\",\"reason\":\"identical trajectory hash in a matching pinned environment; the controller and the delivered replay frames are bound to the verifier's own re-run, and the frames are a physically possible trajectory of this scene\",\"checks\":24}",
@@ -202,68 +202,68 @@
     },
     {
       "id": 2,
-      "listing_id": "0x6259e4aba2d543cc567060f7aef67202d1a0b71d40dc6116aa974dd4367dcbfd",
-      "ts": "2026-09-11T08:48:54.054Z",
+      "listing_id": "0x25bc05ae4be93971ebd06649d4e3b5bb1bbeb1678c9810d50828596e814ec302",
+      "ts": "2026-09-11T09:59:42.648Z",
       "actor": "verifier",
       "kind": "registered",
-      "detail": "{\"seller\":\"0x28dAA9F3F9468382fFeD53cc339418403337cDeD\",\"price_wei\":\"1000000000000000\",\"commitment\":\"0x75154fd68827b5fa20c094090415f90df38d141e6c7dfbfdc660d2ed63933112\",\"terms_hash\":\"0xd3ea096f3269e5ab7554c6496b95db5a27196605f5dda5589d92ae591ef7150f\",\"block\":10897}",
-      "tx_hash": "0x9e1178f3b62875bd7cc4a76290bda3c7daa8adaeaecc924467ebcbb4579cf558",
-      "block_number": 10897,
+      "detail": "{\"seller\":\"0x28dAA9F3F9468382fFeD53cc339418403337cDeD\",\"price_wei\":\"1000000000000000\",\"commitment\":\"0x6341d6147eb204b3dd5225e2b4a21a1ef0937450ccdcd6b1e0565820d10712cb\",\"terms_hash\":\"0xabb8f2b88e19154cf564fbc5805f9fa095f215f95099be896c02b3ffc4f5f32b\",\"block\":15146}",
+      "tx_hash": "0x7e34a8425f6f3e2492640923f9bc0ba468b9e63f86d9e60602ce6d4b33af2191",
+      "block_number": 15146,
       "chain_mode": "local"
     },
     {
-      "id": 15,
-      "listing_id": "0x6259e4aba2d543cc567060f7aef67202d1a0b71d40dc6116aa974dd4367dcbfd",
-      "ts": "2026-09-11T08:49:42.543Z",
+      "id": 19,
+      "listing_id": "0x25bc05ae4be93971ebd06649d4e3b5bb1bbeb1678c9810d50828596e814ec302",
+      "ts": "2026-09-11T10:00:42.180Z",
       "actor": "buyer",
       "kind": "funded",
-      "detail": "{\"buyer\":\"0x1B27C90FcD738E960D3D505682EC2732A08c7f99\",\"price_wei\":\"1000000000000000\",\"block\":10946}",
-      "tx_hash": "0x7fe6335e0e586030ed321d177c739e83d913c28ec5bbe9b9854a93037ffbd135",
-      "block_number": 10946,
+      "detail": "{\"buyer\":\"0x1B27C90FcD738E960D3D505682EC2732A08c7f99\",\"price_wei\":\"1000000000000000\",\"block\":15205}",
+      "tx_hash": "0xce6ff00d8dbb336afd72f3de8ad3f2cad91d7ecfd62085ae4dc788055d0879f7",
+      "block_number": 15205,
       "chain_mode": "local"
     },
     {
-      "id": 16,
-      "listing_id": "0x6259e4aba2d543cc567060f7aef67202d1a0b71d40dc6116aa974dd4367dcbfd",
-      "ts": "2026-09-11T08:49:46.582Z",
+      "id": 20,
+      "listing_id": "0x25bc05ae4be93971ebd06649d4e3b5bb1bbeb1678c9810d50828596e814ec302",
+      "ts": "2026-09-11T10:00:46.225Z",
       "actor": "seller",
       "kind": "delivered",
-      "detail": "{\"asserted_delivery_hash\":\"0x75154fd68827b5fa20c094090415f90df38d141e6c7dfbfdc660d2ed63933112\",\"bytes\":144957,\"tampered_demo\":false,\"block\":10950}",
-      "tx_hash": "0x76bd445aca8271aa558a9dca0f15cbe18665c9431d8c7dadfccfad9017aabafe",
-      "block_number": 10950,
+      "detail": "{\"asserted_delivery_hash\":\"0x6341d6147eb204b3dd5225e2b4a21a1ef0937450ccdcd6b1e0565820d10712cb\",\"bytes\":144971,\"tampered_demo\":false,\"block\":15209}",
+      "tx_hash": "0xcaf8b915c83c3dbaf02498bda2e870e30c2b8e35d2a4470a15cc84c23c00c96e",
+      "block_number": 15209,
       "chain_mode": "local"
     },
     {
-      "id": 17,
-      "listing_id": "0x6259e4aba2d543cc567060f7aef67202d1a0b71d40dc6116aa974dd4367dcbfd",
-      "ts": "2026-09-11T08:49:46.623Z",
+      "id": 21,
+      "listing_id": "0x25bc05ae4be93971ebd06649d4e3b5bb1bbeb1678c9810d50828596e814ec302",
+      "ts": "2026-09-11T10:00:46.268Z",
       "actor": "buyer",
       "kind": "retrieved",
-      "detail": "{\"bytes\":144957,\"signer\":\"0x1B27C90FcD738E960D3D505682EC2732A08c7f99\",\"local_check_ok\":true,\"reason\":\"package matches commitment and advertised terms\"}",
+      "detail": "{\"bytes\":144971,\"signer\":\"0x1B27C90FcD738E960D3D505682EC2732A08c7f99\",\"local_check_ok\":true,\"reason\":\"package matches commitment and advertised terms\"}",
       "tx_hash": null,
       "block_number": null,
       "chain_mode": "local"
     },
     {
-      "id": 18,
-      "listing_id": "0x6259e4aba2d543cc567060f7aef67202d1a0b71d40dc6116aa974dd4367dcbfd",
-      "ts": "2026-09-11T08:49:50.665Z",
+      "id": 22,
+      "listing_id": "0x25bc05ae4be93971ebd06649d4e3b5bb1bbeb1678c9810d50828596e814ec302",
+      "ts": "2026-09-11T10:00:50.314Z",
       "actor": "verifier",
       "kind": "settled_valid",
-      "detail": "{\"reason\":\"delivered package hashes to the on-chain commitment, matches the advertised terms, and its replay frames are a physically possible trajectory that hashes to the run the verifier itself re-ran\",\"credited_to\":\"0x28dAA9F3F9468382fFeD53cc339418403337cDeD\",\"block\":10954}",
-      "tx_hash": "0x361cb60ee11f2b683a08a42512069a499c69eb6f340169ad859d97e080c8065f",
-      "block_number": 10954,
+      "detail": "{\"reason\":\"delivered package hashes to the on-chain commitment, matches the advertised terms, and its replay frames are a physically possible trajectory that hashes to the run the verifier itself re-ran\",\"credited_to\":\"0x28dAA9F3F9468382fFeD53cc339418403337cDeD\",\"block\":15213}",
+      "tx_hash": "0xda56a11a497bad616131033107b493f34fb3222485e0d4e6214f1fc12c28580d",
+      "block_number": 15213,
       "chain_mode": "local"
     },
     {
-      "id": 19,
-      "listing_id": "0x6259e4aba2d543cc567060f7aef67202d1a0b71d40dc6116aa974dd4367dcbfd",
-      "ts": "2026-09-11T08:49:54.706Z",
+      "id": 23,
+      "listing_id": "0x25bc05ae4be93971ebd06649d4e3b5bb1bbeb1678c9810d50828596e814ec302",
+      "ts": "2026-09-11T10:00:54.357Z",
       "actor": "seller",
       "kind": "withdrawn",
-      "detail": "{\"amount_wei\":\"1000000000000000\",\"block\":10958}",
-      "tx_hash": "0xf53889922c3efba50750d5ff17cf17eb55b7cfbb0627c4bbefaa301cfa999645",
-      "block_number": 10958,
+      "detail": "{\"amount_wei\":\"1000000000000000\",\"block\":15217}",
+      "tx_hash": "0x0360aa485e6848d37d19fb886bca80effba402db24a3e06620c9b790256d8b89",
+      "block_number": 15217,
       "chain_mode": "local"
     }
   ]

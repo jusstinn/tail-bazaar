@@ -1,0 +1,55 @@
+{
+  "schema": "tb-summary-2",
+  "format": "tb-cjson-1",
+  "target": {
+    "id": "arm",
+    "label": "Manipulator pick-and-place policy",
+    "machine": "a Fetch arm picking a 5 cm block off a table under a pretrained policy",
+    "subject_label": "Policy",
+    "replay_renderer": "arm-3d"
+  },
+  "failure_class": {
+    "id": "DROPPED",
+    "label": "Dropped",
+    "detected_by": "a mechanical predicate over MuJoCo's OWN contact list: the block was touching both gripper pads and was more than 0.03 m above the table, then was not, and was not at the goal — confirmed over three further ticks, so one momentary lost contact while the part is still pinched is never sold as a drop. This is the one predicate this project owns: the environment scores placement, not custody."
+  },
+  "controller": {
+    "id": "intelligrow-fetch-pick-and-place-v4-sac-her",
+    "hash": "sha256:09a0e01d754d5ec5ea8b5ecb762e4e5cd8c1505cf63bb013517573328590feaa"
+  },
+  "envelope_id": "tb-arm-envelope-1",
+  "admissible": true,
+  "claim_kind": "the pick-and-place policy drops the part, or fails to place it, under admissible conditions inside the published envelope",
+  "verification": {
+    "status": "VERIFIED",
+    "verdict": "VALID",
+    "method": "exact-trajectory-hash",
+    "verifier_version": "tb-verifier-2",
+    "verifier": "0xe592C7DA96Cc42344952C452377eBCc7Cc0982AE",
+    "environment_fingerprint": "0x4925479687a035f944b34e490e507fcd3d9293ee5863aff3dec69598efc8f909",
+    "evidence_binding": "the seller's environment fingerprint equalled the verifier's own, and the policy checkpoint id+hash and the trajectory hash RECOMPUTED from the delivered replay frames were compared against the verifier's own re-run with this target's own simulator; declared hashes are not trusted, the frames were checked to be a physically possible trajectory of this scene, and a replay the verifier cannot bind exactly is INCONCLUSIVE rather than certified",
+    "verified_at": "2026-09-11T10:00:13.866Z"
+  },
+  "operating_context": {
+    "controller_tuned_range": "unmodified Gymnasium-Robotics FetchPickAndPlace-v4: the shipped 2 kg block, shipped friction, the environment's own block and goal sampling, no action noise, no control latency",
+    "controller_tuned_range_label": "conditions the policy's publisher evaluated it under",
+    "searched_envelope": "payload mass 0.2-20 kg, grip friction 0.02-1.5, the part up to 5 cm from where the environment put it on either axis, action noise 0-50 % of the command range, control latency 0-160 ms and an extra 0-160 ms on the gripper channel alone, over eight published pick-and-place problems",
+    "question": "This policy is published as placing the block in about ten control steps, every episode. How far can the operating range be widened - a heavier part, a slipperier one, a part that is not quite where it was expected, noisy or delayed actuation - before it drops what it is carrying?",
+    "note": "The searched envelope is deliberately wider than the conditions the policy was published for, so a finding outside them is not a defect report: the publisher evaluated unmodified FetchPickAndPlace-v4 and claims nothing about payload mass, grip friction, block placement, noise or latency. These bounds are illustrative assumptions for a demonstration; the 'robot' is Gymnasium-Robotics' MuJoCo Fetch mannequin driven by a mocap weld on its end effector, and the 'part' is a 5 cm cube, not a product. The policy checkpoint declares NO LICENCE, and neither does any alternative found on the hub.",
+    "reference": "GET /api/envelope (published axes for every target, same shape as GUARD configs/guard_theta.yaml)"
+  },
+  "severity": {
+    "proxy": "object_impact_speed_mps",
+    "band": "low",
+    "definition": "block impact speed banded against the 2.80 m/s a free fall from the 0.40 m table top reaches at the floor: low below half of it, medium up to it, high above it (a measured kinematic proxy, never a damage, breakage or cost estimate)"
+  },
+  "seller": "0x28dAA9F3F9468382fFeD53cc339418403337cDeD",
+  "seller_settled_orders_at_listing": 13,
+  "price_wei": "1000000000000000",
+  "chain": {
+    "mode": "local",
+    "chain_id": 31337,
+    "escrow": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3"
+  },
+  "hidden": "exact scenario parameters, trajectory, replay frames, the hunt that found it and the reproduction command are in the private package only"
+}

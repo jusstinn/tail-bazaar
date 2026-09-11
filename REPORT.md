@@ -339,14 +339,156 @@ pre-multi-target interface and are kept as the record of that run.
   `web/data/`. Same assertions, same recorded numbers, but `npm test` no longer depends on a demo
   having been run on this machine first.
 
+# Third-target pass — the arm, and published demonstration orders
+
+This pass added the manipulator pick-and-place policy as **target 3** under the same binding rules,
+opened a narrow, explicit hole in hosted mode so a cold reader can follow the whole flow, and brought
+the documentation up to what the code now does — including the two things this project explored and
+decided *not* to ship. No file under `sim/`, `vla/` or `contracts/` was touched.
+
+## What the third target cost
+
+One registry entry, one envelope mirror, one replay renderer, one target view — and no special case
+anywhere else. The agents, the routes, the ledger, the escrow, the buyer policy, the range bars, the
+five-stage finding page and the market aggregates all picked the arm up from the registry.
+
+| | cart | humanoid | arm |
+|---|---|---|---|
+| envelope | `tb-envelope-1` (5 axes) | `tb-humanoid-envelope-1` (7 + 1 discrete) | `tb-arm-envelope-1` (7 + 1 discrete) |
+| simulator | `tailbazaar_sim.cli` | `tailbazaar_sim.humanoid.cli` | `tailbazaar_sim.arm.cli` |
+| subject bound by | SHA-256 of `controller.py` | actor-tensor sha256 of the SAC checkpoint | actor-tensor sha256 of the SAC+HER checkpoint |
+| failure classes | `COLLISION`, `LOAD_SHED` | `FELL` | `DROPPED`, `NOT_PLACED` |
+| who owns the predicate | the simulator's contact flag / slip criterion | Gymnasium's health predicate | Gymnasium-Robotics' success flag for `NOT_PLACED`; **this project** for `DROPPED` |
+| severity proxy | `impact_speed_mps` | `torso_impact_speed_mps`, banded at `sqrt(2·g·1.0 m) = 4.43 m/s` | `object_impact_speed_mps`, banded at `sqrt(2·g·0.4 m) = 2.80 m/s`; `NOT_PLACED` has **none** |
+| plausibility ceiling | **67.0 m/s** | **78.871 m/s** | **72.837 m/s** |
+| honest replay peaks at | 2.0 m/s | 8.1–10.0 m/s | **2.954 m/s** |
+| renderer | `cart-3d` | `humanoid-3d` | `arm-3d` |
+
+Three things were not free, and all three are in the code with the reasoning attached.
+
+**`DROPPED` is the first failure predicate in this marketplace that is ours.** Every other class is
+the simulator's or the environment's own flag, and the honest move was to say so in the same field
+the other classes use to name their detector — on the marketplace card, in the sealed summary, and in
+the README — rather than to let it pass as the environment's verdict. The environment scores
+*placement*; custody is not a thing it measures.
+
+**A plausibility ceiling that would have been theatre.** The Fetch scene carries one body MuJoCo
+**poses rather than integrates** — the mocap weld target the environment drags the gripper to — and it
+is teleported into place on the first recorded tick at an apparent **39.011 m/s**. Against a
+72.837 m/s ceiling that is a factor of 1.87, which is not an impossibility line, it is a tolerance
+wearing one. `web/src/server/plausibility.ts` now takes a list of bodies the engine poses; it reads
+the world bound for them but not a speed, and the list is computed from the **verifier's own re-run
+document** (a body every one of whose published primitives collides with nothing), never from the
+delivered package, so a seller cannot add to it. The honest peak is then **2.954 m/s against
+72.837 m/s**, a factor of 24.7 — the same order of margin the other two targets have.
+
+**The arm simulator names its event field `event`, not `type`.** `failure.ts` now reads whichever the
+document uses and normalises it, rather than either assuming one or special-casing a target. A test
+asserts on the committed run document that the fixture really does use the other name.
+
+The renderer draws **solid** bodies, which was the point of the brief: the evidence PNGs in
+`evidence/arm` are wireframes, and a wireframe cannot answer whether the part is in the hand. It
+skips the mocap gizmo by the `role` the run publishes (three 2 m bars that would put a coordinate
+cross through every frame), draws mesh links at MuJoCo's own bounding half-extents which the run
+itself labels a proxy, and draws the goal — a *site*, not a body, so it is not in `frames` — as an
+open cage at the environment's own 5 cm threshold rather than a solid, because a filled box at the
+goal reads as an obstacle. The goal position is the one field the generic private package had to
+learn (`goal_m`, null for targets that publish none). The ghost is the bench, the part and the
+gripper rather than a second translucent arm, because a full ghost robot is a grey blob across half
+the frame.
+
+## Published demonstration orders
+
+`DEMO_PUBLIC_ORDERS` is a comma-separated list of order ids whose evidence a hosted instance serves
+without a token; `DEMO_PUBLIC_TAMPER_FIXTURES=1` auto-publishes each deliberately tampered order plus
+the paired valid order of the same robot. The reason is that a hosted instance is meant to be read,
+and a grader who opens the link cold and hits a 401 sees the gate working and not the product.
+
+The shape of the exception is what makes it defensible, and each property has a test:
+
+- **per order id** — a listed order returns 200 with `x-access-via: public-demo-fixture` and an
+  `x-tb-demo-fixture` header carrying the badge; every other order still returns 401 with nothing of
+  the package in the body;
+- **the badge is on the page, not just the header** — "DEMONSTRATION FIXTURE, published in the
+  repository, not a secret", because these packages are committed to this repository as evidence and
+  the reader should not think they earned access;
+- **the baseline route opens only for the robots that have a published fixture**, since that is the
+  surviving run their replay draws behind the failure;
+- **the sealed summary is untouched** — a test compares its keys with fixtures published and
+  unpublished and requires them identical, because those bytes are what the terms hash on chain
+  commits to;
+- **nothing else widens** — the pipeline log stays operator-only and `POST /api/demo/run` still
+  requires the operator token;
+- **with the variables unset, hosted mode is what it was.**
+
+## Commands run in this pass and actual results
+
+| Command | Result |
+|---|---|
+| `cd web && npm test` | **83 passed, 0 failed** (was 59: + 9 arm envelope mirror, registry, claim, severity bands, plausibility and the honest negatives read back off the committed hunt documents, + 6 arm verifier binding, + 7 published-demonstration-order rules, + 2 arm failure-class narration) |
+| `cd web && CHAIN_MODE=local npm run test:integration` | **12 passed, 0 failed** (was 11: + a published fixture order opening anonymously while its neighbours do not, on real pipeline data; the three-target and leak assertions were extended in place) |
+| `cd contracts && forge test` | **22 passed, 0 failed** (no contract source was touched) |
+| `cd web && npm run demo -- --reset --evidence ../evidence/local` | run `run-mtwsb96y`, **149.4 s wall, 6 listings across 3 targets, 6 orders.** Cart grid: 144 sims, 336 070 steps, 7.291 s, 102 SUCCESS / 42 COLLISION (3 also LOAD_SHED) / 0 inconclusive, 42 distinct. Humanoid push grid: 88 sims, 240 465 steps, 10.029 s, 35 survived / 53 FELL / 0 inconclusive, 30 distinct, 23 near-duplicates. Arm grip-friction grid: 72 sims, 72 000 steps, 2.216 s, 64 SUCCESS / 4 DROPPED / 4 NOT_PLACED / 0 inconclusive, 4 distinct, 0 near-duplicates. Findings: cart 0.380667 m/s (low) and 0.597248 m/s (medium); humanoid 4.801319 m/s and 4.549013 m/s (both high); arm 3.150862 m/s onto `floor0` (high, trajectory `0xc34cf117…`, the hash the committed evidence carries) and 0.940892 m/s (low). Five settled VALID → seller paid; the tampered cart delivery → COMMITMENT MISMATCH → recheck → INVALID → buyer refunded |
+| `npm run ledger` | 6 findings `{"VALID": 6}`, `findings_by_target {"cart": 2, "humanoid": 2, "arm": 2}`, 304 simulations / 648 535 physics steps, and three `nominal_suites` entries — the arm's reports `all_passed: true`, the humanoid's `all_passed: false` with `gate_passed: true` and `cases_that_failed: ["one-tick-latency"]` |
+| hosted-mode matrix on real order ids (published: the arm's high-band order; non-public: a humanoid order) | anonymous — reveal of the non-public order **401** with 0 leak markers in the body, `baseline?target=cart` **401**, `?target=humanoid` **401**, `?target=arm` **200** (the only robot with a published fixture), reveal of the published order **200** with `x-access-via: public-demo-fixture` and `x-tb-demo-fixture: DEMONSTRATION FIXTURE, published in the repository, not a secret`, and its 65 524 bytes keccak to the on-chain commitment. Operator token — non-public reveal **200** (`x-access-via: operator`), humanoid baseline **200**. Wrong token **401**. Demo log `log_redacted: true`, 0 lines; `POST /api/demo/run` **401** |
+| leak test, anonymous public projections | **PASS** — 7 routes (`/api/listings`, `/api/orders`, `/api/market`, `/api/status`, `/api/demo/status`, one order, one listing) against **24 markers** including every arm axis (`object_mass_kg`, `grip_friction`, `object_offset_x_m`, `object_offset_y_m`, `action_noise_frac`, `gripper_latency_ms`) and `goal_m`: **zero leaks** |
+| UI captures | refreshed against this run: `marketplace.png` (three robot cards), `order-arm-dropped.png`, `replay-arm-drop.png`, `replay-arm-split.png`, `order-cart-collision.png`, `order-humanoid-fell.png`, `order-invalid-refund.png`, `how-it-works.png`, `hosted-reveal-locked.png`, and `hosted-demo-fixture.png` — the anonymous hosted view of a published fixture, badge visible |
+
+`window.tbReplay` on the arm finding reports the part inside the frame in both modes, and the HUD
+reads `1.16 s · not held · on the floor · 0.68 m from the goal · 0.04 m/s` at the captured instant.
+
+**Base Sepolia was not re-run and did not need to be.** This pass is entirely off-chain and
+`contracts/` is unchanged; the deployment at `0xfadf11662C46c0214B0A40938a26FB8f0CD785A3` and its 14
+recorded receipts stand as recorded.
+
+## Factual limitations added or sharpened in this pass
+
+- **The arm's `DROPPED` predicate is this project's own.** It is mechanical and it reads MuJoCo's own
+  contact list, but the airborne margin (0.03 m) and the three-tick confirmation window are choices
+  this project made. Both are documented where the class is named, so a reader can disagree with them
+  on the evidence rather than on trust. The confirmation window is why `grid-grip` reports 4 drops and
+  not 7.
+- **The arm's policy checkpoint declares no licence**, and neither does any FetchPickAndPlace
+  checkpoint found on the hub — six were checked one by one. Weights are fetched at run time, never
+  vendored, never redistributed. The scene is MIT.
+- **The honest negatives are load-bearing and are stated as measurements, not as caveats.** Payload
+  mass alone placed the part 48/48 up to ten times the published mass; placement alone 25/25; the
+  whole latency × noise grid produced zero drops. Failure is not monotone in friction and is
+  concentrated in the geometry. A single friction threshold would have been a more sellable answer and
+  a false one.
+- **A fourth target was explored and deliberately not listed.** openpi `pi0` on ALOHA-sim ran, reached
+  4/6 nominal, and produced findings — and the same seed run twice diverged at control tick 129
+  (SUCCESS, then DROPPED) because `gym-aloha` is registered nondeterministic and `pi0` runs in bf16 on
+  a GPU. Under this marketplace's rules every VLA finding would be INCONCLUSIVE, and INCONCLUSIVE
+  never pays. The README states what a reproduction-rate market would need instead rather than
+  quietly weakening the binding rule for one target.
+- **Cross-platform reproduction was measured, not assumed.** The same scenario with the same pinned
+  dependency set gives identical **outcomes** and **different trajectory hashes** on macOS arm64 and
+  Linux x86_64 on all three robots (cart `0x3445cbf379…` vs `0x2eb8cdbff1…`, humanoid `0xb724…` vs
+  `0x3c2a…`, arm `0x8e44…` vs `0xcfa2…`). That is exactly why exact-hash binding is paired with an
+  environment fingerprint and why a mismatch is INCONCLUSIVE; the hosted pipeline therefore runs
+  hunter and verifier on the same host.
+- **The published-fixture exception is real access, deliberately granted.** Anyone who can reach a
+  host that sets `DEMO_PUBLIC_ORDERS` can read those orders' scenarios, trajectories, salts and replay
+  frames. It is safe only because those exact packages are already committed to this repository as
+  evidence; on a host with private findings the variable must stay unset.
+- **`.env.example` was not updated** with `DEMO_PUBLIC_ORDERS` and `DEMO_PUBLIC_TAMPER_FIXTURES`: this
+  pass owned `web/**` and the three top-level documents only. Both are documented in the README's
+  hosted-mode section, and both default to unset.
+- **Two arm findings, two different bands** (high and low), so the buyer's severity ranking does
+  discriminating work on this target — which it did not on the humanoid, where both demo findings land
+  in `high`.
+
 ## Running state left on this machine
 
 anvil (pid in `.local/anvil.pid`) and the web server (pid in `.local/server.pid`,
 http://127.0.0.1:3100) are left running for review; `scripts/server-stop.sh`, `scripts/anvil-stop.sh`.
-After the multi-target pass the server runs in **local** chain mode against the regenerated demo
-database (4 listings, both robots),
+After the third-target pass the server runs in **local** chain mode against the regenerated demo
+database (6 listings across three robots, 6 orders, one refunded),
 in local demonstration mode (no `PUBLIC_BASE_URL`), so the reveal view works without a token. To see
 the hosted behaviour: `scripts/server-stop.sh`, then
 `PUBLIC_BASE_URL=https://example.test node web/dist/server/index.js` — the same order page then shows
-"authentication required" and the reveal route answers 401. To browse the Base Sepolia orders again:
-`CHAIN_MODE=testnet scripts/server-start.sh`.
+"authentication required" and the reveal route answers 401. Add
+`DEMO_PUBLIC_ORDERS=<an order id>` to that command to see the published-fixture path instead: that
+one order opens anonymously with the DEMONSTRATION FIXTURE badge and every other one still 401s. To
+browse the Base Sepolia orders again: `CHAIN_MODE=testnet scripts/server-start.sh`.

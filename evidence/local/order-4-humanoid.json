@@ -1,25 +1,25 @@
 {
   "order": {
-    "order_id": "0xb135609c7349479c0ff32c838d85943a7ee9ec6004ca2bc61345696c96926f06",
-    "listing_id": "0xb135609c7349479c0ff32c838d85943a7ee9ec6004ca2bc61345696c96926f06",
+    "order_id": "0xd5445ad1af1ed96e8f5bcfa2a507b59c8a5833723411892d50e54a8061480c82",
+    "listing_id": "0xd5445ad1af1ed96e8f5bcfa2a507b59c8a5833723411892d50e54a8061480c82",
     "buyer": "0x1B27C90FcD738E960D3D505682EC2732A08c7f99",
     "price_wei": "1000000000000000",
     "status": "SETTLED_VALID",
-    "fund_tx": "0x24bbf2b922fedca141bb5e8a0011642263e74ca5d9c272ecadfa48af7177144b",
-    "deliver_tx": "0xae6da8cabd531202bb9fffcdc4abab5c623a155c6bce9c94b890521885f2f38b",
+    "fund_tx": "0xaf68f4c6950a3283de1ff988eead825ce06828a6f0148e61232be8ea531a44f5",
+    "deliver_tx": "0x24505b32d148ae1d78eef64964a6f1a30aabd923e00055075a1d26adddc387e5",
     "recheck_tx": null,
-    "settle_tx": "0xf490309757438b313e8c106b7f55e4c26aad4bdfe640a3afeca73bae24cf901d",
-    "withdraw_tx": "0x765c77922b148e4ada8339b14d9f0b33fe82de89889f73fe8846f5d4fbd1919d",
+    "settle_tx": "0xa2dbc5c93ccae639eb3c4d59909fd292a97cdfa8f40e736952366e05fe148839",
+    "withdraw_tx": "0x6fe5119dff2511ca4454598748e33632689f3305111cd0af7db44c9fd008c1a4",
     "timeout_tx": null,
-    "delivery_hash": "0x1aeb11d2f2f09bed6b86cb70d1242d252e68dd24eb0d433b7485f92efe3ffe4e",
-    "retrieved_at": "2026-09-11T08:50:19.004Z",
+    "delivery_hash": "0xcc74b8d9868fd3af6732be641581cbea34a59224309484a151204948ce1667d9",
+    "retrieved_at": "2026-09-11T10:01:18.655Z",
     "delivery_check": {
       "valid": true,
       "verdict": "VALID",
       "reason": "delivered package hashes to the on-chain commitment, matches the advertised terms, and its replay frames are a physically possible trajectory that hashes to the run the verifier itself re-ran",
-      "on_chain_commitment": "0x1aeb11d2f2f09bed6b86cb70d1242d252e68dd24eb0d433b7485f92efe3ffe4e",
-      "delivered_hash": "0x1aeb11d2f2f09bed6b86cb70d1242d252e68dd24eb0d433b7485f92efe3ffe4e",
-      "asserted_delivery_hash": "0x1aeb11d2f2f09bed6b86cb70d1242d252e68dd24eb0d433b7485f92efe3ffe4e",
+      "on_chain_commitment": "0xcc74b8d9868fd3af6732be641581cbea34a59224309484a151204948ce1667d9",
+      "delivered_hash": "0xcc74b8d9868fd3af6732be641581cbea34a59224309484a151204948ce1667d9",
+      "asserted_delivery_hash": "0xcc74b8d9868fd3af6732be641581cbea34a59224309484a151204948ce1667d9",
       "checks": [
         {
           "name": "on-chain-status-delivered",
@@ -29,17 +29,17 @@
         {
           "name": "delivered-bytes-present",
           "ok": true,
-          "detail": "120273 bytes"
+          "detail": "120287 bytes"
         },
         {
           "name": "delivered-hash-equals-commitment",
           "ok": true,
-          "detail": "keccak256(delivered) 0x1aeb11d2f2f0... vs on-chain commitment 0x1aeb11d2f2f0..."
+          "detail": "keccak256(delivered) 0xcc74b8d9868f... vs on-chain commitment 0xcc74b8d9868f..."
         },
         {
           "name": "seller-asserted-hash-honest",
           "ok": true,
-          "detail": "seller asserted 0x1aeb11d2f2f0..."
+          "detail": "seller asserted 0xcc74b8d9868f..."
         },
         {
           "name": "package-target-matches-summary",
@@ -89,18 +89,18 @@
           "detail": "no recorded body exceeds the 78.871 m/s this scene can produce (J_max/(m*s_min) + sqrt(2*(1+mu_max)*g*d_max) + sqrt(2*g*h_stand) with J_max=120 N*s (largest impulse the published envelope admits), m=42.116 kg and s_min=0.8 (lightest admissible body), mu_max=1.4 (largest surface friction the envelope admits), g=9.81 m/s^2, d_max=100 m (the simulator's divergence bound) and h_stand=2.28 m (top of the environment's healthy height band plus the head's reach above the torso))"
         }
       ],
-      "checked_at": "2026-09-11T08:50:19.047Z"
+      "checked_at": "2026-09-11T10:01:18.698Z"
     },
     "buyer_check": {
       "ok": true,
       "reason": "package matches commitment and advertised terms",
-      "delivered_hash": "0x1aeb11d2f2f09bed6b86cb70d1242d252e68dd24eb0d433b7485f92efe3ffe4e",
-      "on_chain_commitment": "0x1aeb11d2f2f09bed6b86cb70d1242d252e68dd24eb0d433b7485f92efe3ffe4e",
+      "delivered_hash": "0xcc74b8d9868fd3af6732be641581cbea34a59224309484a151204948ce1667d9",
+      "on_chain_commitment": "0xcc74b8d9868fd3af6732be641581cbea34a59224309484a151204948ce1667d9",
       "checks": [
         {
           "name": "hash-equals-on-chain-commitment",
           "ok": true,
-          "detail": "0x1aeb11d2f2f0... vs 0x1aeb11d2f2f0..."
+          "detail": "0xcc74b8d9868f... vs 0xcc74b8d9868f..."
         },
         {
           "name": "target-subject-and-envelope-match-summary",
@@ -116,18 +116,18 @@
         }
       ]
     },
-    "created_at": "2026-09-11T08:50:14.954Z"
+    "created_at": "2026-09-11T10:01:14.607Z"
   },
   "listing": {
-    "listing_id": "0xb135609c7349479c0ff32c838d85943a7ee9ec6004ca2bc61345696c96926f06",
+    "listing_id": "0xd5445ad1af1ed96e8f5bcfa2a507b59c8a5833723411892d50e54a8061480c82",
     "chain_mode": "local",
     "chain_id": 31337,
     "escrow_address": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3",
     "target_id": "humanoid",
     "seller": "0x28dAA9F3F9468382fFeD53cc339418403337cDeD",
     "price_wei": "1000000000000000",
-    "commitment": "0x1aeb11d2f2f09bed6b86cb70d1242d252e68dd24eb0d433b7485f92efe3ffe4e",
-    "terms_hash": "0x97dd4d29c84a53a07812541dcda7d88b7e5947249c66dc6c357aee92ba58761b",
+    "commitment": "0xcc74b8d9868fd3af6732be641581cbea34a59224309484a151204948ce1667d9",
+    "terms_hash": "0x4786309ce0b44c0f3dd76a78cfd6193e1bb62491e410dabc3022e5604a4c87f7",
     "public_summary": {
       "admissible": true,
       "chain": {
@@ -159,7 +159,7 @@
       "price_wei": "1000000000000000",
       "schema": "tb-summary-2",
       "seller": "0x28dAA9F3F9468382fFeD53cc339418403337cDeD",
-      "seller_settled_orders_at_listing": 5,
+      "seller_settled_orders_at_listing": 13,
       "severity": {
         "band": "high",
         "definition": "torso impact speed banded against the 4.43 m/s a free fall from the 1.0 m healthy-height floor reaches: low below half of it, medium up to it, high above it (a measured kinematic proxy, never a damage, injury or cost estimate)",
@@ -178,21 +178,21 @@
         "method": "exact-trajectory-hash",
         "status": "VERIFIED",
         "verdict": "VALID",
-        "verified_at": "2026-09-11T08:49:14.233Z",
+        "verified_at": "2026-09-11T10:00:02.418Z",
         "verifier": "0xe592C7DA96Cc42344952C452377eBCc7Cc0982AE",
         "verifier_version": "tb-verifier-2"
       }
     },
     "status": "SETTLED_VALID",
-    "register_tx": "0x70ca977af78a0ccc3992183b2505056285294dfe27119293fb02f2d7e67b3452",
-    "created_at": "2026-09-11T08:49:18.252Z",
+    "register_tx": "0xeed37fb8673d33d8b3e34fe99fe95ac6b65bf37d62a9127a4b61a3958867c96b",
+    "created_at": "2026-09-11T10:00:06.437Z",
     "demo_note": null
   },
   "events": [
     {
       "id": 7,
-      "listing_id": "0xb135609c7349479c0ff32c838d85943a7ee9ec6004ca2bc61345696c96926f06",
-      "ts": "2026-09-11T08:49:18.254Z",
+      "listing_id": "0xd5445ad1af1ed96e8f5bcfa2a507b59c8a5833723411892d50e54a8061480c82",
+      "ts": "2026-09-11T10:00:06.441Z",
       "actor": "verifier",
       "kind": "verified",
       "detail": "{\"target\":\"humanoid\",\"status\":\"VERIFIED\",\"method\":\"exact-trajectory-hash\",\"reason\":\"identical trajectory hash in a matching pinned environment; the policy checkpoint and the delivered replay frames are bound to the verifier's own re-run, and the frames are a physically possible trajectory of this scene\",\"checks\":24}",
@@ -202,68 +202,68 @@
     },
     {
       "id": 8,
-      "listing_id": "0xb135609c7349479c0ff32c838d85943a7ee9ec6004ca2bc61345696c96926f06",
-      "ts": "2026-09-11T08:49:18.254Z",
+      "listing_id": "0xd5445ad1af1ed96e8f5bcfa2a507b59c8a5833723411892d50e54a8061480c82",
+      "ts": "2026-09-11T10:00:06.442Z",
       "actor": "verifier",
       "kind": "registered",
-      "detail": "{\"seller\":\"0x28dAA9F3F9468382fFeD53cc339418403337cDeD\",\"price_wei\":\"1000000000000000\",\"commitment\":\"0x1aeb11d2f2f09bed6b86cb70d1242d252e68dd24eb0d433b7485f92efe3ffe4e\",\"terms_hash\":\"0x97dd4d29c84a53a07812541dcda7d88b7e5947249c66dc6c357aee92ba58761b\",\"block\":10921}",
-      "tx_hash": "0x70ca977af78a0ccc3992183b2505056285294dfe27119293fb02f2d7e67b3452",
-      "block_number": 10921,
+      "detail": "{\"seller\":\"0x28dAA9F3F9468382fFeD53cc339418403337cDeD\",\"price_wei\":\"1000000000000000\",\"commitment\":\"0xcc74b8d9868fd3af6732be641581cbea34a59224309484a151204948ce1667d9\",\"terms_hash\":\"0x4786309ce0b44c0f3dd76a78cfd6193e1bb62491e410dabc3022e5604a4c87f7\",\"block\":15169}",
+      "tx_hash": "0xeed37fb8673d33d8b3e34fe99fe95ac6b65bf37d62a9127a4b61a3958867c96b",
+      "block_number": 15169,
       "chain_mode": "local"
     },
     {
-      "id": 25,
-      "listing_id": "0xb135609c7349479c0ff32c838d85943a7ee9ec6004ca2bc61345696c96926f06",
-      "ts": "2026-09-11T08:50:14.956Z",
+      "id": 29,
+      "listing_id": "0xd5445ad1af1ed96e8f5bcfa2a507b59c8a5833723411892d50e54a8061480c82",
+      "ts": "2026-09-11T10:01:14.607Z",
       "actor": "buyer",
       "kind": "funded",
-      "detail": "{\"buyer\":\"0x1B27C90FcD738E960D3D505682EC2732A08c7f99\",\"price_wei\":\"1000000000000000\",\"block\":10978}",
-      "tx_hash": "0x24bbf2b922fedca141bb5e8a0011642263e74ca5d9c272ecadfa48af7177144b",
-      "block_number": 10978,
+      "detail": "{\"buyer\":\"0x1B27C90FcD738E960D3D505682EC2732A08c7f99\",\"price_wei\":\"1000000000000000\",\"block\":15238}",
+      "tx_hash": "0xaf68f4c6950a3283de1ff988eead825ce06828a6f0148e61232be8ea531a44f5",
+      "block_number": 15238,
       "chain_mode": "local"
     },
     {
-      "id": 26,
-      "listing_id": "0xb135609c7349479c0ff32c838d85943a7ee9ec6004ca2bc61345696c96926f06",
-      "ts": "2026-09-11T08:50:18.992Z",
+      "id": 30,
+      "listing_id": "0xd5445ad1af1ed96e8f5bcfa2a507b59c8a5833723411892d50e54a8061480c82",
+      "ts": "2026-09-11T10:01:18.642Z",
       "actor": "seller",
       "kind": "delivered",
-      "detail": "{\"asserted_delivery_hash\":\"0x1aeb11d2f2f09bed6b86cb70d1242d252e68dd24eb0d433b7485f92efe3ffe4e\",\"bytes\":120273,\"tampered_demo\":false,\"block\":10982}",
-      "tx_hash": "0xae6da8cabd531202bb9fffcdc4abab5c623a155c6bce9c94b890521885f2f38b",
-      "block_number": 10982,
+      "detail": "{\"asserted_delivery_hash\":\"0xcc74b8d9868fd3af6732be641581cbea34a59224309484a151204948ce1667d9\",\"bytes\":120287,\"tampered_demo\":false,\"block\":15242}",
+      "tx_hash": "0x24505b32d148ae1d78eef64964a6f1a30aabd923e00055075a1d26adddc387e5",
+      "block_number": 15242,
       "chain_mode": "local"
     },
     {
-      "id": 27,
-      "listing_id": "0xb135609c7349479c0ff32c838d85943a7ee9ec6004ca2bc61345696c96926f06",
-      "ts": "2026-09-11T08:50:19.030Z",
+      "id": 31,
+      "listing_id": "0xd5445ad1af1ed96e8f5bcfa2a507b59c8a5833723411892d50e54a8061480c82",
+      "ts": "2026-09-11T10:01:18.684Z",
       "actor": "buyer",
       "kind": "retrieved",
-      "detail": "{\"bytes\":120273,\"signer\":\"0x1B27C90FcD738E960D3D505682EC2732A08c7f99\",\"local_check_ok\":true,\"reason\":\"package matches commitment and advertised terms\"}",
+      "detail": "{\"bytes\":120287,\"signer\":\"0x1B27C90FcD738E960D3D505682EC2732A08c7f99\",\"local_check_ok\":true,\"reason\":\"package matches commitment and advertised terms\"}",
       "tx_hash": null,
       "block_number": null,
       "chain_mode": "local"
     },
     {
-      "id": 28,
-      "listing_id": "0xb135609c7349479c0ff32c838d85943a7ee9ec6004ca2bc61345696c96926f06",
-      "ts": "2026-09-11T08:50:23.078Z",
+      "id": 32,
+      "listing_id": "0xd5445ad1af1ed96e8f5bcfa2a507b59c8a5833723411892d50e54a8061480c82",
+      "ts": "2026-09-11T10:01:22.726Z",
       "actor": "verifier",
       "kind": "settled_valid",
-      "detail": "{\"reason\":\"delivered package hashes to the on-chain commitment, matches the advertised terms, and its replay frames are a physically possible trajectory that hashes to the run the verifier itself re-ran\",\"credited_to\":\"0x28dAA9F3F9468382fFeD53cc339418403337cDeD\",\"block\":10986}",
-      "tx_hash": "0xf490309757438b313e8c106b7f55e4c26aad4bdfe640a3afeca73bae24cf901d",
-      "block_number": 10986,
+      "detail": "{\"reason\":\"delivered package hashes to the on-chain commitment, matches the advertised terms, and its replay frames are a physically possible trajectory that hashes to the run the verifier itself re-ran\",\"credited_to\":\"0x28dAA9F3F9468382fFeD53cc339418403337cDeD\",\"block\":15246}",
+      "tx_hash": "0xa2dbc5c93ccae639eb3c4d59909fd292a97cdfa8f40e736952366e05fe148839",
+      "block_number": 15246,
       "chain_mode": "local"
     },
     {
-      "id": 29,
-      "listing_id": "0xb135609c7349479c0ff32c838d85943a7ee9ec6004ca2bc61345696c96926f06",
-      "ts": "2026-09-11T08:50:27.110Z",
+      "id": 33,
+      "listing_id": "0xd5445ad1af1ed96e8f5bcfa2a507b59c8a5833723411892d50e54a8061480c82",
+      "ts": "2026-09-11T10:01:26.767Z",
       "actor": "seller",
       "kind": "withdrawn",
-      "detail": "{\"amount_wei\":\"1000000000000000\",\"block\":10990}",
-      "tx_hash": "0x765c77922b148e4ada8339b14d9f0b33fe82de89889f73fe8846f5d4fbd1919d",
-      "block_number": 10990,
+      "detail": "{\"amount_wei\":\"1000000000000000\",\"block\":15250}",
+      "tx_hash": "0x6fe5119dff2511ca4454598748e33632689f3305111cd0af7db44c9fd008c1a4",
+      "block_number": 15250,
       "chain_mode": "local"
     }
   ]

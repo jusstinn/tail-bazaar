@@ -1,6 +1,6 @@
 {
   "schema": "tb-ledger-2",
-  "generated_at": "2026-09-11T09:02:39.366Z",
+  "generated_at": "2026-09-11T10:01:59.227Z",
   "targets": [
     {
       "target_id": "cart",
@@ -30,6 +30,21 @@
       "published_range": "unmodified Gymnasium Humanoid-v5: no external push, floor friction 1.0, stock body masses, no actuator noise, no control latency",
       "searched_envelope": "push impulse 0-120 N·s from any heading, push time 0.6-7.8 s, floor friction 0.4-1.4, body mass ×0.8-1.25, actuator noise 0-30 %, control latency 0-90 ms, over eight published initial states",
       "product_question": "This policy is published with a mean return of 8127 on stock Humanoid-v5. How far can the operating range be widened — a shove, a slippery floor, a heavier body, noisy or delayed actuation — before it falls over?"
+    },
+    {
+      "target_id": "arm",
+      "label": "Manipulator pick-and-place policy",
+      "envelope_id": "tb-arm-envelope-1",
+      "envelope_yaml": "sim/envelope-arm.yaml",
+      "failure_classes": [
+        "DROPPED",
+        "NOT_PLACED"
+      ],
+      "severity_proxy": "object_impact_speed_mps",
+      "severity_units": "m/s",
+      "published_range": "unmodified Gymnasium-Robotics FetchPickAndPlace-v4: the shipped 2 kg block, shipped friction, the environment's own block and goal sampling, no action noise, no control latency",
+      "searched_envelope": "payload mass 0.2-20 kg, grip friction 0.02-1.5, the part up to 5 cm from where the environment put it on either axis, action noise 0-50 % of the command range, control latency 0-160 ms and an extra 0-160 ms on the gripper channel alone, over eight published pick-and-place problems",
+      "product_question": "This policy is published as placing the block in about ten control steps, every episode. How far can the operating range be widened - a heavier part, a slipperier one, a part that is not quite where it was expected, noisy or delayed actuation - before it drops what it is carrying?"
     }
   ],
   "chain": {
@@ -38,15 +53,16 @@
     "escrow": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3"
   },
   "provenance": {
-    "git_sha": "233420350276d0bf732edfa9436dc4f9f1cbbcee",
+    "git_sha": "1b44a091a0feabb8cc633b8250d9b19ed63f968a",
     "git_dirty": true,
     "envelope_ids": [
       "tb-envelope-1",
-      "tb-humanoid-envelope-1"
+      "tb-humanoid-envelope-1",
+      "tb-arm-envelope-1"
     ],
-    "envelope_id": "tb-envelope-1 + tb-humanoid-envelope-1",
-    "envelope_config_hash": "0xb4bc0770162ab354a4f1d53899f2729ca9193876fcc35a5dd9b06ca955990882",
-    "captured_at": "2026-09-11T09:02:39.364Z"
+    "envelope_id": "tb-envelope-1 + tb-humanoid-envelope-1 + tb-arm-envelope-1",
+    "envelope_config_hash": "0x6cda466bb6edaafe049d44a004a2aea93ff999656d570b398df4892f6dd7a2a5",
+    "captured_at": "2026-09-11T10:01:59.226Z"
   },
   "nominal_suites": [
     {
@@ -66,34 +82,43 @@
         "one-tick-latency"
       ],
       "source": "evidence/humanoid/nominal-suite.json"
+    },
+    {
+      "target_id": "arm",
+      "n_nominal_runs": 8,
+      "all_passed": true,
+      "gate_passed": true,
+      "cases_that_failed": null,
+      "source": "evidence/arm/nominal-suite.json"
     }
   ],
-  "n_search_runs": 232,
+  "n_search_runs": 304,
   "search_cost_total": {
-    "simulations": 232,
-    "sim_steps": 576535,
-    "wall_time_s": 17.467
+    "simulations": 304,
+    "sim_steps": 648535,
+    "wall_time_s": 19.536
   },
-  "n_findings": 4,
+  "n_findings": 6,
   "findings_by_target": {
     "cart": 2,
-    "humanoid": 2
+    "humanoid": 2,
+    "arm": 2
   },
   "verdict_counts": {
-    "VALID": 4
+    "VALID": 6
   },
   "placeholder_warnings": [
     "Adversarially selected failures are not failure frequencies: this ledger is a set of found failures, not an estimate of P(failure) under any distribution.",
     "No distribution D over the envelope axes is stated or estimated here; both envelope YAMLs leave GUARD's marginal/scale null on purpose.",
-    "Severity is an uncalibrated kinematic proxy per target (cart: impact speed; humanoid: torso impact speed). No biomechanical tier, damage estimate or monetary value is assigned.",
+    "Severity is an uncalibrated kinematic proxy per target (cart: impact speed; humanoid: torso impact speed; arm: the carried part's impact speed, and NOT_PLACED deliberately has none at all). No biomechanical tier, damage estimate or monetary value is assigned.",
     "limit_state_margin_m is the cart's minimum recorded range to the obstacle; the simulator records no signed penetration depth, so it is not negative on contact, and the humanoid target records no quantity of that shape at all.",
-    "The physics is a simplified cart and a Gymnasium MuJoCo mannequin in illustrative envelopes, and needs calibration against physical robots before any underwriting use.",
-    "The humanoid target's policy checkpoint declares no licence; see evidence/humanoid/README.md.",
+    "The physics is a simplified cart, a Gymnasium MuJoCo mannequin and a mocap-welded Fetch arm in illustrative envelopes, and needs calibration against physical robots before any underwriting use.",
+    "The humanoid target's policy checkpoint declares no licence; see evidence/humanoid/README.md. Neither does the arm target's, nor any FetchPickAndPlace checkpoint found on the hub; see evidence/arm/README.md.",
     "INCONCLUSIVE never pays; INVALID rows are recorded findings that failed verification, not deliverable evidence."
   ],
   "findings": [
     {
-      "finding_id": "0x75154fd68827b5fa20c094090415f90df38d141e6c7dfbfdc660d2ed63933112",
+      "finding_id": "0x6341d6147eb204b3dd5225e2b4a21a1ef0937450ccdcd6b1e0565820d10712cb",
       "target_id": "cart",
       "target_label": "Warehouse cart",
       "controller_id": "stop-before-obstacle-v1",
@@ -133,10 +158,10 @@
       "search_cost": {
         "simulations": 144,
         "sim_steps": 336070,
-        "wall_time_s": 7.435
+        "wall_time_s": 7.291
       },
-      "run_id": "run-df19fdfa278dc734",
-      "git_sha": "233420350276d0bf732edfa9436dc4f9f1cbbcee",
+      "run_id": "run-d2297e9633ea654c",
+      "git_sha": "1b44a091a0feabb8cc633b8250d9b19ed63f968a",
       "git_dirty": true,
       "environment": {
         "control_dt_s": 0.02,
@@ -152,20 +177,20 @@
         "uv_lock_sha256": "69aea99583c3f5bfc05e8bc71d6b5df09bc6f74073a60ce6ded4ba455de285c1"
       },
       "trajectory_hash": "0x3445cbf3794f9ba5c508c9f8f35b8aa32f2fb6e187b926316f36fa2ca23c1ff5",
-      "commitment": "0x75154fd68827b5fa20c094090415f90df38d141e6c7dfbfdc660d2ed63933112",
+      "commitment": "0x6341d6147eb204b3dd5225e2b4a21a1ef0937450ccdcd6b1e0565820d10712cb",
       "settled_on_chain": {
         "chain_mode": "local",
         "chain_id": 31337,
         "escrow": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3",
-        "listing_id": "0x6259e4aba2d543cc567060f7aef67202d1a0b71d40dc6116aa974dd4367dcbfd",
-        "register_tx": "0x9e1178f3b62875bd7cc4a76290bda3c7daa8adaeaecc924467ebcbb4579cf558",
+        "listing_id": "0x25bc05ae4be93971ebd06649d4e3b5bb1bbeb1678c9810d50828596e814ec302",
+        "register_tx": "0x7e34a8425f6f3e2492640923f9bc0ba468b9e63f86d9e60602ce6d4b33af2191",
         "order_status": "SETTLED_VALID",
-        "settle_tx": "0x361cb60ee11f2b683a08a42512069a499c69eb6f340169ad859d97e080c8065f"
+        "settle_tx": "0xda56a11a497bad616131033107b493f34fb3222485e0d4e6214f1fc12c28580d"
       },
-      "created_at": "2026-09-11T08:48:54.053Z"
+      "created_at": "2026-09-11T09:59:42.648Z"
     },
     {
-      "finding_id": "0xe6a6fe0f8b9340bb697497294e49486fd78325b1e8b16057e2319956c5462fad",
+      "finding_id": "0xa709f532adac632f630838456e6d8633a9a8888423381d7d9385fea36363d425",
       "target_id": "cart",
       "target_label": "Warehouse cart",
       "controller_id": "stop-before-obstacle-v1",
@@ -205,10 +230,10 @@
       "search_cost": {
         "simulations": 144,
         "sim_steps": 336070,
-        "wall_time_s": 7.435
+        "wall_time_s": 7.291
       },
-      "run_id": "run-6d1aed2aadf47242",
-      "git_sha": "233420350276d0bf732edfa9436dc4f9f1cbbcee",
+      "run_id": "run-ce3f240c2338fdaf",
+      "git_sha": "1b44a091a0feabb8cc633b8250d9b19ed63f968a",
       "git_dirty": true,
       "environment": {
         "control_dt_s": 0.02,
@@ -224,20 +249,20 @@
         "uv_lock_sha256": "69aea99583c3f5bfc05e8bc71d6b5df09bc6f74073a60ce6ded4ba455de285c1"
       },
       "trajectory_hash": "0x8e8a239d2360e3c367b6898bd1e5301b43ed5df7d2676c5a8ffa80b0b276a889",
-      "commitment": "0xe6a6fe0f8b9340bb697497294e49486fd78325b1e8b16057e2319956c5462fad",
+      "commitment": "0xa709f532adac632f630838456e6d8633a9a8888423381d7d9385fea36363d425",
       "settled_on_chain": {
         "chain_mode": "local",
         "chain_id": 31337,
         "escrow": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3",
-        "listing_id": "0x385db144b62e683dbb74071c9748b7d6c4ff77a2abd3b26865a15950acf42a02",
-        "register_tx": "0xe0ebaefc4b4e722dad4c64e75c0abaca138d60e0ab126e184275227e350a6c89",
+        "listing_id": "0x317f01ebc2886c928b66a8653bbc144429418c564e060d267cb599ac6db00b6f",
+        "register_tx": "0x7ef01d5779b61bbed782f0923834fb57be6f54d3478910bda95510a3722580f6",
         "order_status": "SETTLED_INVALID",
-        "settle_tx": "0x6f4a29e4a9e7bf074d29164154c9c244e78ed4d00544e6f9bd43dd14e18e2eae"
+        "settle_tx": "0x350ff6914351a95b039fc367797ea634b4e063fd35803923db130659e7170eb7"
       },
-      "created_at": "2026-09-11T08:48:58.434Z"
+      "created_at": "2026-09-11T09:59:47.010Z"
     },
     {
-      "finding_id": "0x5e57c85e06fdee0146dc786e79dd17f8436b19a451f2f1e784daef3542ba2128",
+      "finding_id": "0xeefbd13f65599b65a3d4eeaf04d2d9c72901269c3a14f2205cbe27b5c28cd36d",
       "target_id": "humanoid",
       "target_label": "Humanoid balance policy",
       "controller_id": "farama-minari-humanoid-v5-sac-expert",
@@ -282,10 +307,10 @@
       "search_cost": {
         "simulations": 88,
         "sim_steps": 240465,
-        "wall_time_s": 10.032
+        "wall_time_s": 10.029
       },
-      "run_id": "run-1d4da8269d7c4c13",
-      "git_sha": "233420350276d0bf732edfa9436dc4f9f1cbbcee",
+      "run_id": "run-6edaf54e336c8fd8",
+      "git_sha": "1b44a091a0feabb8cc633b8250d9b19ed63f968a",
       "git_dirty": true,
       "environment": {
         "control_dt_s": 0.015,
@@ -302,20 +327,20 @@
         "uv_lock_sha256": "69aea99583c3f5bfc05e8bc71d6b5df09bc6f74073a60ce6ded4ba455de285c1"
       },
       "trajectory_hash": "0xa3a790803c0816a6d49c7749ea47f61dc57f8b3022ff82ad452c34356e89440e",
-      "commitment": "0x5e57c85e06fdee0146dc786e79dd17f8436b19a451f2f1e784daef3542ba2128",
+      "commitment": "0xeefbd13f65599b65a3d4eeaf04d2d9c72901269c3a14f2205cbe27b5c28cd36d",
       "settled_on_chain": {
         "chain_mode": "local",
         "chain_id": 31337,
         "escrow": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3",
-        "listing_id": "0x7340e290563e24aa5df193a084ab1a88d637c0864fde133bee2d09915131dd71",
-        "register_tx": "0x2c4c183e47ffc3805a0db68c974ea38f7493913c384e535931bc884100fc650f",
+        "listing_id": "0x49276e0339a9732ccd0404f270e82d9ee83aaf317a92e597005b2acd2b11ca41",
+        "register_tx": "0x86a146b6d39b614deee78364ad21bbdb95d40d7bf2ec04f2e3375f07fa8d926e",
         "order_status": "SETTLED_VALID",
-        "settle_tx": "0x90232246a626b20a39142491fc6f0c06c7c441e273e9869178edf105469c40fc"
+        "settle_tx": "0x824b48b686bad8e32d61cffb1f112e7a4f2fef7c0a1d85e8936722095871ef0f"
       },
-      "created_at": "2026-09-11T08:49:13.922Z"
+      "created_at": "2026-09-11T10:00:02.094Z"
     },
     {
-      "finding_id": "0x1aeb11d2f2f09bed6b86cb70d1242d252e68dd24eb0d433b7485f92efe3ffe4e",
+      "finding_id": "0xcc74b8d9868fd3af6732be641581cbea34a59224309484a151204948ce1667d9",
       "target_id": "humanoid",
       "target_label": "Humanoid balance policy",
       "controller_id": "farama-minari-humanoid-v5-sac-expert",
@@ -360,10 +385,10 @@
       "search_cost": {
         "simulations": 88,
         "sim_steps": 240465,
-        "wall_time_s": 10.032
+        "wall_time_s": 10.029
       },
-      "run_id": "run-0e410a1c706cae37",
-      "git_sha": "233420350276d0bf732edfa9436dc4f9f1cbbcee",
+      "run_id": "run-d4ed872ae1f3fb86",
+      "git_sha": "1b44a091a0feabb8cc633b8250d9b19ed63f968a",
       "git_dirty": true,
       "environment": {
         "control_dt_s": 0.015,
@@ -380,17 +405,175 @@
         "uv_lock_sha256": "69aea99583c3f5bfc05e8bc71d6b5df09bc6f74073a60ce6ded4ba455de285c1"
       },
       "trajectory_hash": "0xfa8513ac6ff7b228aeee5ac80d675ae74b973d44f67699c55a0e312314f22a34",
-      "commitment": "0x1aeb11d2f2f09bed6b86cb70d1242d252e68dd24eb0d433b7485f92efe3ffe4e",
+      "commitment": "0xcc74b8d9868fd3af6732be641581cbea34a59224309484a151204948ce1667d9",
       "settled_on_chain": {
         "chain_mode": "local",
         "chain_id": 31337,
         "escrow": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3",
-        "listing_id": "0xb135609c7349479c0ff32c838d85943a7ee9ec6004ca2bc61345696c96926f06",
-        "register_tx": "0x70ca977af78a0ccc3992183b2505056285294dfe27119293fb02f2d7e67b3452",
+        "listing_id": "0xd5445ad1af1ed96e8f5bcfa2a507b59c8a5833723411892d50e54a8061480c82",
+        "register_tx": "0xeed37fb8673d33d8b3e34fe99fe95ac6b65bf37d62a9127a4b61a3958867c96b",
         "order_status": "SETTLED_VALID",
-        "settle_tx": "0xf490309757438b313e8c106b7f55e4c26aad4bdfe640a3afeca73bae24cf901d"
+        "settle_tx": "0xa2dbc5c93ccae639eb3c4d59909fd292a97cdfa8f40e736952366e05fe148839"
       },
-      "created_at": "2026-09-11T08:49:18.254Z"
+      "created_at": "2026-09-11T10:00:06.441Z"
+    },
+    {
+      "finding_id": "0x24832e93767371aa832cb0ef94e955a488e72a19b95bfa823b5c553ab6b6134a",
+      "target_id": "arm",
+      "target_label": "Manipulator pick-and-place policy",
+      "controller_id": "intelligrow-fetch-pick-and-place-v4-sac-her",
+      "controller_hash": "sha256:09a0e01d754d5ec5ea8b5ecb762e4e5cd8c1505cf63bb013517573328590feaa",
+      "envelope_id": "tb-arm-envelope-1",
+      "scenario": {
+        "action_noise_frac": 0,
+        "control_latency_ms": 0,
+        "grip_friction": 0.25,
+        "gripper_latency_ms": 0,
+        "init_seed": 3,
+        "object_mass_kg": 2,
+        "object_offset_x_m": 0,
+        "object_offset_y_m": 0
+      },
+      "in_tuned_range": {
+        "object_mass_kg": true,
+        "grip_friction": false,
+        "object_offset_x_m": true,
+        "object_offset_y_m": true,
+        "action_noise_frac": true,
+        "control_latency_ms": true,
+        "gripper_latency_ms": true
+      },
+      "outcome": "DROPPED",
+      "failure_class": "DROPPED",
+      "limit_state_margin_m": null,
+      "severity": {
+        "proxy": "object_impact_speed_mps",
+        "value": 3.150862,
+        "units": "m/s",
+        "band": "high"
+      },
+      "impact_speed_mps": null,
+      "impact_kinetic_energy_j": null,
+      "total_mass_kg": null,
+      "verdict": "VALID",
+      "delivery_verdict": "VALID",
+      "verification_status": "VERIFIED",
+      "verification_method": "exact-trajectory-hash",
+      "source": "bounded grid search (grip friction x initial state)",
+      "search_cost": {
+        "simulations": 72,
+        "sim_steps": 72000,
+        "wall_time_s": 2.216
+      },
+      "run_id": "run-6dc71931900e117c",
+      "git_sha": "1b44a091a0feabb8cc633b8250d9b19ed63f968a",
+      "git_dirty": true,
+      "environment": {
+        "control_dt_s": 0.04,
+        "engine": "mujoco",
+        "engine_version": "3.13.0",
+        "gymnasium_robotics_version": "1.4.2",
+        "gymnasium_version": "1.3.0",
+        "n_substeps": 20,
+        "numpy_version": "2.5.3",
+        "physics_timestep_s": 0.002,
+        "platform": "Darwin-arm64",
+        "policy_backend": "numpy",
+        "python_version": "3.12.13",
+        "threads": 1,
+        "uv_lock_sha256": "69aea99583c3f5bfc05e8bc71d6b5df09bc6f74073a60ce6ded4ba455de285c1"
+      },
+      "trajectory_hash": "0xc34cf1174a11df86cff27328150c75a1fd6119976746678e5c43e1bb837a7373",
+      "commitment": "0x24832e93767371aa832cb0ef94e955a488e72a19b95bfa823b5c553ab6b6134a",
+      "settled_on_chain": {
+        "chain_mode": "local",
+        "chain_id": 31337,
+        "escrow": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3",
+        "listing_id": "0x595b9aab60a6efb9d2e7c46084c6c8d325dc084ca13902583f84908b52d546c9",
+        "register_tx": "0x601287c4b78f35cef4011c7ce6b2f84c7bf9def9213c9a96b02e9a1b479b2d3a",
+        "order_status": "SETTLED_VALID",
+        "settle_tx": "0xf93c828e0fcec470f5dfd918c675145e4a2dbae1718af05241e4c72a311902e7"
+      },
+      "created_at": "2026-09-11T10:00:13.566Z"
+    },
+    {
+      "finding_id": "0x2f88890cb2e5de07b1a4506a490896c8ecaf3c6ff4898f7e69ced8bf6352bca6",
+      "target_id": "arm",
+      "target_label": "Manipulator pick-and-place policy",
+      "controller_id": "intelligrow-fetch-pick-and-place-v4-sac-her",
+      "controller_hash": "sha256:09a0e01d754d5ec5ea8b5ecb762e4e5cd8c1505cf63bb013517573328590feaa",
+      "envelope_id": "tb-arm-envelope-1",
+      "scenario": {
+        "action_noise_frac": 0,
+        "control_latency_ms": 0,
+        "grip_friction": 0.05,
+        "gripper_latency_ms": 0,
+        "init_seed": 3,
+        "object_mass_kg": 2,
+        "object_offset_x_m": 0,
+        "object_offset_y_m": 0
+      },
+      "in_tuned_range": {
+        "object_mass_kg": true,
+        "grip_friction": false,
+        "object_offset_x_m": true,
+        "object_offset_y_m": true,
+        "action_noise_frac": true,
+        "control_latency_ms": true,
+        "gripper_latency_ms": true
+      },
+      "outcome": "DROPPED",
+      "failure_class": "DROPPED",
+      "limit_state_margin_m": null,
+      "severity": {
+        "proxy": "object_impact_speed_mps",
+        "value": 0.940892,
+        "units": "m/s",
+        "band": "low"
+      },
+      "impact_speed_mps": null,
+      "impact_kinetic_energy_j": null,
+      "total_mass_kg": null,
+      "verdict": "VALID",
+      "delivery_verdict": "VALID",
+      "verification_status": "VERIFIED",
+      "verification_method": "exact-trajectory-hash",
+      "source": "bounded grid search (grip friction x initial state)",
+      "search_cost": {
+        "simulations": 72,
+        "sim_steps": 72000,
+        "wall_time_s": 2.216
+      },
+      "run_id": "run-0b1ca8c24bf2125e",
+      "git_sha": "1b44a091a0feabb8cc633b8250d9b19ed63f968a",
+      "git_dirty": true,
+      "environment": {
+        "control_dt_s": 0.04,
+        "engine": "mujoco",
+        "engine_version": "3.13.0",
+        "gymnasium_robotics_version": "1.4.2",
+        "gymnasium_version": "1.3.0",
+        "n_substeps": 20,
+        "numpy_version": "2.5.3",
+        "physics_timestep_s": 0.002,
+        "platform": "Darwin-arm64",
+        "policy_backend": "numpy",
+        "python_version": "3.12.13",
+        "threads": 1,
+        "uv_lock_sha256": "69aea99583c3f5bfc05e8bc71d6b5df09bc6f74073a60ce6ded4ba455de285c1"
+      },
+      "trajectory_hash": "0xe070d1df0be13acc91a1039b6431d107c1cd44695520bcd47d5ba2c387c4ce62",
+      "commitment": "0x2f88890cb2e5de07b1a4506a490896c8ecaf3c6ff4898f7e69ced8bf6352bca6",
+      "settled_on_chain": {
+        "chain_mode": "local",
+        "chain_id": 31337,
+        "escrow": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3",
+        "listing_id": "0xddcd1dc593e935c6e4d40109b1b72cbf55817760af06354a760d0c7e0f284bc0",
+        "register_tx": "0xe9296f87741297024275049bb5ca752b833d45f5fc5ee4784e4d553bc3c6f0d9",
+        "order_status": "SETTLED_VALID",
+        "settle_tx": "0x7b39a3febb07ddbfa8a05f05021e4f4b90ab0cc5325ce38d6d7ac752d7b1a6bf"
+      },
+      "created_at": "2026-09-11T10:00:17.884Z"
     }
   ]
 }

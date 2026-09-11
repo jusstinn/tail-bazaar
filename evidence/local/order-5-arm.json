@@ -1,0 +1,270 @@
+{
+  "order": {
+    "order_id": "0x595b9aab60a6efb9d2e7c46084c6c8d325dc084ca13902583f84908b52d546c9",
+    "listing_id": "0x595b9aab60a6efb9d2e7c46084c6c8d325dc084ca13902583f84908b52d546c9",
+    "buyer": "0x1B27C90FcD738E960D3D505682EC2732A08c7f99",
+    "price_wei": "1000000000000000",
+    "status": "SETTLED_VALID",
+    "fund_tx": "0xfd35b5c1246cb2f376ee12342c48bcde64eeac1e114c0bbd7f7dda3cb5d88914",
+    "deliver_tx": "0x90696586dc9cd252f6a79e89181ef9f7866404168a2c04aae71392c19f258de3",
+    "recheck_tx": null,
+    "settle_tx": "0xf93c828e0fcec470f5dfd918c675145e4a2dbae1718af05241e4c72a311902e7",
+    "withdraw_tx": "0x355527b46ee1450a90ad4428337c246e2864e72f397794a2c0298edde941835f",
+    "timeout_tx": null,
+    "delivery_hash": "0x24832e93767371aa832cb0ef94e955a488e72a19b95bfa823b5c553ab6b6134a",
+    "retrieved_at": "2026-09-11T10:01:34.867Z",
+    "delivery_check": {
+      "valid": true,
+      "verdict": "VALID",
+      "reason": "delivered package hashes to the on-chain commitment, matches the advertised terms, and its replay frames are a physically possible trajectory that hashes to the run the verifier itself re-ran",
+      "on_chain_commitment": "0x24832e93767371aa832cb0ef94e955a488e72a19b95bfa823b5c553ab6b6134a",
+      "delivered_hash": "0x24832e93767371aa832cb0ef94e955a488e72a19b95bfa823b5c553ab6b6134a",
+      "asserted_delivery_hash": "0x24832e93767371aa832cb0ef94e955a488e72a19b95bfa823b5c553ab6b6134a",
+      "checks": [
+        {
+          "name": "on-chain-status-delivered",
+          "ok": true,
+          "detail": "status 3"
+        },
+        {
+          "name": "delivered-bytes-present",
+          "ok": true,
+          "detail": "65524 bytes"
+        },
+        {
+          "name": "delivered-hash-equals-commitment",
+          "ok": true,
+          "detail": "keccak256(delivered) 0x24832e937673... vs on-chain commitment 0x24832e937673..."
+        },
+        {
+          "name": "seller-asserted-hash-honest",
+          "ok": true,
+          "detail": "seller asserted 0x24832e937673..."
+        },
+        {
+          "name": "package-target-matches-summary",
+          "ok": true,
+          "detail": "arm vs arm"
+        },
+        {
+          "name": "package-subject-matches-summary",
+          "ok": true
+        },
+        {
+          "name": "package-envelope-matches-summary",
+          "ok": true
+        },
+        {
+          "name": "package-claim-matches-summary",
+          "ok": true,
+          "detail": "DROPPED / high"
+        },
+        {
+          "name": "package-scenario-admissible",
+          "ok": true
+        },
+        {
+          "name": "listing-was-certified-by-exact-trajectory-binding",
+          "ok": true,
+          "detail": "certification method exact-trajectory-hash, verifier re-run trajectory on record"
+        },
+        {
+          "name": "package-replay-matches-verified-run",
+          "ok": true,
+          "detail": "0xc34cf1174a11... vs verifier re-run 0xc34cf1174a11..."
+        },
+        {
+          "name": "delivered-frames-hash-to-verified-trajectory",
+          "ok": true,
+          "detail": "keccak256(canonical(delivered frames)) 0xc34cf1174a11... vs 0xc34cf1174a11..."
+        },
+        {
+          "name": "delivered-subject-is-the-one-re-run",
+          "ok": true,
+          "detail": "sha256:09a0e01d754d5... vs re-run sha256:09a0e01d754d5..."
+        },
+        {
+          "name": "delivered-frames-physically-plausible",
+          "ok": true,
+          "detail": "no recorded body exceeds the 72.837 m/s this scene can produce (sqrt(2*(1+mu_max)*g*d_max) + sqrt(2*g*h_table) with mu_max=1.5 (the largest contact friction the published envelope admits, written on the part and on both gripper pads), g=9.81 m/s^2, d_max=100 m (the simulator's divergence bound) and h_table=0.4 m (the only raised surface in this scene; the floor plane is at z = 0). The simulator independently ends a run as DIVERGED once the carried part exceeds 50 m/s, so no conclusive run can contain one faster than that either)"
+        }
+      ],
+      "checked_at": "2026-09-11T10:01:34.890Z"
+    },
+    "buyer_check": {
+      "ok": true,
+      "reason": "package matches commitment and advertised terms",
+      "delivered_hash": "0x24832e93767371aa832cb0ef94e955a488e72a19b95bfa823b5c553ab6b6134a",
+      "on_chain_commitment": "0x24832e93767371aa832cb0ef94e955a488e72a19b95bfa823b5c553ab6b6134a",
+      "checks": [
+        {
+          "name": "hash-equals-on-chain-commitment",
+          "ok": true,
+          "detail": "0x24832e937673... vs 0x24832e937673..."
+        },
+        {
+          "name": "target-subject-and-envelope-match-summary",
+          "ok": true
+        },
+        {
+          "name": "claim-matches-summary",
+          "ok": true
+        },
+        {
+          "name": "scenario-admissible-and-replayable",
+          "ok": true
+        }
+      ]
+    },
+    "created_at": "2026-09-11T10:01:30.806Z"
+  },
+  "listing": {
+    "listing_id": "0x595b9aab60a6efb9d2e7c46084c6c8d325dc084ca13902583f84908b52d546c9",
+    "chain_mode": "local",
+    "chain_id": 31337,
+    "escrow_address": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3",
+    "target_id": "arm",
+    "seller": "0x28dAA9F3F9468382fFeD53cc339418403337cDeD",
+    "price_wei": "1000000000000000",
+    "commitment": "0x24832e93767371aa832cb0ef94e955a488e72a19b95bfa823b5c553ab6b6134a",
+    "terms_hash": "0x36d99df5897a986e14dc7b954b9df031f4c1c82b534713789cbcdef0ca3b9425",
+    "public_summary": {
+      "admissible": true,
+      "chain": {
+        "chain_id": 31337,
+        "escrow": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3",
+        "mode": "local"
+      },
+      "claim_kind": "the pick-and-place policy drops the part, or fails to place it, under admissible conditions inside the published envelope",
+      "controller": {
+        "hash": "sha256:09a0e01d754d5ec5ea8b5ecb762e4e5cd8c1505cf63bb013517573328590feaa",
+        "id": "intelligrow-fetch-pick-and-place-v4-sac-her"
+      },
+      "envelope_id": "tb-arm-envelope-1",
+      "failure_class": {
+        "detected_by": "a mechanical predicate over MuJoCo's OWN contact list: the block was touching both gripper pads and was more than 0.03 m above the table, then was not, and was not at the goal — confirmed over three further ticks, so one momentary lost contact while the part is still pinched is never sold as a drop. This is the one predicate this project owns: the environment scores placement, not custody.",
+        "id": "DROPPED",
+        "label": "Dropped"
+      },
+      "format": "tb-cjson-1",
+      "hidden": "exact scenario parameters, trajectory, replay frames, the hunt that found it and the reproduction command are in the private package only",
+      "operating_context": {
+        "controller_tuned_range": "unmodified Gymnasium-Robotics FetchPickAndPlace-v4: the shipped 2 kg block, shipped friction, the environment's own block and goal sampling, no action noise, no control latency",
+        "controller_tuned_range_label": "conditions the policy's publisher evaluated it under",
+        "note": "The searched envelope is deliberately wider than the conditions the policy was published for, so a finding outside them is not a defect report: the publisher evaluated unmodified FetchPickAndPlace-v4 and claims nothing about payload mass, grip friction, block placement, noise or latency. These bounds are illustrative assumptions for a demonstration; the 'robot' is Gymnasium-Robotics' MuJoCo Fetch mannequin driven by a mocap weld on its end effector, and the 'part' is a 5 cm cube, not a product. The policy checkpoint declares NO LICENCE, and neither does any alternative found on the hub.",
+        "question": "This policy is published as placing the block in about ten control steps, every episode. How far can the operating range be widened - a heavier part, a slipperier one, a part that is not quite where it was expected, noisy or delayed actuation - before it drops what it is carrying?",
+        "reference": "GET /api/envelope (published axes for every target, same shape as GUARD configs/guard_theta.yaml)",
+        "searched_envelope": "payload mass 0.2-20 kg, grip friction 0.02-1.5, the part up to 5 cm from where the environment put it on either axis, action noise 0-50 % of the command range, control latency 0-160 ms and an extra 0-160 ms on the gripper channel alone, over eight published pick-and-place problems"
+      },
+      "price_wei": "1000000000000000",
+      "schema": "tb-summary-2",
+      "seller": "0x28dAA9F3F9468382fFeD53cc339418403337cDeD",
+      "seller_settled_orders_at_listing": 13,
+      "severity": {
+        "band": "high",
+        "definition": "block impact speed banded against the 2.80 m/s a free fall from the 0.40 m table top reaches at the floor: low below half of it, medium up to it, high above it (a measured kinematic proxy, never a damage, breakage or cost estimate)",
+        "proxy": "object_impact_speed_mps"
+      },
+      "target": {
+        "id": "arm",
+        "label": "Manipulator pick-and-place policy",
+        "machine": "a Fetch arm picking a 5 cm block off a table under a pretrained policy",
+        "replay_renderer": "arm-3d",
+        "subject_label": "Policy"
+      },
+      "verification": {
+        "environment_fingerprint": "0x4925479687a035f944b34e490e507fcd3d9293ee5863aff3dec69598efc8f909",
+        "evidence_binding": "the seller's environment fingerprint equalled the verifier's own, and the policy checkpoint id+hash and the trajectory hash RECOMPUTED from the delivered replay frames were compared against the verifier's own re-run with this target's own simulator; declared hashes are not trusted, the frames were checked to be a physically possible trajectory of this scene, and a replay the verifier cannot bind exactly is INCONCLUSIVE rather than certified",
+        "method": "exact-trajectory-hash",
+        "status": "VERIFIED",
+        "verdict": "VALID",
+        "verified_at": "2026-09-11T10:00:09.544Z",
+        "verifier": "0xe592C7DA96Cc42344952C452377eBCc7Cc0982AE",
+        "verifier_version": "tb-verifier-2"
+      }
+    },
+    "status": "SETTLED_VALID",
+    "register_tx": "0x601287c4b78f35cef4011c7ce6b2f84c7bf9def9213c9a96b02e9a1b479b2d3a",
+    "created_at": "2026-09-11T10:00:13.563Z",
+    "demo_note": null
+  },
+  "events": [
+    {
+      "id": 9,
+      "listing_id": "0x595b9aab60a6efb9d2e7c46084c6c8d325dc084ca13902583f84908b52d546c9",
+      "ts": "2026-09-11T10:00:13.566Z",
+      "actor": "verifier",
+      "kind": "verified",
+      "detail": "{\"target\":\"arm\",\"status\":\"VERIFIED\",\"method\":\"exact-trajectory-hash\",\"reason\":\"identical trajectory hash in a matching pinned environment; the policy checkpoint and the delivered replay frames are bound to the verifier's own re-run, and the frames are a physically possible trajectory of this scene\",\"checks\":24}",
+      "tx_hash": null,
+      "block_number": null,
+      "chain_mode": "local"
+    },
+    {
+      "id": 10,
+      "listing_id": "0x595b9aab60a6efb9d2e7c46084c6c8d325dc084ca13902583f84908b52d546c9",
+      "ts": "2026-09-11T10:00:13.567Z",
+      "actor": "verifier",
+      "kind": "registered",
+      "detail": "{\"seller\":\"0x28dAA9F3F9468382fFeD53cc339418403337cDeD\",\"price_wei\":\"1000000000000000\",\"commitment\":\"0x24832e93767371aa832cb0ef94e955a488e72a19b95bfa823b5c553ab6b6134a\",\"terms_hash\":\"0x36d99df5897a986e14dc7b954b9df031f4c1c82b534713789cbcdef0ca3b9425\",\"block\":15177}",
+      "tx_hash": "0x601287c4b78f35cef4011c7ce6b2f84c7bf9def9213c9a96b02e9a1b479b2d3a",
+      "block_number": 15177,
+      "chain_mode": "local"
+    },
+    {
+      "id": 34,
+      "listing_id": "0x595b9aab60a6efb9d2e7c46084c6c8d325dc084ca13902583f84908b52d546c9",
+      "ts": "2026-09-11T10:01:30.807Z",
+      "actor": "buyer",
+      "kind": "funded",
+      "detail": "{\"buyer\":\"0x1B27C90FcD738E960D3D505682EC2732A08c7f99\",\"price_wei\":\"1000000000000000\",\"block\":15254}",
+      "tx_hash": "0xfd35b5c1246cb2f376ee12342c48bcde64eeac1e114c0bbd7f7dda3cb5d88914",
+      "block_number": 15254,
+      "chain_mode": "local"
+    },
+    {
+      "id": 35,
+      "listing_id": "0x595b9aab60a6efb9d2e7c46084c6c8d325dc084ca13902583f84908b52d546c9",
+      "ts": "2026-09-11T10:01:34.855Z",
+      "actor": "seller",
+      "kind": "delivered",
+      "detail": "{\"asserted_delivery_hash\":\"0x24832e93767371aa832cb0ef94e955a488e72a19b95bfa823b5c553ab6b6134a\",\"bytes\":65524,\"tampered_demo\":false,\"block\":15258}",
+      "tx_hash": "0x90696586dc9cd252f6a79e89181ef9f7866404168a2c04aae71392c19f258de3",
+      "block_number": 15258,
+      "chain_mode": "local"
+    },
+    {
+      "id": 36,
+      "listing_id": "0x595b9aab60a6efb9d2e7c46084c6c8d325dc084ca13902583f84908b52d546c9",
+      "ts": "2026-09-11T10:01:34.880Z",
+      "actor": "buyer",
+      "kind": "retrieved",
+      "detail": "{\"bytes\":65524,\"signer\":\"0x1B27C90FcD738E960D3D505682EC2732A08c7f99\",\"local_check_ok\":true,\"reason\":\"package matches commitment and advertised terms\"}",
+      "tx_hash": null,
+      "block_number": null,
+      "chain_mode": "local"
+    },
+    {
+      "id": 37,
+      "listing_id": "0x595b9aab60a6efb9d2e7c46084c6c8d325dc084ca13902583f84908b52d546c9",
+      "ts": "2026-09-11T10:01:38.919Z",
+      "actor": "verifier",
+      "kind": "settled_valid",
+      "detail": "{\"reason\":\"delivered package hashes to the on-chain commitment, matches the advertised terms, and its replay frames are a physically possible trajectory that hashes to the run the verifier itself re-ran\",\"credited_to\":\"0x28dAA9F3F9468382fFeD53cc339418403337cDeD\",\"block\":15262}",
+      "tx_hash": "0xf93c828e0fcec470f5dfd918c675145e4a2dbae1718af05241e4c72a311902e7",
+      "block_number": 15262,
+      "chain_mode": "local"
+    },
+    {
+      "id": 38,
+      "listing_id": "0x595b9aab60a6efb9d2e7c46084c6c8d325dc084ca13902583f84908b52d546c9",
+      "ts": "2026-09-11T10:01:42.956Z",
+      "actor": "seller",
+      "kind": "withdrawn",
+      "detail": "{\"amount_wei\":\"1000000000000000\",\"block\":15266}",
+      "tx_hash": "0x355527b46ee1450a90ad4428337c246e2864e72f397794a2c0298edde941835f",
+      "block_number": 15266,
+      "chain_mode": "local"
+    }
+  ]
+}

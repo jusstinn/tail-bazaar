@@ -28,7 +28,7 @@
     "verifier": "0xe592C7DA96Cc42344952C452377eBCc7Cc0982AE",
     "environment_fingerprint": "0x3f773b1fe738262d9913b6e9425a7d4788208cbe16e47bef5455f9a61bb14546",
     "evidence_binding": "the seller's environment fingerprint equalled the verifier's own, and the policy checkpoint id+hash and the trajectory hash RECOMPUTED from the delivered replay frames were compared against the verifier's own re-run with this target's own simulator; declared hashes are not trusted, the frames were checked to be a physically possible trajectory of this scene, and a replay the verifier cannot bind exactly is INCONCLUSIVE rather than certified",
-    "verified_at": "2026-09-11T08:49:14.233Z"
+    "verified_at": "2026-09-11T10:00:02.418Z"
   },
   "operating_context": {
     "controller_tuned_range": "unmodified Gymnasium Humanoid-v5: no external push, floor friction 1.0, stock body masses, no actuator noise, no control latency",
@@ -44,7 +44,7 @@
     "definition": "torso impact speed banded against the 4.43 m/s a free fall from the 1.0 m healthy-height floor reaches: low below half of it, medium up to it, high above it (a measured kinematic proxy, never a damage, injury or cost estimate)"
   },
   "seller": "0x28dAA9F3F9468382fFeD53cc339418403337cDeD",
-  "seller_settled_orders_at_listing": 5,
+  "seller_settled_orders_at_listing": 13,
   "price_wei": "1000000000000000",
   "chain": {
     "mode": "local",

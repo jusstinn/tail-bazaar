@@ -76,6 +76,20 @@ export function isPublicDemoOrder(orderId: string | null | undefined): boolean {
   return typeof orderId === "string" && publicDemoOrderIds().has(orderId.toLowerCase());
 }
 
+/** The targets whose nominal baseline run a published fixture's replay needs. The baseline route is
+ *  not order-scoped, so this is how the exception stays as narrow as the order list that caused it:
+ *  a robot with no published fixture keeps its 401 on that route too. */
+export function publicDemoTargets(): Set<string> {
+  const ids = publicDemoOrderIds();
+  const out = new Set<string>();
+  if (ids.size === 0) return out;
+  try {
+    const rows = getDb().prepare("SELECT o.order_id, l.target_id FROM orders o JOIN listings l ON l.listing_id = o.listing_id").all() as { order_id: string; target_id: string | null }[];
+    for (const r of rows) if (ids.has(r.order_id.toLowerCase())) out.add(r.target_id ?? DEFAULT_TARGET);
+  } catch { /* no database yet: nothing is published */ }
+  return out;
+}
+
 /** Gate for every route that can return private package bytes, scenario parameters, trajectories or
  *  salts. `orderId` null means "any live buyer session is enough" (the shared public baseline run);
  *  otherwise the session must be bound to that order. Operator-only routes pass operatorOnly. */
@@ -183,16 +197,17 @@ export function buildApp() {
 
   // The nominal baseline run is public by design (its scenario is the published nominal operating
   // point), but it is still a full recorded trajectory and it is only used by the reveal view, so it
-  // is gated with the rest of the private-data routes in hosted mode. When this host publishes
-  // demonstration fixtures it is opened too, because it is the surviving run their replay draws
+  // is gated with the rest of the private-data routes in hosted mode. It opens for the ROBOTS whose
+  // fixtures this host publishes, and only those, because it is the surviving run their replay draws
   // behind the failure and a fixture whose ghost 401s is not a demonstration of anything.
   app.get("/api/runs/baseline", async (c) => {
     const access = privateAccess(c, null);
-    const viaFixture = !access.ok && publicDemoOrderIds().size > 0;
-    if (!access.ok && !viaFixture) return c.json({ error: access.error, hosted_mode: true }, 401);
     const want = c.req.query("target");
     if (want !== undefined && !isTargetId(want)) return c.json({ error: `unknown target ${want}`, known: TARGET_IDS }, 404);
-    const { file } = await ensureBaseline(targetFor(want ?? DEFAULT_TARGET));
+    const target = targetFor(want ?? DEFAULT_TARGET);
+    const viaFixture = !access.ok && publicDemoTargets().has(target.id);
+    if (!access.ok && !viaFixture) return c.json({ error: access.error, hosted_mode: true }, 401);
+    const { file } = await ensureBaseline(target);
     const fixture = viaFixture ? { "x-access-via": "public-demo-fixture", "x-tb-demo-fixture": DEMO_FIXTURE_NOTE } : { "x-access-via": access.via };
     return new Response(fs.readFileSync(file), { headers: { "content-type": "application/json", ...fixture } });
   });

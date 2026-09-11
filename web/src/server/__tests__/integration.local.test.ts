@@ -217,7 +217,8 @@ test("hosted mode: a published fixture order opens anonymously and its neighbour
     assert.match(opened.headers.get("x-tb-demo-fixture") ?? "", /DEMONSTRATION FIXTURE/);
     const listing = getDb().prepare("SELECT commitment FROM listings WHERE listing_id = ?").get(valid.listing_id) as { commitment: string };
     assert.equal(keccakHex(new Uint8Array(await opened.arrayBuffer())), listing.commitment, "and it is the committed package, not a redaction");
-    assert.equal((await app.request("/api/runs/baseline")).status, 200, "so is the baseline its replay draws behind it");
+    const target = (getDb().prepare("SELECT target_id FROM listings WHERE listing_id = ?").get(valid.listing_id) as { target_id: string | null }).target_id ?? "cart";
+    assert.equal((await app.request(`/api/runs/baseline?target=${target}`)).status, 200, "so is the baseline its replay draws behind it");
     const closed = await app.request(`/api/orders/${other.order_id}/reveal`);
     assert.equal(closed.status, 401, "every other order keeps the hosted-mode 401");
     assert.ok(!(await closed.text()).includes("salt_hex"));

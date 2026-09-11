@@ -87,10 +87,12 @@ test("a listed order is readable anonymously on a hosted instance, and says it i
   assert.equal(doc.public_demo_fixture, true);
   assert.equal(doc.public_demo_fixture_note, DEMO_FIXTURE_NOTE);
   assert.equal(doc.reveal_requires_auth, false);
-  // The nominal baseline the replay draws behind it opens too, or the fixture shows half a story.
-  const base = await app.request("/api/runs/baseline");
+  // The nominal baseline the replay draws behind it opens too, or the fixture shows half a story —
+  // but only for THIS ROBOT. A robot with no published fixture keeps its 401 on that route as well.
+  const base = await app.request("/api/runs/baseline?target=cart");
   assert.equal(base.status, 200);
   assert.equal(base.headers.get("x-access-via"), "public-demo-fixture");
+  assert.equal((await app.request("/api/runs/baseline?target=humanoid")).status, 401, "the published cart fixture does not open the humanoid's baseline");
   hosted(false);
   fixtures(null);
 });

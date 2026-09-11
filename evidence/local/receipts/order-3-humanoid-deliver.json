@@ -1,23 +1,23 @@
 {
   "chain_mode": "local",
   "chain_id": 31337,
-  "hash": "0xd6ba6857193a7cbe7b4ea0770f2fd03b021899e521c4c8efc696a18381422b1a",
-  "block_number": 10966,
+  "hash": "0x24d762562e3979cd169ce2aecf5222cd4ab43c98b27c9911fb644c2cf14aea25",
+  "block_number": 15225,
   "status": "success",
   "from": "0x28daa9f3f9468382ffed53cc339418403337cded",
   "to": "0xfadf11662c46c0214b0a40938a26fb8f0cd785a3",
-  "gas_used": "53577",
+  "gas_used": "53565",
   "effective_gas_price": "1000000007",
   "value": "0",
-  "input": "0x4c69bf787340e290563e24aa5df193a084ab1a88d637c0864fde133bee2d09915131dd715e57c85e06fdee0146dc786e79dd17f8436b19a451f2f1e784daef3542ba2128",
+  "input": "0x4c69bf7849276e0339a9732ccd0404f270e82d9ee83aaf317a92e597005b2acd2b11ca41eefbd13f65599b65a3d4eeaf04d2d9c72901269c3a14f2205cbe27b5c28cd36d",
   "logs": [
     {
       "address": "0xfadf11662c46c0214b0a40938a26fb8f0cd785a3",
       "topics": [
         "0x872024bb4356ecd19dc9cbc3cf9c28c766da9ea9e1276f6e463216e81acd3c92",
-        "0x7340e290563e24aa5df193a084ab1a88d637c0864fde133bee2d09915131dd71"
+        "0x49276e0339a9732ccd0404f270e82d9ee83aaf317a92e597005b2acd2b11ca41"
       ],
-      "data": "0x5e57c85e06fdee0146dc786e79dd17f8436b19a451f2f1e784daef3542ba2128"
+      "data": "0xeefbd13f65599b65a3d4eeaf04d2d9c72901269c3a14f2205cbe27b5c28cd36d"
     }
   ],
   "explorer": null
