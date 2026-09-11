@@ -1,5 +1,7 @@
 # Tail Bazaar — status at the first runnable milestone (simulator feasibility)
 
+> Superseded for the complete candidate by `REPORT.md` (contract, marketplace, Base Sepolia deployment). This file is kept as the simulator milestone record.
+
 Date: 2026-09-10 (local). Scope of this milestone: prove the simulator before building the marketplace. Nothing below involves a chain, a wallet, or a network call; everything ran locally.
 
 ## What ran
