@@ -15,14 +15,16 @@ The environment's, read and never reimplemented:
   * `info["is_success"]`, i.e. `FetchEnv._is_success(achieved_goal, goal)`, which is
     `goal_distance < distance_threshold` with the environment's own 5 cm threshold;
   * the reward, the observation, and the registered 50-step episode horizon.
-This project cross-checks the success flag against the distance it recomputes at every tick and
-publishes `success_predicate_mismatches` in every document. It is 0 everywhere in the evidence.
+This project cross-checks the success flag at every tick against the distance recomputed from the
+environment's own `achieved_goal` and `desired_goal`, and publishes `success_predicate_mismatches`
+in every document. It is 0 everywhere in the evidence.
 
 This project's, and documented as such:
   * the DROP predicate, which the environment does not provide and cannot: the environment
     scores placement, not custody. It is mechanical and reads MuJoCo's own contact list —
-    see `DROP_PREDICATE` below. It invents no detector for anything the environment already
-    reports, which is exactly why NOT_PLACED is the environment's flag and nothing else.
+    see `DROP_PREDICATE` below, including why a proposed release has to be confirmed before it
+    counts. It invents no detector for anything the environment already reports, which is exactly
+    why NOT_PLACED is the environment's flag and nothing else.
   * the settle window: after a drop, stepping continues past the environment's horizon (the
     policy still acting, nothing frozen or scripted) until the block has landed, so the impact
     can be measured and the replay shows the fall. Capped at SETTLE_TICKS.
@@ -33,7 +35,6 @@ from __future__ import annotations
 import hashlib
 import math
 import platform
-import sys
 import time
 from typing import Any
 
@@ -76,6 +77,20 @@ FRAME_PLACES = 4
 SETTLE_TICKS = 30  # 1.2 s
 POST_IMPACT_TICKS = 5  # 0.2 s after the landing, so the replay shows it come to rest
 
+# How long a loss of grasp must persist before it counts as a drop rather than a blip.
+#
+# THIS IS NOT COSMETIC. Without it the predicate is wrong: MuJoCo's contact list can report one
+# pad's contact missing for a single 40 ms tick while the block is still firmly pinched and being
+# carried UPWARD at constant speed. That happened in the first grid sweep — the block rose
+# 0.507 -> 0.601 -> 0.632 m at a steady 0.67 m/s with one tick of "not grasped" in the middle —
+# and it is a contact-list artefact, not a dropped part. A drop that is immediately re-caught is
+# also not a drop. So a release is confirmed only if, over the next DROP_CONFIRM_TICKS,
+#   * the grasp is NOT regained, and
+#   * the block is at some point touching NOTHING AT ALL, i.e. it is genuinely in free flight.
+# 3 ticks is 120 ms, in which a released block falls about 7 cm — unmistakable, and short enough
+# that a real drop is still attributed to the tick it actually left the hand.
+DROP_CONFIRM_TICKS = 3
+
 # Divergence guard: a block moving faster than this is a solver blow-up, not a dropped part.
 MAX_PLAUSIBLE_SPEED_MPS = 50.0
 
@@ -83,15 +98,28 @@ DROP_PREDICATE = {
     "class": "DROPPED",
     "owner": "this project (the environment scores placement, not custody)",
     "rule": (
-        "at control tick k: the block was in contact with BOTH gripper finger pads at tick k-1, "
-        "AND its centre was more than airborne_margin_m above its resting height on the table at "
-        "tick k-1, AND at tick k MuJoCo reports it in contact with fewer than both pads, AND the "
-        "environment's own info['is_success'] is false at tick k"
+        "a release is proposed at control tick k when the block was in contact with BOTH gripper "
+        "finger pads at tick k-1, AND its centre was more than airborne_margin_m above its resting "
+        "height on the table at tick k-1, AND at tick k MuJoCo reports it in contact with fewer than "
+        "both pads, AND the environment's own info['is_success'] is false at tick k. It is CONFIRMED "
+        "as a drop only if, over the following drop_confirm_ticks, the grasp is not regained and the "
+        "block is at some tick in contact with nothing at all. Otherwise it is discarded."
     ),
-    "plain_english": "it was being held, it was off the table, it is not being held any more, and it is not at the goal",
+    "plain_english": (
+        "it was being held, it was off the table, it left the hand, it stayed out of the hand, and it "
+        "was not at the goal"
+    ),
+    "why_confirmation": (
+        "MuJoCo's contact list can drop one pad for a single tick while the block is still pinched and "
+        "being carried upward; without the confirmation window that artefact would be sold as a drop"
+    ),
     "reads": "mujoco MjData.contact, the engine's own contact list; no vision, no heuristic, no policy introspection",
     "airborne_margin_m": AIRBORNE_MARGIN_M,
-    "detected_within": "the environment's own registered episode horizon only; the settle window never creates a drop",
+    "drop_confirm_ticks": DROP_CONFIRM_TICKS,
+    "detected_within": (
+        "the release must occur within the environment's own registered episode horizon; its "
+        "confirmation window may extend up to drop_confirm_ticks past it"
+    ),
     "severity_proxy": {
         "primary": "object_impact_speed_mps",
         "definition": (
@@ -116,7 +144,21 @@ SUCCESS_PREDICATE = {
     "rule": "success when goal_distance(achieved_goal, desired_goal) < distance_threshold",
     "no_bespoke_detector": (
         "this project implements no placement detector; it records the environment's flag and "
-        "cross-checks it against the distance it recomputes at every tick"
+        "cross-checks it at every tick against the distance recomputed from the environment's OWN "
+        "achieved_goal and desired_goal"
+    ),
+    "block_position_source": (
+        "obs['achieved_goal'], which is the environment's own read of the block's site. NOTE: after "
+        "mujoco.mj_step the kinematics cache (xpos, site_xpos, contacts) is one 2 ms physics substep "
+        "behind qpos, because mj_step evaluates forward dynamics and then integrates. The environment "
+        "computes is_success from that cache, so this project does too — comparing the environment's "
+        "boolean against a position recomputed from qpos instead disagrees on about one tick in a "
+        "thousand, purely where the distance sits within ~2 mm of the 50 mm threshold. The skew is "
+        "1.4 mm at 0.7 m/s, far below every threshold used here (the airborne margin is 30 mm)."
+    ),
+    "block_velocity_source": (
+        "the block's free-joint linear dof velocity from qvel, exact for a free body; the environment "
+        "publishes only a dt-scaled site velocity, so there is no environment-owned alternative"
     ),
 }
 
@@ -249,7 +291,7 @@ def run_scenario(scenario: dict[str, Any], record_frames: bool = True) -> dict[s
     result["episode_horizon_ticks"] = horizon
     result["episode_horizon_source"] = "gymnasium.spec('FetchPickAndPlace-v4').max_episode_steps"
 
-    obj0 = index.object_pos(data)
+    obj0 = np.asarray(obs["achieved_goal"], dtype=np.float64)
     grip0 = np.asarray(data.site_xpos[index.grip_site], dtype=np.float64)
     init_ok_resting = abs(float(obj0[2]) - index.resting_z) < 5e-3
     init_ok_on_table = index.over_table(obj0)
@@ -322,6 +364,7 @@ def run_scenario(scenario: dict[str, Any], record_frames: bool = True) -> dict[s
     prev_speed = 0.0
     prev_z = float(obj0[2])
 
+    pending: dict[str, Any] | None = None  # a proposed release awaiting confirmation
     drop_tick: int | None = None
     drop_t: float | None = None
     drop_z: float | None = None
@@ -364,14 +407,18 @@ def run_scenario(scenario: dict[str, Any], record_frames: bool = True) -> dict[s
         obs, reward, terminated, truncated, info = env.step(applied)
         last_tick = tick + 1
 
-        obj = index.object_pos(data)
+        # The block's position is the ENVIRONMENT's own `achieved_goal`, so the geometry reported
+        # here and the flag the environment reports are computed from the same read of the block.
+        obj = np.asarray(obs["achieved_goal"], dtype=np.float64)
         obj_z = float(obj[2])
         speed = float(np.linalg.norm(index.object_linvel(data)))
-        goal_dist = float(np.linalg.norm(obj - goal))
+        goal_dist = float(np.linalg.norm(obj - np.asarray(obs["desired_goal"], dtype=np.float64)))
         is_grasped = index.grasped(data)
+        touching_anything = index.any_contact(data)
         env_success = float(info["is_success"])
 
-        # Cross-check the environment's own flag against the distance recomputed here.
+        # Cross-check the environment's own flag against the distance recomputed from the
+        # environment's own achieved_goal and desired_goal.
         if bool(env_success > 0.5) != bool(goal_dist < float(env.distance_threshold)):
             success_mismatches += 1
 
@@ -394,30 +441,72 @@ def run_scenario(scenario: dict[str, Any], record_frames: bool = True) -> dict[s
         lift_max_z = max(lift_max_z, obj_z)
         min_goal_dist = min(min_goal_dist, goal_dist)
 
-        # ---- the drop predicate -------------------------------------------------------------
+        # ---- the drop predicate: propose a release, then confirm or discard it ----------------
+        if drop_tick is None and pending is not None:
+            if is_grasped:
+                # Back in the hand inside the confirmation window: a contact-list blip or a catch,
+                # not a drop. Discarded, and recorded so the evidence shows it was considered.
+                events.append(
+                    {
+                        "event": "RELEASE_DISCARDED",
+                        "t_s": pending["t_s"],
+                        "reason": f"the grasp was regained {tick - pending['tick']} tick(s) later",
+                    }
+                )
+                pending = None
+            else:
+                pending["free_flight"] = pending["free_flight"] or not touching_anything
+                if tick - pending["tick"] >= DROP_CONFIRM_TICKS:
+                    if pending["free_flight"]:
+                        drop_tick = pending["tick"]
+                        drop_t = pending["t_s"]
+                        drop_z = pending["z"]
+                        drop_dist = pending["goal_dist"]
+                        events.append(
+                            {
+                                "event": "DROPPED",
+                                "t_s": drop_t,
+                                "confirmed_at_t_s": round(t + DT_CTRL_S, 6),
+                                "object_z_m": round(float(drop_z), 6),
+                                "height_above_table_m": round(float(drop_z) - index.resting_z, 6),
+                                "object_goal_distance_m": round(float(drop_dist), 6),
+                                "object_speed_mps": pending["speed"],
+                                "detected_by": (
+                                    "both-pad contact lost while airborne and not at the goal, then "
+                                    f"not regained and in free flight within {DROP_CONFIRM_TICKS} ticks"
+                                ),
+                            }
+                        )
+                    else:
+                        events.append(
+                            {
+                                "event": "RELEASE_DISCARDED",
+                                "t_s": pending["t_s"],
+                                "reason": (
+                                    f"the block was still touching something at every tick of the "
+                                    f"{DROP_CONFIRM_TICKS}-tick confirmation window, so it never left the hand"
+                                ),
+                            }
+                        )
+                    pending = None
+
         if (
             drop_tick is None
+            and pending is None
             and in_episode
             and prev_grasped
             and prev_airborne
             and not is_grasped
             and env_success <= 0.5
         ):
-            drop_tick = tick
-            drop_t = round(t + DT_CTRL_S, 6)
-            drop_z = obj_z
-            drop_dist = goal_dist
-            events.append(
-                {
-                    "event": "DROPPED",
-                    "t_s": drop_t,
-                    "object_z_m": round(obj_z, 6),
-                    "height_above_table_m": round(obj_z - index.resting_z, 6),
-                    "object_goal_distance_m": round(goal_dist, 6),
-                    "object_speed_mps": round(speed, 6),
-                    "detected_by": "both-pad contact lost while airborne and not at the goal",
-                }
-            )
+            pending = {
+                "tick": tick,
+                "t_s": round(t + DT_CTRL_S, 6),
+                "z": obj_z,
+                "goal_dist": goal_dist,
+                "speed": round(speed, 6),
+                "free_flight": not touching_anything,
+            }
 
         if drop_tick is not None and tick > drop_tick:
             peak_speed_after_drop = max(peak_speed_after_drop, speed)
@@ -464,9 +553,9 @@ def run_scenario(scenario: dict[str, Any], record_frames: bool = True) -> dict[s
         if diverged_reason is not None:
             break
         if tick + 1 >= horizon:
-            if drop_tick is None:
+            if drop_tick is None and pending is None:
                 break
-            if impact_tick is not None and tick >= impact_tick + POST_IMPACT_TICKS:
+            if drop_tick is not None and impact_tick is not None and tick >= impact_tick + POST_IMPACT_TICKS:
                 break
 
     # The loop records the state BEFORE each step, so without this the final state — the one the
@@ -521,7 +610,10 @@ def run_scenario(scenario: dict[str, Any], record_frames: bool = True) -> dict[s
                 "value": None,
                 "units": "m/s",
                 "measured": False,
-                "why_none": "the block had not landed when the settle window ended",
+                "why_none": (
+                    "no contact between the block and the table or the floor occurred between the drop "
+                    "and the end of the settle window; see recovered_after_drop"
+                ),
                 "not_a_damage_estimate": True,
             }
     elif outcome == "NOT_PLACED":

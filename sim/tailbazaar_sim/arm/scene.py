@@ -236,6 +236,17 @@ class SceneIndex:
                 right = True
         return left and right
 
+    def any_contact(self, data: mujoco.MjData) -> bool:
+        """True when MuJoCo reports the block touching ANY geom at all.
+
+        False means free flight: the block is held by nothing and resting on nothing.
+        """
+        for i in range(data.ncon):
+            c = data.contact[i]
+            if self.object_geom in (int(c.geom1), int(c.geom2)):
+                return True
+        return False
+
     def support_contact(self, data: mujoco.MjData) -> int | None:
         """The first geom other than a finger pad that the block is touching, or None.
 
@@ -251,9 +262,6 @@ class SceneIndex:
                 return other
         return None
 
-    def object_pos(self, data: mujoco.MjData) -> np.ndarray:
-        return np.asarray(data.qpos[self.object_qposadr : self.object_qposadr + 3], dtype=np.float64)
-
     def object_linvel(self, data: mujoco.MjData) -> np.ndarray:
         """World-frame linear velocity of the block. Exact: it is a free body, so this is its
         own free joint's first three dof velocities, not a com-based or derived quantity."""
@@ -267,9 +275,19 @@ class SceneIndex:
         )
 
     def geom_name(self, gid: int | None) -> str | None:
+        """A reportable name for a geom.
+
+        The Fetch MJCF leaves the table's geom unnamed, so `mj_id2name` returns None for the one
+        surface a dropped block most often lands on. Fall back to the owning body plus the geom
+        index rather than publishing a null that reads as "we did not see what it hit".
+        """
         if gid is None:
             return None
-        return mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_GEOM, int(gid))
+        name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_GEOM, int(gid))
+        if name:
+            return name
+        body = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_BODY, int(self.model.geom_bodyid[int(gid)]))
+        return f"{body or 'world'}:geom{int(gid)}"
 
 
 def render_body_names(model: mujoco.MjModel) -> list[str]:
@@ -302,10 +320,18 @@ def render_bodies(model: mujoco.MjModel) -> list[dict[str, Any]]:
         body = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, bid)
         gtype = _GEOM_TYPE_NAMES.get(int(model.geom_type[g]), str(int(model.geom_type[g])))
         size = [float(x) for x in model.geom_size[g]]
+        # Classified from the model, not by name: a geom that collides with nothing
+        # (contype == conaffinity == 0) is a visual marker, not physical geometry. In this scene
+        # that is the environment's mocap gizmo — three 2 m long thin bars on `robot0:mocap`
+        # marking the weld target the Fetch env drives the gripper with. A viewer that drew them
+        # would put a giant coordinate cross through the picture, so the contract says which is
+        # which and every consumer, including render.py, can skip them.
+        collides = int(model.geom_contype[g]) != 0 or int(model.geom_conaffinity[g]) != 0
         entry: dict[str, Any] = {
             "body": body,
             "geom": mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, g),
             "type": gtype,
+            "role": "collision" if collides else "visual_marker",
             "pos_m": [round(float(x), 6) for x in model.geom_pos[g]],
             "quat_wxyz": [round(float(x), 6) for x in model.geom_quat[g]],
             "rgba": [round(float(x), 4) for x in model.geom_rgba[g]],

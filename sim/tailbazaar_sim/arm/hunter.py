@@ -8,8 +8,8 @@ there is no model in the loop.
 Search modes (all bounded; `search_cost` in the result reports what each one actually spent):
   grid-grip      grip friction x initial state. The direct question: how slippery does the part
                  have to be before the gripper loses it?
-  grid-payload   block mass x grip friction, on one initial state. The two physical axes that
-                 decide whether a grasp holds, swept against each other.
+  grid-payload   block mass x initial state. Does a heavier part ON ITS OWN cost the grasp?
+                 One axis crossed with the stratification, unconfounded with friction.
   grid-systems   control latency x action noise, everything else nominal. The axis every real
                  deployment has.
   grid-placement block offset x by y, on one initial state. Does a part that is not quite where
@@ -92,10 +92,14 @@ def grip_grid(friction_values: tuple[float, ...] = (1.0, 0.7, 0.5, 0.35, 0.25, 0
 
 def payload_grid(
     mass_values: tuple[float, ...] = (0.5, 2.0, 5.0, 10.0, 15.0, 20.0),
-    friction_values: tuple[float, ...] = (1.0, 0.5, 0.25, 0.1, 0.05),
 ) -> list[dict[str, Any]]:
-    """Block mass x grip friction, on the nominal initial state."""
-    return [normalize({"object_mass_kg": m, "grip_friction": f}) for m in mass_values for f in friction_values]
+    """Block mass against every published initial state, everything else nominal.
+
+    One axis crossed with the stratification, the same shape as `grid-grip`, so the answer to
+    "does a heavier part ON ITS OWN make it drop the block?" is not confounded with friction.
+    The mass x friction interaction is covered by the random mode.
+    """
+    return [normalize({"object_mass_kg": m, "init_seed": s}) for m in mass_values for s in INIT_SEEDS]
 
 
 def systems_grid(noise_step: float = 0.1) -> list[dict[str, Any]]:
@@ -146,7 +150,7 @@ def random_scenarios(n: int, seed: int) -> list[dict[str, Any]]:
 
 MODES: dict[str, tuple[Any, list[str]]] = {
     "grid-grip": (lambda n, seed: grip_grid(), ["grip_friction", "init_seed"]),
-    "grid-payload": (lambda n, seed: payload_grid(), ["object_mass_kg", "grip_friction"]),
+    "grid-payload": (lambda n, seed: payload_grid(), ["object_mass_kg", "init_seed"]),
     "grid-systems": (lambda n, seed: systems_grid(), ["control_latency_ms", "action_noise_frac"]),
     "grid-placement": (lambda n, seed: placement_grid(), ["object_offset_x_m", "object_offset_y_m"]),
     "random": (
