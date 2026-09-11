@@ -105,6 +105,18 @@ export function getDb(): DatabaseSync {
       status TEXT NOT NULL,
       log TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS pending_txs (
+      hash TEXT PRIMARY KEY,
+      function_name TEXT NOT NULL,
+      args_json TEXT NOT NULL,
+      from_address TEXT,
+      chain_mode TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT,
+      status TEXT NOT NULL,
+      block_number INTEGER,
+      error TEXT
+    );
   `);
   // Additive migration for databases created before the marketplace became multi-target. A listing
   // or ledger row with no target id is a cart row, because the cart was the only target then.
@@ -142,6 +154,35 @@ export function addEvent(listingId: string, actor: string, kind: string, detail:
 
 export function listEvents(listingId: string): EventRow[] {
   return getDb().prepare("SELECT * FROM events WHERE listing_id = ? ORDER BY id ASC").all(listingId) as unknown as EventRow[];
+}
+
+// ------------------------------------------------------------------ broadcast transaction ledger
+// Every hash chain.ts broadcasts is written here BEFORE the receipt wait, then resolved:
+//   pending    broadcast, receipt not seen yet
+//   confirmed  receipt status "success"
+//   reverted   receipt status "reverted" (the caller was thrown at; no marketplace state was written)
+//   timeout    the receipt wait ended without a receipt (viem timeout or transport error); the
+//              transaction may still be mined, so reconcilePendingTxs() in chain.ts re-checks it
+export type PendingTxStatus = "pending" | "confirmed" | "reverted" | "timeout";
+export type PendingTxRow = {
+  hash: string; function_name: string; args_json: string; from_address: string | null; chain_mode: string;
+  created_at: string; updated_at: string | null; status: PendingTxStatus; block_number: number | null; error: string | null;
+};
+export const UNRESOLVED_TX_STATUSES: PendingTxStatus[] = ["pending", "timeout"];
+
+export function insertPendingTx(row: { hash: string; function_name: string; args_json: string; from_address: string | null; chain_mode: string }): void {
+  getDb().prepare("INSERT OR REPLACE INTO pending_txs(hash, function_name, args_json, from_address, chain_mode, created_at, updated_at, status, block_number, error) VALUES (?,?,?,?,?,?,?,?,?,?)")
+    .run(row.hash, row.function_name, row.args_json, row.from_address, row.chain_mode, nowIso(), null, "pending", null, null);
+}
+
+export function updatePendingTx(hash: string, status: PendingTxStatus, blockNumber: number | null, error: string | null): void {
+  getDb().prepare("UPDATE pending_txs SET status = ?, block_number = ?, error = ?, updated_at = ? WHERE hash = ?").run(status, blockNumber, error, nowIso(), hash);
+}
+
+/** Rows in the given statuses (default: the unresolved ones), oldest first. */
+export function listPendingTxs(statuses: PendingTxStatus[] = UNRESOLVED_TX_STATUSES): PendingTxRow[] {
+  if (statuses.length === 0) return [];
+  return getDb().prepare(`SELECT * FROM pending_txs WHERE status IN (${statuses.map(() => "?").join(",")}) ORDER BY created_at ASC`).all(...statuses) as unknown as PendingTxRow[];
 }
 
 /** Public projection of a listing: never includes private package data. */

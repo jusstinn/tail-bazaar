@@ -492,3 +492,80 @@ the hosted behaviour: `scripts/server-stop.sh`, then
 `DEMO_PUBLIC_ORDERS=<an order id>` to that command to see the published-fixture path instead: that
 one order opens anonymously with the DEMONSTRATION FIXTURE badge and every other one still 401s. To
 browse the Base Sepolia orders again: `CHAIN_MODE=testnet scripts/server-start.sh`.
+
+---
+
+# Review round 3 — server-side findings from an independent review
+
+Three server-side defects and one demo-latency issue, reported by an independent reviewer and fixed
+under `web/src/server/**` only. `contracts/`, `sim/` and `web/src/client/` are untouched; no existing
+test was edited. Each fix has its own test file, listed in `npm test`.
+
+1. **The verifier did not bind the package's run record to its own re-run** (high). Once the delivered
+   replay frames hashed to the verifier's re-run, the only remaining content checks were the package
+   claim against the SELLER's submission claim (both seller-supplied) and the severity band. The
+   package's `scene`, `metrics`, `events`, `ticks`, `claim`, `scenario`, initial state, termination
+   rules and environment were never compared with the verifier's own run document, and those fields
+   drive the replay HUD, the narrative and the metrics table. Reproduction: a cart package with
+   `metrics.impact_speed_mps = 999`, the obstacle moved from 6 m to 100 m in `scene`, or the failure
+   class relabelled `FELL` was VERIFIED over authentic poses.
+   **What changed** (`agents/verifier.ts`, evidence binding (d)): after the trajectory binding, every
+   run-derived section of the package is compared byte-for-byte, after canonicalization, with the
+   verifier's own run document, and the claim with `target.claimFromRun(verifier run)`; the first
+   mismatch is REJECTED / INVALID by `package-run-record-matches-verifier-rerun`, whose detail names
+   the section and the first differing path. The exempt fields are the ones the re-run cannot reproduce
+   by construction, listed in `RUN_RECORD_EXEMPT`: `salt_hex`, `seller`, `created_at`, `hunter`,
+   `reproduce`, `target_id` (checked separately), `replay.frames` (bound by hash) and
+   `scene.mjcf_path` (an absolute venv path; the model itself is bound by `scene.mjcf_hash` and
+   `scene.compiled_model_hash`). A package field that is neither compared nor exempt is refused too.
+   **Test:** `__tests__/verifier-run-record-binding.test.ts`, 7 cases against the real simulator: the
+   three reproductions above (each INVALID with the new check failing and the older checks passing),
+   seven further sections plus a foreign top-level field, the exemption list, and the unmodified
+   package still VALID.
+2. **Reverted transactions were recorded as successes** (high). `chain.ts` `write()` returned
+   `{ status: receipt.status }` and never threw on `"reverted"`, so `buyerFund`, `sellerDeliver` and
+   the verifier's settle path wrote rows as if the action had happened (a reverted `fund` produced a
+   FUNDED order).
+   **What changed:** `write()` throws `TxRevertedError` (hash, function name, block on the error and in
+   its message) whenever the receipt status is not `"success"`, so no caller updates state. The hash is
+   written to a new `pending_txs` table (`db.ts`: hash, function_name, args_json, from_address,
+   chain_mode, created_at, updated_at, status pending|confirmed|reverted|timeout, block_number, error)
+   BEFORE the receipt wait and resolved when the receipt arrives or the wait throws. `listPendingTxs()`
+   and `reconcilePendingTxs()` (re-checks unresolved hashes with `getTransactionReceipt`; reads only)
+   are exported, and `GET /api/txs/pending` (`?reconcile=1`; operator-gated in hosted mode) exposes
+   them. The viem client pair is injectable through `setChainClientsForTests()`, so the suite stubs
+   chain.ts's own seam instead of monkey-patching viem.
+   **Test:** `__tests__/chain-reverted.test.ts`, 6 cases: a reverted receipt throws with hash/function/
+   block; a success still returns and confirms the row; `buyerFund` against a reverted `fund` leaves no
+   orders row, no FUNDED listing and no funded event; the row exists as `pending` while the wait is in
+   progress, becomes `timeout` when the wait throws, and reconcile resolves it from the chain; the route
+   is operator-gated.
+3. **The buyer trusted the database's copy of the advertised terms** (medium). `selectListing()` read
+   robot, severity and verification from `listings.public_summary` without recomputing the terms hash
+   against `onChain.termsHash`, and never compared the row's seller, price or commitment with the
+   chain; an edited summary (band raised low → high) ranked first and was funded.
+   **What changed** (`agents/buyer.ts`): `checkTermsBinding()` recomputes the summary's terms hash with
+   the registration function itself (`termsHashOf`, now a named export of `agents/verifier.ts` and
+   used there for `registerListing`) and compares it, the seller, the price and the commitment with the
+   chain. `selectListing()` marks a disagreeing row ineligible with a plain reason (`stored terms are
+   not the on-chain terms: terms hash mismatch ...`), and `buyerFund()` re-reads the listing and
+   re-checks all four immediately before `fund()`, throwing instead of broadcasting.
+   **Test:** `__tests__/buyer-terms-binding.test.ts`, 4 cases: the altered summary is skipped with the
+   terms-hash reason and the unaltered one is chosen (the altered one would have out-ranked it);
+   each of the four mismatches is named; `buyerFund` refuses an altered or repriced row before any
+   broadcast and still funds the honest one.
+4. **Demo latency** (low). `GET /api/listings` awaited `getListing` then `settledOrders` for every row
+   in sequence, so one slow RPC provider stalled the whole marketplace page.
+   **What changed** (`index.ts`): the chain reads are concurrent across rows (`Promise.allSettled`),
+   each with a 4 s timeout (`withTimeout` in `chain.ts`), and the on-chain part of a row is cached in
+   memory for 10 s keyed by listing id (only complete reads are cached; a failed read is retried on
+   the next request). On timeout or error the stored row is served with `on_chain: null`, exactly as
+   before; the response shape is unchanged. `/api/status`'s block number gets the same timeout and
+   cache. Covered by the existing suites.
+
+**Results in this pass:** `cd web && npm run build` clean; `npm test` **100 passed, 0 failed** (83
+before this pass + 17 new); `npm run test:integration` **12 passed, 0 failed** against the local anvil
+and the demo database. Not done: no change to `contracts/`, `sim/` or the client; the pending-tx
+ledger is wired to nothing but the operator route (no automatic reconcile loop); the delivery-time
+check (`verifierCheckDeliveryAndSettle`) was not extended, because the bytes it examines must hash to
+the commitment that was run-record-checked at listing time.

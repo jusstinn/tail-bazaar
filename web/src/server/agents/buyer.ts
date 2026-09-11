@@ -1,19 +1,45 @@
 // BUYER AGENT (local demonstration mode). Deterministic policy, described exactly:
-//   eligible = listings on the configured chain whose on-chain status is Listed, whose public summary
-//              says VERIFIED and admissible, whose TARGET is one the buyer is shopping for, whose
-//              subject id+hash (controller file / policy checkpoint) and envelope id equal the
-//              buyer's target, and whose price is within both the per-purchase cap and the remaining
-//              budget
+//   eligible = listings on the configured chain whose on-chain status is Listed, whose STORED TERMS
+//              ARE THE ON-CHAIN TERMS (the public summary re-hashes to the registered terms hash, and
+//              the row's seller, price and commitment equal the chain's — see checkTermsBinding),
+//              whose public summary says VERIFIED and admissible, whose TARGET is one the buyer is
+//              shopping for, whose subject id+hash (controller file / policy checkpoint) and envelope
+//              id equal the buyer's target, and whose price is within both the per-purchase cap and
+//              the remaining budget
 //   ranking  = severity band (high > medium > low), then lower price, then earlier listing
-// It funds escrow, signs the retrieval challenge, retrieves over HTTP, checks the package itself
-// against the on-chain commitment and the advertised terms, and asks for a recheck on chain if its
-// own check fails. It never sees parameters before paying.
+// It funds escrow (re-checking the terms binding immediately before the fund transaction), signs the
+// retrieval challenge, retrieves over HTTP, checks the package itself against the on-chain commitment
+// and the advertised terms, and asks for a recheck on chain if its own check fails. It never sees
+// parameters before paying, and it never takes the database's word for what was advertised: the
+// robot, severity band and verification status it ranks on come from a summary whose hash the
+// verifier put on chain.
 import type { Hex } from "viem";
 import { keccakHex, isCanonical } from "../canonical.js";
 import { buyerBudgetWei, chainMode, roles } from "../config.js";
-import { escrow, getListing, getListingExpecting, walletFor } from "../chain.js";
+import { escrow, getListing, getListingExpecting, walletFor, type OnChainListing } from "../chain.js";
 import { addEvent, getDb, nowIso, publicListing, type ListingRow, type OrderRow } from "../db.js";
 import { targetFor, type TargetId } from "../targets.js";
+import { termsHashOf } from "./verifier.js";
+
+/** The four facts the buyer takes from the CHAIN and never from the database: the terms hash the
+ *  verifier registered (recomputed here from the stored public summary with the same function that
+ *  produced it), the seller, the price and the package commitment. Returns a plain reason when the
+ *  stored row disagrees with the chain on any of them, null when all four bind. */
+export function checkTermsBinding(row: Pick<ListingRow, "public_summary" | "seller" | "price_wei" | "commitment">, onChain: OnChainListing): string | null {
+  let recomputed: string;
+  try {
+    recomputed = termsHashOf(JSON.parse(row.public_summary));
+  } catch {
+    return "stored public summary is not JSON, so its terms hash cannot be recomputed";
+  }
+  if (recomputed.toLowerCase() !== String(onChain.termsHash).toLowerCase()) return `terms hash mismatch: the stored public summary hashes to ${recomputed.slice(0, 14)}... but the chain registered ${String(onChain.termsHash).slice(0, 14)}... (advertised terms altered or stale)`;
+  if (String(onChain.seller).toLowerCase() !== row.seller.toLowerCase()) return `seller mismatch: stored ${row.seller} vs on-chain ${onChain.seller}`;
+  let price: bigint;
+  try { price = BigInt(row.price_wei); } catch { return `stored price ${row.price_wei} is not an integer`; }
+  if (onChain.price !== price) return `price mismatch: stored ${row.price_wei} wei vs on-chain ${onChain.price} wei`;
+  if (String(onChain.commitment).toLowerCase() !== row.commitment.toLowerCase()) return `commitment mismatch: stored ${row.commitment.slice(0, 14)}... vs on-chain ${String(onChain.commitment).slice(0, 14)}...`;
+  return null;
+}
 
 export type BuyerPolicy = {
   /** Which targets this buyer shops for. null means "any target in the registry". */
@@ -36,7 +62,9 @@ export async function selectListing(policy: BuyerPolicy, log: (m: string) => voi
     const onChain = row.status === "LISTED" ? await getListingExpecting(row.listing_id as Hex, (l) => l.status === 1) : await getListing(row.listing_id as Hex);
     const price = BigInt(row.price_wei);
     let why = "eligible";
+    const binding = onChain.status === 1 ? checkTermsBinding(row, onChain) : null;
     if (onChain.status !== 1) why = `on-chain status is ${onChain.status} (not Listed)`;
+    else if (binding !== null) why = `stored terms are not the on-chain terms: ${binding}`;
     else if (policy.target_ids && !policy.target_ids.includes(targetId)) why = `target ${targetId} is not one this buyer is shopping for (${policy.target_ids.join(", ")})`;
     else if (s.verification?.status !== "VERIFIED") why = `verification ${s.verification?.status}`;
     else if (!s.admissible) why = "not admissible";
@@ -57,6 +85,13 @@ export async function buyerFund(listing: ListingRow, log: (m: string) => void): 
   const price = BigInt(listing.price_wei);
   if (price > buyerBudgetWei) throw new Error("price exceeds buyer budget cap");
   const buyer = roles.buyer();
+  // Immediately before the money moves, read the listing from the chain again and refuse to fund
+  // unless the stored terms are exactly the registered ones. selectListing already checked this,
+  // but a row can change between selection and funding and the fund transaction is irreversible.
+  const onChain = await getListingExpecting(listing.listing_id as Hex, (l) => l.status === 1);
+  if (onChain.status !== 1) throw new Error(`refusing to fund ${listing.listing_id.slice(0, 12)}...: on-chain status is ${onChain.status} (not Listed)`);
+  const binding = checkTermsBinding(listing, onChain);
+  if (binding !== null) throw new Error(`refusing to fund ${listing.listing_id.slice(0, 12)}...: stored terms are not the on-chain terms: ${binding}`);
   const tx = await escrow.fund(buyer, listing.listing_id as Hex, price);
   db.prepare("INSERT INTO orders(order_id, listing_id, buyer, price_wei, status, fund_tx, created_at) VALUES (?,?,?,?,?,?,?)").run(listing.listing_id, listing.listing_id, buyer.address, listing.price_wei, "FUNDED", tx.hash, nowIso());
   db.prepare("UPDATE listings SET status = 'FUNDED' WHERE listing_id = ?").run(listing.listing_id);
@@ -123,7 +158,7 @@ export async function buyerWithdraw(log: (m: string) => void) {
 export function describePolicy(policy: BuyerPolicy) {
   return {
     mode: "deterministic (no model calls)",
-    eligibility: ["on-chain status Listed", "target is one the buyer shops for", "public summary verification VERIFIED and admissible", "controller/policy id and hash equal the buyer's target", "envelope id equal", "price within per-purchase cap and remaining budget"],
+    eligibility: ["on-chain status Listed", "stored terms are the on-chain terms (public summary re-hashes to the registered terms hash; seller, price and commitment equal the chain's)", "target is one the buyer shops for", "public summary verification VERIFIED and admissible", "controller/policy id and hash equal the buyer's target", "envelope id equal", "price within per-purchase cap and remaining budget"],
     ranking: ["severity band high > medium > low", "lower price", "earlier listing"],
     targets: policy.target_ids ?? "any",
     target_controller: policy.target_controller_id === null ? "any" : { id: policy.target_controller_id, hash: policy.target_controller_hash },

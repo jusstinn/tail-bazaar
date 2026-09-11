@@ -27,7 +27,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import type { Hex } from "viem";
 import { AuthError, createChallenge, lookupSession, redeemChallenge } from "./auth.js";
 import { keccakHex } from "./canonical.js";
-import { publicClient, getListing, settledOrders, STATUS_NAMES, balanceOf } from "./chain.js";
+import { blockNumber, getListing, listPendingTxs, reconcilePendingTxs, settledOrders, STATUS_NAMES, balanceOf, withTimeout } from "./chain.js";
 import { appDomain, buyerBudgetWei, buyerConsoleEnabled, chainId, chainLabel, chainMode, demoPublicOrderIds, demoPublicTamperFixtures, demoTriggerEnabled, escrowAddress, explorerBase, hostedMode, operatorToken, port, publicBaseUrl, roleAddresses, WEB_ROOT } from "./config.js";
 import { getDb, listEvents, publicListing, publicOrder, type ListingRow, type OrderRow } from "./db.js";
 import { DEFAULT_TARGET, envelopesDoc, isTargetId, TARGET_IDS, TARGETS, targetFor } from "./targets.js";
@@ -108,12 +108,57 @@ export function privateAccess(c: Context, orderId: string | null, operatorOnly =
   return { ok: false, via: "none", error: "unknown, expired, or wrongly bound token" };
 }
 
+// ------------------------------------------------------------ on-chain reads for the public pages
+// The marketplace page lists every row; one slow RPC provider used to stall the whole page because the
+// rows were read one after another. Reads are now issued concurrently across rows, each with its own
+// timeout, and the on-chain part of a row is cached briefly so a reload does not re-query. On a
+// timeout or an error the stored row is served with `on_chain: null`, exactly as before.
+export const ON_CHAIN_READ_TIMEOUT_MS = 4_000;
+export const ON_CHAIN_CACHE_TTL_MS = 10_000;
+type OnChainPart = { on_chain: any; seller_settled_orders: number | null };
+const onChainCache = new Map<string, { at: number; value: OnChainPart }>();
+let blockCache: { at: number; value: number } | null = null;
+
+/** TESTS ONLY: forget every cached on-chain read. */
+export function clearOnChainCacheForTests(): void {
+  onChainCache.clear();
+  blockCache = null;
+}
+
+async function onChainPartOf(r: ListingRow, now = Date.now()): Promise<OnChainPart> {
+  const hit = onChainCache.get(r.listing_id);
+  if (hit && now - hit.at < ON_CHAIN_CACHE_TTL_MS) return hit.value;
+  const [listing, settled] = await Promise.allSettled([
+    withTimeout(getListing(r.listing_id as Hex), ON_CHAIN_READ_TIMEOUT_MS, `getListing(${r.listing_id.slice(0, 12)}...)`),
+    withTimeout(settledOrders(r.seller as Hex), ON_CHAIN_READ_TIMEOUT_MS, `settledOrders(${r.seller})`),
+  ]);
+  const value: OnChainPart = { on_chain: null, seller_settled_orders: null };
+  if (listing.status === "fulfilled") {
+    const l = listing.value;
+    value.on_chain = { status: STATUS_NAMES[l.status], buyer: l.buyer, price: l.price.toString(), commitment: l.commitment, terms_hash: l.termsHash, delivery_hash: l.deliveryHash, delivery_deadline: Number(l.deliveryDeadline), settlement_deadline: Number(l.settlementDeadline) };
+  }
+  if (settled.status === "fulfilled") value.seller_settled_orders = settled.value;
+  // Only a complete read is cached: a transient failure is retried on the next request, not remembered.
+  if (listing.status === "fulfilled" && settled.status === "fulfilled") onChainCache.set(r.listing_id, { at: now, value });
+  return value;
+}
+
+async function latestBlock(now = Date.now()): Promise<number | null> {
+  if (blockCache && now - blockCache.at < ON_CHAIN_CACHE_TTL_MS) return blockCache.value;
+  try {
+    const value = await withTimeout(blockNumber(), ON_CHAIN_READ_TIMEOUT_MS, "getBlockNumber");
+    blockCache = { at: now, value };
+    return value;
+  } catch {
+    return null;
+  }
+}
+
 export function buildApp() {
   const app = new Hono();
 
   app.get("/api/status", async (c) => {
-    let block: number | null = null;
-    try { block = Number(await publicClient.getBlockNumber()); } catch { block = null; }
+    const block = await latestBlock();
     const addrs = roleAddresses();
     const hosted = hostedMode();
     return c.json({
@@ -134,18 +179,20 @@ export function buildApp() {
 
   app.get("/api/listings", async (c) => {
     const rows = getDb().prepare("SELECT * FROM listings ORDER BY created_at DESC").all() as unknown as ListingRow[];
-    const out = [];
-    for (const r of rows) {
-      let onChain: any = null;
-      let sellerSettled: number | null = null;
-      try {
-        const l = await getListing(r.listing_id as Hex);
-        onChain = { status: STATUS_NAMES[l.status], buyer: l.buyer, price: l.price.toString(), commitment: l.commitment, terms_hash: l.termsHash, delivery_hash: l.deliveryHash, delivery_deadline: Number(l.deliveryDeadline), settlement_deadline: Number(l.settlementDeadline) };
-        sellerSettled = await settledOrders(r.seller as Hex);
-      } catch { /* chain unreachable: show stored state only */ }
-      out.push({ ...publicListing(r), on_chain: onChain, seller_settled_orders: sellerSettled });
-    }
-    return c.json(out);
+    // Concurrent across rows, one timeout per call, cached briefly; a failed read shows stored state only.
+    const parts = await Promise.all(rows.map((r) => onChainPartOf(r)));
+    return c.json(rows.map((r, i) => ({ ...publicListing(r), on_chain: parts[i].on_chain, seller_settled_orders: parts[i].seller_settled_orders })));
+  });
+
+  // OPERATOR VIEW of broadcast transactions whose receipt is not on record: status "pending" (receipt
+  // wait still running, or the process died during it) or "timeout" (the wait ended without a
+  // receipt). `?reconcile=1` re-checks them against the chain first (reads only; nothing is re-sent).
+  // Hashes, function names and public call arguments only; gated because it is operational detail.
+  app.get("/api/txs/pending", async (c) => {
+    const access = privateAccess(c, null, true);
+    if (!access.ok) return c.json({ error: access.error, hosted_mode: true }, 401);
+    const reconciled = c.req.query("reconcile") === "1" ? await reconcilePendingTxs() : null;
+    return c.json({ chain_mode: chainMode, pending: listPendingTxs(), reconciled });
   });
 
   app.get("/api/listings/:id", async (c) => {

@@ -29,7 +29,14 @@
 //      abstains rather than certifying evidence it cannot check. Agreement of the headline metrics
 //      across differing environments is recorded in `checks` as evidence and never certifies
 //      anything on its own.
-//   9. publish a public summary (target, failure class, severity band, verdict, seller history — no
+//   9. EVIDENCE BINDING (d): once the frames are bound, every other run-derived section of the
+//      package (scene, metrics, events, ticks, claim, scenario, initial state, termination rules,
+//      environment, ...) must be byte-identical, after canonicalization, to the verifier's OWN run
+//      document. Those sections drive the replay HUD, the narrative and the metrics table; a package
+//      with authentic poses and a fabricated impact speed, a moved obstacle or a relabelled failure
+//      class is REJECTED (`package-run-record-matches-verifier-rerun`). The only exempt fields are
+//      the ones the re-run cannot reproduce by construction, listed in RUN_RECORD_EXEMPT.
+//  10. publish a public summary (target, failure class, severity band, verdict, seller history — no
 //      parameters, no trajectory), register the listing on chain
 import path from "node:path";
 import type { Hex } from "viem";
@@ -38,8 +45,8 @@ import { chainId, chainMode, dataDir, escrowAddress, roles } from "../config.js"
 import { escrow, getListingExpecting, settledOrders } from "../chain.js";
 import { addEvent, getDb, nowIso, type ListingRow, type OrderRow } from "../db.js";
 import { checkReplayPlausibility, type ReplayLimits } from "../plausibility.js";
-import { fingerprint, runScenario } from "../sim.js";
-import { operatingContext, targetFor, type Scenario, type Subject, type TargetSpec } from "../targets.js";
+import { fingerprint, runScenario, type RunDoc } from "../sim.js";
+import { operatingContext, targetFor, type Claim, type Scenario, type Subject, type TargetSpec } from "../targets.js";
 import type { Submission } from "./seller.js";
 
 export const VERIFIER_OUT = path.join(dataDir, "sim", "verifier");
@@ -88,6 +95,116 @@ export function recomputeTrajectoryHash(frames: unknown): string | null {
 
 function fingerprintHash(target: TargetSpec, env: Record<string, unknown>): Hex {
   return commitment(fingerprint(target, env));
+}
+
+/** The listing's terms hash exactly as it is registered on chain: keccak256 over the canonical bytes
+ *  of the public summary. The buyer recomputes it from the stored summary with this same function
+ *  before trusting a row (agents/buyer.ts, checkTermsBinding). */
+export function termsHashOf(summary: unknown): Hex {
+  return commitment(summary);
+}
+
+// ------------------------------------------------------- EVIDENCE BINDING (d): the run record
+/** Package fields the verifier's own re-run does NOT reproduce, each with the reason. Everything
+ *  else in the package is compared byte-for-byte (after canonicalization) with the re-run. */
+export const RUN_RECORD_EXEMPT: Readonly<Record<string, string>> = {
+  salt_hex: "the seller's random 32-byte salt that blinds the commitment",
+  seller: "the seller's address: identity, not physics",
+  created_at: "wall-clock timestamp of packaging",
+  hunter: "aggregate statistics of the hunt that found the scenario (simulation counts, wall time)",
+  reproduce: "the reproduction command string and its note: prose, not physics",
+  target_id: "checked separately against the submission (package-target-matches)",
+  "replay.frames": "bound separately: keccak256 over the canonical frames must equal the verifier's own trajectory hash",
+  "scene.mjcf_path": "absolute filesystem path of the pinned model on the host that ran it; the model's content is bound by scene.mjcf_hash and scene.compiled_model_hash",
+};
+// Not in the package at all, so nothing to exempt: the run document's wall_time_s, and the policy
+// targets' `target` block (reduced to `controller`, the subject id and digest, which IS compared).
+
+/** The package's run-derived sections, each paired with the value the verifier derives from ITS OWN
+ *  run document. Compared in this order; the first mismatch names the section and the path. */
+export function expectedRunRecord(target: TargetSpec, run: RunDoc, vClaim: Claim): Record<string, unknown> {
+  return {
+    claim: vClaim,
+    metrics: run.metrics,
+    scene: run.scene,
+    scenario: run.scenario,
+    controller: target.subjectOf(run),
+    envelope_id: run.envelope_id,
+    environment: run.environment,
+    engine: run.engine,
+    termination_rules: run.termination_rules ?? null,
+    initial_state: run.initial_state ?? null,
+    initial_state_check: run.initial_state_check ?? null,
+    goal_m: run.goal_m ?? null,
+    events: run.events,
+    ticks: run.ticks,
+    changed_conditions: target.changedConditions(run.scenario),
+    nominal_scenario: target.nominal_scenario,
+    target_label: target.label,
+    replay: { trajectory_hash: run.trajectory_hash, mjcf_hash: run.mjcf_hash ?? null, renderer: target.replay_renderer },
+  };
+}
+
+export type RunRecordMismatch = { section: string; path: string; package: string; verifier: string };
+
+const preview = (v: unknown): string => {
+  let s: string;
+  try { s = v === undefined ? "(absent)" : dumps(v); } catch { s = String(v); }
+  return s.length > 60 ? s.slice(0, 57) + "..." : s;
+};
+
+/** First path at which two canonical documents differ, or null if they are identical. Objects are
+ *  walked in sorted key order and arrays by index, so the answer is deterministic. */
+export function firstDifference(a: unknown, b: unknown, at: string): { path: string; a: unknown; b: unknown } | null {
+  const isObj = (x: unknown): x is Record<string, unknown> => typeof x === "object" && x !== null && !Array.isArray(x);
+  if (Array.isArray(a) && Array.isArray(b)) {
+    const n = Math.max(a.length, b.length);
+    for (let i = 0; i < n; i++) {
+      if (i >= a.length || i >= b.length) return { path: `${at}[${i}]`, a: i < a.length ? a[i] : undefined, b: i < b.length ? b[i] : undefined };
+      const d = firstDifference(a[i], b[i], `${at}[${i}]`);
+      if (d) return d;
+    }
+    return null;
+  }
+  if (isObj(a) && isObj(b)) {
+    const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].sort();
+    for (const k of keys) {
+      if (!(k in a) || !(k in b)) return { path: `${at}.${k}`, a: a[k], b: b[k] };
+      const d = firstDifference(a[k], b[k], `${at}.${k}`);
+      if (d) return d;
+    }
+    return null;
+  }
+  try {
+    if (dumps(a) === dumps(b)) return null;
+  } catch { /* not canonically serializable: treated as different */ }
+  return { path: at, a, b };
+}
+
+/** Compare a delivered package's run-derived sections with the verifier's own re-run. Returns the
+ *  first mismatch, or null when every section is byte-identical after canonicalization. */
+export function runRecordMismatch(pkg: Record<string, any>, target: TargetSpec, run: RunDoc, vClaim: Claim): RunRecordMismatch | null {
+  const expected = expectedRunRecord(target, run, vClaim);
+  const strip = (v: unknown, key: string): unknown => {
+    if (typeof v !== "object" || v === null || Array.isArray(v)) return v;
+    const copy = { ...(v as Record<string, unknown>) };
+    delete copy[key];
+    return copy;
+  };
+  for (const [section, want] of Object.entries(expected)) {
+    let got: unknown = pkg[section];
+    let exp: unknown = want;
+    if (section === "scene") { got = strip(got, "mjcf_path"); exp = strip(exp, "mjcf_path"); }
+    if (section === "replay") got = strip(got, "frames");
+    const d = firstDifference(got, exp, section);
+    if (d) return { section, path: d.path, package: preview(d.a), verifier: preview(d.b) };
+  }
+  // A field the run record does not have and the exemption list does not name is not evidence of
+  // anything the verifier ran; it is refused rather than carried into the buyer's replay unchecked.
+  for (const k of Object.keys(pkg)) {
+    if (!(k in expected) && !(k in RUN_RECORD_EXEMPT) && k !== "schema" && k !== "format") return { section: k, path: k, package: preview(pkg[k]), verifier: "(no such field in the verifier's run record)" };
+  }
+  return null;
 }
 
 // Re-exported so the adversarial tests and any external reader keep one import site.
@@ -182,6 +299,15 @@ export async function verifySubmission(sub: Submission, packageBytes: Uint8Array
     return { status: "INCONCLUSIVE", verdict: "INCONCLUSIVE", reason: "same environment fingerprint but different trajectory hash (numerical divergence or tampered run)", method, fingerprint_match: true, target_id: target.id, verifier_run: verifierRun, checks };
   if (!check(checks, "package-frames-reproduce-verified-trajectory", recomputed === v.doc.trajectory_hash, `${String(recomputed).slice(0, 20)}... vs verifier run ${v.doc.trajectory_hash.slice(0, 20)}...`))
     return { ...reject("the package's replay frames are not the trajectory the verifier re-ran"), method };
+  // EVIDENCE BINDING (d): the frames are now the verifier's own trajectory, so every other section
+  // the simulator derives from that trajectory must be the verifier's own as well. The claim is
+  // compared with the claim derived from the VERIFIER'S run (vClaim), never with the seller's
+  // submission; the scene, metrics, events, ticks and the rest with the verifier's run document.
+  const rr = runRecordMismatch(pkg, target, v.doc, vClaim);
+  if (!check(checks, "package-run-record-matches-verifier-rerun", rr === null, rr
+    ? `section "${rr.section}" differs at ${rr.path}: package ${rr.package} vs verifier re-run ${rr.verifier}`
+    : `${Object.keys(expectedRunRecord(target, v.doc, vClaim)).length} run-derived sections byte-identical (canonical JSON) to the verifier's own run document; exempt: ${Object.keys(RUN_RECORD_EXEMPT).join(", ")}`))
+    return { ...reject(`the package's run record is not the run the verifier performed: section "${rr!.section}" differs at ${rr!.path} (authentic frames do not certify fabricated metrics, scene or claim)`), method };
   if (!check(checks, "package-claim-matches", dumps(pkg.claim) === dumps(sub.claim))) return { ...reject("package claim differs from submission"), method };
   const bandOk = target.severityBand(vClaim.severity_value).band === sub.claim.severity_band;
   if (!check(checks, "severity-band-consistent", bandOk, `${target.severityBand(vClaim.severity_value).band} vs advertised ${sub.claim.severity_band}`)) return { ...reject("advertised severity band does not match the verifier's observation"), method };
@@ -247,7 +373,7 @@ export async function verifyAndList(sub: Submission, packageBytes: Uint8Array, o
   }
   const sellerSettled = await settledOrders(sub.seller as Hex);
   const summary = buildPublicSummary(sub, res, opts.priceWei, sellerSettled);
-  const termsHash = commitment(summary);
+  const termsHash = termsHashOf(summary);
   const listingId = keccakHex(new Uint8Array([...Buffer.from(sub.package_commitment.slice(2), "hex"), ...Buffer.from(termsHash.slice(2), "hex")]));
   log(`verifier: VERIFIED (${res.method}); registering ${target.id} listing ${listingId.slice(0, 12)}... on ${chainMode} (commitment ${sub.package_commitment.slice(0, 12)}..., terms ${termsHash.slice(0, 12)}...)`);
   const tx = await escrow.registerListing(roles.verifier(), listingId, sub.seller as Hex, opts.priceWei, sub.package_commitment as Hex, termsHash);

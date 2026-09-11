@@ -14,7 +14,7 @@
     "start": "node dist/server/index.js",
     "demo": "node dist/server/cli.js demo",
     "ledger": "node dist/server/cli.js ledger",
-    "test": "node --test \"dist/server/__tests__/canonical.test.js\" \"dist/server/__tests__/envelope.test.js\" \"dist/server/__tests__/envelope-humanoid.test.js\" \"dist/server/__tests__/envelope-arm.test.js\" \"dist/server/__tests__/failure.test.js\" \"dist/server/__tests__/hosted-auth.test.js\" \"dist/server/__tests__/demo-public-orders.test.js\" \"dist/server/__tests__/verifier-binding.test.js\" \"dist/server/__tests__/verifier-humanoid.test.js\" \"dist/server/__tests__/verifier-arm.test.js\" \"dist/server/__tests__/verifier-adversarial.test.js\" \"dist/server/__tests__/auth-nonce-race.test.js\"",
+    "test": "node --test \"dist/server/__tests__/canonical.test.js\" \"dist/server/__tests__/envelope.test.js\" \"dist/server/__tests__/envelope-humanoid.test.js\" \"dist/server/__tests__/envelope-arm.test.js\" \"dist/server/__tests__/failure.test.js\" \"dist/server/__tests__/hosted-auth.test.js\" \"dist/server/__tests__/demo-public-orders.test.js\" \"dist/server/__tests__/verifier-binding.test.js\" \"dist/server/__tests__/verifier-humanoid.test.js\" \"dist/server/__tests__/verifier-arm.test.js\" \"dist/server/__tests__/verifier-adversarial.test.js\" \"dist/server/__tests__/auth-nonce-race.test.js\" \"dist/server/__tests__/verifier-run-record-binding.test.js\" \"dist/server/__tests__/chain-reverted.test.js\" \"dist/server/__tests__/buyer-terms-binding.test.js\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:integration": "node --test \"dist/server/__tests__/integration.local.test.js\""
   },
