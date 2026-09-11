@@ -268,6 +268,9 @@ def side_by_side_png(
             _setup_axes(ax, res)
             _draw_frame(ax, res, _frame_at(res, tt))
             ax.set_title(f"t = {tt:.2f}s", fontsize=8)
+    import textwrap
+
+    width = max(60, int(13 * len(times)))
     labels = []
     for res in (a, b):
         s = res["scenario"]
@@ -277,9 +280,14 @@ def side_by_side_png(
         line = f"{res['outcome']}  —  {tag}  (init_seed {s['init_seed']})"
         if m.get("drop_t_s") is not None:
             line += f"  —  dropped at {m['drop_t_s']}s, impact {m.get('object_impact_speed_mps')} m/s"
-        labels.append(line)
-    fig.suptitle(labels[0] + "\n" + labels[1], fontsize=9.5, y=0.985)
-    fig.tight_layout(rect=(0, 0, 1, 0.94))
+        # A many-axis scenario names every axis it moved, which can run several times the figure
+        # width; wrap rather than letting it disappear off both edges.
+        labels.append("\n".join(textwrap.wrap(line, width=width)))
+    title = labels[0] + "\n" + labels[1]
+    lines = title.count("\n") + 1
+    top = max(0.78, 1.0 - 0.028 * lines)
+    fig.suptitle(title, fontsize=9.5, y=0.995, va="top")
+    fig.tight_layout(rect=(0, 0, 1, top))
     fig.savefig(path)
     plt.close(fig)
     return path
