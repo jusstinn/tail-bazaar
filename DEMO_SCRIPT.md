@@ -191,3 +191,20 @@ If time allows, the honest negative — it is the most persuasive thing on the p
 - **"Can I just read this on the hosted URL?"** Yes for the orders the host publishes: a short
   `DEMO_PUBLIC_ORDERS` list is served without a token, badged **"DEMONSTRATION FIXTURE, published in
   the repository, not a secret"**. Every other order still returns 401.
+
+## 3:00 — buy one yourself (tab 1, marketplace) — *the market, live*
+
+Click **List a new finding** under the warehouse cart. The live panel shows the hunter searching, the
+verifier re-running the finding and the listing being registered on chain (about 30 s on anvil).
+
+> "A seller's hunter just found a new failure. The verifier reproduced it in its own simulator and
+> registered the sealed claim on chain. Nobody has paid anything yet."
+
+When the new card appears, click **Buy for 0.001 ETH**. The page moves to the order and walks through
+each step as its transaction lands: funding the escrow, the seller delivering the sealed package, the
+buyer retrieving it with a signed challenge, the verifier checking the bytes against the seal, the
+escrow settling and the seller withdrawing (about 15 s on anvil).
+
+> "Every one of those was a real transaction. The money left the buyer's wallet before it saw anything,
+> and reached the seller only after the verifier confirmed the bytes matched the seal."
+
