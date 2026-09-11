@@ -10,11 +10,20 @@
   "claim_kind": "controller collides with the obstacle under admissible conditions inside the published envelope",
   "verification": {
     "status": "VERIFIED",
+    "verdict": "VALID",
     "method": "exact-trajectory-hash",
     "verifier_version": "tb-verifier-1",
     "verifier": "0xe592C7DA96Cc42344952C452377eBCc7Cc0982AE",
     "environment_fingerprint": "0xdf8e9156e211e7786d8e44136d2b78f30c6b47a92392bbefd77707a1f5384de3",
-    "verified_at": "2026-09-11T06:00:28.542Z"
+    "evidence_binding": "the controller id+hash and the trajectory hash recomputed from the delivered replay frames were compared against the verifier's own re-run; declared hashes are not trusted",
+    "verified_at": "2026-09-11T06:56:54.317Z"
+  },
+  "operating_context": {
+    "controller_tuned_range": "sensor latency <= 40 ms, actuator latency <= 20 ms, floor friction >= 0.6, payload 20 kg",
+    "searched_envelope": "sensor latency 0-300 ms, actuator latency 0-100 ms, floor friction 0.2-1.0, payload 5-60 kg",
+    "question": "Can this controller be deployed in a wider operating range than it was tuned for, and where exactly does it stop working?",
+    "note": "The searched envelope is deliberately wider than the range the controller was tuned for, so a finding outside the tuned range is not a defect report: it is a measured boundary of the deployable range. The controller checks none of its tuned-range assumptions at runtime. Both ranges are illustrative design assumptions, not measurements of a physical robot.",
+    "reference": "GET /api/envelope (published axes, same shape as GUARD configs/guard_theta.yaml)"
   },
   "severity": {
     "proxy": "impact_speed_mps",
@@ -22,7 +31,7 @@
     "definition": "impact speed band: low < 0.5 m/s, medium 0.5-1.0 m/s, high > 1.0 m/s (proxy only, not a damage estimate)"
   },
   "seller": "0x28dAA9F3F9468382fFeD53cc339418403337cDeD",
-  "seller_settled_orders_at_listing": 1,
+  "seller_settled_orders_at_listing": 2,
   "price_wei": "1000000000000000",
   "chain": {
     "mode": "local",

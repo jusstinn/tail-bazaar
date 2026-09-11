@@ -13,6 +13,7 @@
     "build:client": "esbuild src/client/main.ts --bundle --minify --format=iife --target=es2022 --outfile=dist/client/app.js --log-level=warning && node -e \"require('fs').cpSync('public','dist/client',{recursive:true})\"",
     "start": "node dist/server/index.js",
     "demo": "node dist/server/cli.js demo",
+    "ledger": "node dist/server/cli.js ledger",
     "test": "node --test \"dist/server/__tests__/canonical.test.js\" \"dist/server/__tests__/envelope.test.js\" \"dist/server/__tests__/hosted-auth.test.js\" \"dist/server/__tests__/verifier-binding.test.js\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:integration": "node --test \"dist/server/__tests__/integration.local.test.js\""

@@ -7,6 +7,8 @@ import { balanceOf, publicClient, requireEscrow, retry, saveReceipt, verifierOf,
 import { buyerBudgetWei, chainId, chainMode, dataDir, listingPriceWei, publicBaseUrl, roleAddresses, roles } from "./config.js";
 import { addEvent, getDb, nowIso, publicListing, publicOrder, type ListingRow, type OrderRow } from "./db.js";
 import { ENVELOPE_ID, NOMINAL_SCENARIO } from "./envelope.js";
+import { writeLedger } from "./ledger.js";
+import { provenance } from "./provenance.js";
 import { runScenario } from "./sim.js";
 import { buyerFund, buyerRetrieveAndCheck, buyerWithdraw, describePolicy, selectListing, type BuyerPolicy } from "./agents/buyer.js";
 import { buildPrivatePackage, buildSubmission, sellerDeliver, sellerDiscover, sellerWithdraw } from "./agents/seller.js";
@@ -63,6 +65,8 @@ export async function runDemoPipeline(opts: { evidenceDir?: string | null; baseU
     if (!code || code === "0x") throw new Error(`no contract code at ${escrowAddr} on ${chainMode}`);
     const onChainVerifier = await verifierOf();
     if (onChainVerifier.toLowerCase() !== addrs.verifier.toLowerCase()) throw new Error(`escrow verifier ${onChainVerifier} is not our verifier ${addrs.verifier}`);
+    const prov = provenance();
+    L(`provenance: git ${prov.git_sha ? prov.git_sha.slice(0, 12) : "unknown"}${prov.git_dirty ? " (DIRTY working tree)" : prov.git_dirty === false ? " (clean)" : ""}, envelope ${prov.envelope_id}, config hash ${prov.envelope_config_hash.slice(0, 14)}...`);
     L(`preflight: chain mode ${chainMode} (chain id ${chainId}), escrow ${escrowAddr}, block ${await publicClient.getBlockNumber()}`);
     for (const [role, a] of Object.entries(addrs)) {
       // a just-confirmed top-up may not be visible on every RPC backend yet: retry zero balances briefly
@@ -133,6 +137,12 @@ export async function runDemoPipeline(opts: { evidenceDir?: string | null; baseU
       const left = await retry(async () => { const x = await withdrawable(credited); if (x !== 0n) throw new Error("not yet"); return x; }, 8, 2500).catch(() => withdrawable(credited));
       L(`order ${n}: ${settled.check.valid ? "VALID -> seller paid" : "INVALID -> buyer refunded"}; ${settled.check.valid ? "seller" : "buyer"} withdrawable after withdraw = ${left} wei`);
       if (evidenceDir) fs.writeFileSync(path.join(evidenceDir, `order-${n}.json`), JSON.stringify({ order: publicOrder(fresh()), listing: publicListing(db.prepare("SELECT * FROM listings WHERE listing_id = ?").get(order.listing_id) as unknown as ListingRow), events: db.prepare("SELECT * FROM events WHERE listing_id = ? ORDER BY id").all(order.listing_id) }, null, 2) + "\n");
+    }
+    if (evidenceDir) {
+      // The failure ledger a GUARD-style estimator would ingest. It carries the theta vector of every
+      // finding, so it is an operator/Loop-facing artifact: no HTTP route ever serves it.
+      const led = writeLedger(path.join(evidenceDir, "ledger.json"));
+      L(`failure ledger: ${led.doc.n_findings} finding(s) (${JSON.stringify(led.doc.verdict_counts)}) over ${led.doc.n_search_runs} search simulations -> ${led.file}`);
     }
     if (evidenceDir && chainMode === "testnet") writeTestnetMd(evidenceDir, orders);
     running.status = "done";

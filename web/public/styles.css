@@ -29,6 +29,7 @@ dl { display: grid; grid-template-columns: 150px 1fr; gap: 4px 10px; margin: 0; 
 .timeline td:first-child { white-space: nowrap; }
 .checks td { padding: 3px 6px; } .metrics td, .metrics th { padding: 4px 8px; }
 .changes { margin: 0 0 8px; padding-left: 18px; }
+.question { font-size: 15px; margin: 2px 0 10px; max-width: 900px; }
 .viewports { position: relative; width: 100%; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; background: #f7f8fa; }
 .viewports canvas { display: block; }
 .vp-overlay { position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 1fr; pointer-events: none; }

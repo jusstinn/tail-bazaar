@@ -1,0 +1,99 @@
+# Tail Bazaar — the operating envelope (theta) the hunter searches, published in the same axis shape
+# GUARD uses in configs/guard_theta.yaml so that a Tail Bazaar failure ledger can be consumed by a
+# GUARD-style estimator later. Machine-readable copy of the ranges in sim/tailbazaar_sim/envelope.py
+# and of the controller's tuned range in the docstring of sim/tailbazaar_sim/controller.py; the two
+# Python files stay authoritative and a unit test (web/src/server/__tests__/envelope.test.ts) fails if
+# this file drifts from them. Served as JSON by GET /api/envelope.
+#
+# EVERYTHING HERE IS AN ILLUSTRATIVE ASSUMPTION for a demonstration warehouse cart. None of these
+# bounds is measured on a physical robot.
+#
+# NO DISTRIBUTION D IS STATED. GUARD's `marginal` and `scale` describe the deployment distribution its
+# estimator prices against. Tail Bazaar does not estimate a probability: it runs a bounded
+# deterministic grid search over these axes and sells individual reproducible failures. The two fields
+# are therefore present for schema compatibility and left null. Choosing D is a modelling decision
+# that belongs to whoever prices the risk, and adversarially selected failures are not failure
+# frequencies.
+#
+# Axis groups (GUARD's vocabulary):
+#   physical  — mass and contact properties of the world
+#   systems   — latency in the sensing and actuation path, the axis real deployments have
+#   visual    — not modelled here; Tail Bazaar's scene has no perception stack
+#
+# `tuned_range` is not a GUARD field. It records the operating range the controller under test was
+# tuned for, so a reader can see immediately whether a finding sits inside the controller's design
+# assumptions or outside them. The searched envelope is deliberately wider than the tuned range: the
+# product question is where the controller stops working as the operating range is widened.
+
+envelope_id: tb-envelope-1
+controller_id: stop-before-obstacle-v1
+control_tick_ms: 20        # 50 Hz; both latency axes are quantized to one control tick
+duplicate_rule: normalized L-infinity distance < 0.05
+distribution_D: null       # not stated, not estimated; see the note above
+
+continuous:
+  # --- physical ---------------------------------------------------------------
+  - name: floor_friction
+    low: 0.2
+    high: 1.0
+    nominal: 0.8
+    marginal: null
+    scale: null
+    units: coefficient
+    group: physical
+    places: 3
+    tuned_range: ">= 0.6"
+  - name: payload_kg
+    low: 5.0
+    high: 60.0
+    nominal: 20.0
+    marginal: null
+    scale: null
+    units: kg
+    group: physical
+    places: 1
+    tuned_range: "= 20"
+
+  # --- systems ----------------------------------------------------------------
+  # Latency of the exteroceptive obstacle-distance measurement as the controller sees it.
+  # Proprioceptive odometry is not delayed. GUARD's SystemsWrapper quantizes latency against the
+  # control period; Tail Bazaar quantizes to its own 20 ms control tick in the same way, so a delay is
+  # always an integer number of ticks and never lands between two control decisions.
+  - name: sensor_delay_ms
+    low: 0
+    high: 300
+    nominal: 20
+    marginal: null
+    scale: null
+    units: ms
+    group: systems
+    step: 20
+    tuned_range: "<= 40"
+  - name: actuator_delay_ms
+    low: 0
+    high: 100
+    nominal: 20
+    marginal: null
+    scale: null
+    units: ms
+    group: systems
+    step: 20
+    tuned_range: "<= 20"
+
+discrete: []               # no stratified axes in this envelope
+
+# Limit state and severity, in GUARD's field names (guard/severity.py):
+#   limit_state_margin_m   g(theta), the minimum recorded range to the obstacle; failure when contact
+#                          occurs. The simulator records `min_range_m` and the boolean `collision`
+#                          from MuJoCo contact data; it does not record a signed penetration depth, so
+#                          on a collision this margin is the closest recorded approach, not a negative
+#                          number, and `collision` is the authoritative failure flag.
+#   impact_speed_mps       speed at first contact (the severity proxy that is actually measured)
+#   impact_kinetic_energy_j  0.5 * total_mass_kg * impact_speed_mps^2, GUARD's impact energy in joules
+# No biomechanical tier is assigned. GUARD's ISO/TS 15066 thresholds are marked
+# PLACEHOLDER_UNVERIFIED there, and Tail Bazaar does not add dollar values or damage estimates.
+
+verdicts:
+  VALID: re-simulated by the verifier and bound to the delivered evidence; pays the seller
+  INVALID: rejected — not reproducible, out of envelope, duplicate, or evidence not bound to the verified run
+  INCONCLUSIVE: numerical divergence or metrics outside tolerance; never pays

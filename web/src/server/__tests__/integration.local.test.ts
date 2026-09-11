@@ -30,8 +30,24 @@ test("pre-purchase summary carries only the allowed fields", async () => {
   const rows = (await res.json()) as any[];
   assert.ok(rows.length >= 2);
   const s = rows[0].public_summary;
-  assert.deepEqual(Object.keys(s).sort(), ["admissible", "chain", "claim_kind", "controller", "envelope_id", "format", "hidden", "price_wei", "schema", "seller", "seller_settled_orders_at_listing", "severity", "verification"]);
+  assert.deepEqual(Object.keys(s).sort(), ["admissible", "chain", "claim_kind", "controller", "envelope_id", "format", "hidden", "operating_context", "price_wei", "schema", "seller", "seller_settled_orders_at_listing", "severity", "verification"]);
   assert.equal(typeof rows[0].seller_settled_orders, "number");
+  // P3: the buyer's real question and both ranges are stated before purchase, in prose that names no
+  // parameter and no value of this scenario (the leak test above covers the parameter names).
+  assert.match(s.operating_context.controller_tuned_range, /sensor latency <= 40 ms/);
+  assert.match(s.operating_context.searched_envelope, /sensor latency 0-300 ms/);
+  assert.match(s.operating_context.question, /wider operating range than it was tuned for/);
+  assert.equal(s.verification.verdict, "VALID");
+});
+
+test("the published envelope endpoint carries both ranges in GUARD's axis shape", async () => {
+  const env = (await (await app.request("/api/envelope")).json()) as any;
+  assert.equal(env.envelope_id, "tb-envelope-1");
+  assert.equal(env.axes.length, 4);
+  for (const a of env.axes) assert.deepEqual(Object.keys(a).sort(), ["group", "high", "low", "marginal", "name", "nominal", "quantization", "scale", "tuned_range", "units"]);
+  assert.deepEqual(env.axes.map((a: any) => a.group).sort(), ["physical", "physical", "systems", "systems"]);
+  assert.equal(env.axes.every((a: any) => a.marginal === null && a.scale === null), true, "no distribution D is stated");
+  assert.deepEqual(Object.keys(env.verdicts).sort(), ["INCONCLUSIVE", "INVALID", "VALID"]);
 });
 
 test("retrieval requires the bound buyer's signature over a fresh challenge", async () => {
@@ -68,6 +84,40 @@ test("retrieval requires the bound buyer's signature over a fresh challenge", as
   ch = createChallenge(valid.order_id, buyer.address);
   const sigExp = await walletFor(buyer).signMessage({ message: ch.message });
   await assert.rejects(() => redeemChallenge(valid.order_id, ch.nonce, sigExp, ch.expires_at + 1), /expired/);
+});
+
+// P1 end to end: in hosted mode the paid evidence is not public, and the session a real signed
+// retrieval hands back is what unlocks it. (hosted-auth.test.ts covers the gate in isolation.)
+test("hosted mode: the reveal route is closed to visitors and opened by a real retrieval session", async () => {
+  const valid = orders().find((o) => o.status === "SETTLED_VALID")!;
+  const buyer = roles.buyer();
+  const reveal = `/api/orders/${valid.order_id}/reveal`;
+  assert.equal((await app.request(reveal)).status, 200, "local demonstration mode is unchanged");
+  process.env.PUBLIC_BASE_URL = "https://tail-bazaar.example";
+  try {
+    const anon = await app.request(reveal);
+    assert.equal(anon.status, 401, "an anonymous visitor to the public URL cannot read paid evidence");
+    assert.ok(!(await anon.text()).includes("salt_hex"));
+    assert.equal((await app.request("/api/runs/baseline")).status, 401);
+
+    const ch = createChallenge(valid.order_id, buyer.address);
+    const sig = await walletFor(buyer).signMessage({ message: ch.message });
+    const got = await app.request("/api/retrieve", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ order_id: valid.order_id, nonce: ch.nonce, signature: sig }) });
+    assert.equal(got.status, 200, "the signed-challenge route still works in hosted mode");
+    const token = got.headers.get("x-tb-session")!;
+    assert.match(token, /^[0-9a-f]{64}$/);
+
+    const opened = await app.request(reveal, { headers: { authorization: `Bearer ${token}` } });
+    assert.equal(opened.status, 200);
+    assert.equal(opened.headers.get("x-access-via"), "buyer-session");
+    const bytes = new Uint8Array(await opened.arrayBuffer());
+    const listing = getDb().prepare("SELECT commitment FROM listings WHERE listing_id = ?").get(valid.listing_id) as { commitment: string };
+    assert.equal(keccakHex(bytes), listing.commitment, "the authenticated path returns the committed package");
+    assert.equal((await app.request(reveal, { headers: { authorization: "Bearer " + "0".repeat(64) } })).status, 401);
+  } finally {
+    delete process.env.PUBLIC_BASE_URL;
+  }
+  assert.equal((await app.request(reveal)).status, 200, "unsetting PUBLIC_BASE_URL restores local demonstration mode");
 });
 
 test("a refunded order cannot be retrieved even by its buyer", async () => {

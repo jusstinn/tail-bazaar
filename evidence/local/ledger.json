@@ -1,0 +1,168 @@
+{
+  "schema": "tb-ledger-1",
+  "generated_at": "2026-09-11T06:58:11.560Z",
+  "envelope_id": "tb-envelope-1",
+  "envelope_yaml": "sim/envelope.yaml (same axis shape as GUARD configs/guard_theta.yaml)",
+  "chain": {
+    "mode": "local",
+    "chain_id": 31337,
+    "escrow": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3"
+  },
+  "provenance": {
+    "git_sha": "cb837f3d72df33d732c5b1dc92609476dcfdc7f6",
+    "git_dirty": true,
+    "envelope_id": "tb-envelope-1",
+    "envelope_config_hash": "0xf0a01018026c5364f26a3cf93e19129fecbee33502b18c078546d7ba017b226f",
+    "captured_at": "2026-09-11T06:58:11.557Z"
+  },
+  "n_nominal_runs": 6,
+  "nominal_suite": {
+    "all_passed": true,
+    "source": "evidence/milestone/nominal-suite.json"
+  },
+  "n_search_runs": 144,
+  "search_cost_total": {
+    "simulations": 144,
+    "sim_steps": 336350,
+    "wall_time_s": 8.535
+  },
+  "n_findings": 2,
+  "verdict_counts": {
+    "VALID": 2
+  },
+  "controller_tuned_range": "sensor latency <= 40 ms, actuator latency <= 20 ms, floor friction >= 0.6, payload 20 kg",
+  "searched_envelope": "sensor latency 0-300 ms, actuator latency 0-100 ms, floor friction 0.2-1.0, payload 5-60 kg",
+  "product_question": "Can this controller be deployed in a wider operating range than it was tuned for, and where exactly does it stop working?",
+  "placeholder_warnings": [
+    "Adversarially selected failures are not failure frequencies: this ledger is a set of found failures, not an estimate of P(failure) under any distribution.",
+    "No distribution D over the envelope axes is stated or estimated here; sim/envelope.yaml leaves GUARD's marginal/scale null on purpose.",
+    "Severity is an uncalibrated impact-speed / kinetic-energy proxy. No biomechanical tier, damage estimate or monetary value is assigned.",
+    "limit_state_margin_m is the minimum recorded range to the obstacle; the simulator records no signed penetration depth, so it is not negative on contact.",
+    "The physics is a simplified cart in an illustrative envelope and needs calibration against physical robots before any underwriting use.",
+    "INCONCLUSIVE never pays; INVALID rows are recorded findings that failed verification, not deliverable evidence."
+  ],
+  "findings": [
+    {
+      "finding_id": "0xad09364f2711eab0a5189c9738258c1f07ca68ee9a7bddf6514de06505c2856a",
+      "controller_id": "stop-before-obstacle-v1",
+      "controller_hash": "sha256:7620971c1ea6d527fbe9b91c026a921b7f23abee8cb274ea136022c60d169760",
+      "envelope_id": "tb-envelope-1",
+      "scenario": {
+        "actuator_delay_ms": 20,
+        "floor_friction": 0.3,
+        "payload_kg": 20,
+        "sensor_delay_ms": 200
+      },
+      "in_tuned_range": {
+        "sensor_delay_ms": false,
+        "actuator_delay_ms": true,
+        "floor_friction": false,
+        "payload_kg": true
+      },
+      "outcome": "COLLISION",
+      "limit_state_margin_m": 0.001628,
+      "impact_speed_mps": 0.414745,
+      "impact_kinetic_energy_j": 4.558,
+      "total_mass_kg": 53,
+      "verdict": "VALID",
+      "delivery_verdict": "VALID",
+      "verification_status": "VERIFIED",
+      "verification_method": "exact-trajectory-hash",
+      "source": "bounded grid search",
+      "search_cost": {
+        "sim_steps": 336350,
+        "simulations": 144,
+        "wall_time_s": 8.535
+      },
+      "run_id": "run-84a3595f5dc677c3",
+      "git_sha": "cb837f3d72df33d732c5b1dc92609476dcfdc7f6",
+      "git_dirty": true,
+      "environment": {
+        "control_dt_s": 0.02,
+        "engine": "mujoco",
+        "engine_version": "3.13.0",
+        "integrator": "implicitfast",
+        "numpy_version": "2.5.3",
+        "physics_timestep_s": 0.002,
+        "platform": "Darwin-arm64",
+        "python_version": "3.12.13",
+        "substeps_per_tick": 10,
+        "threads": 1,
+        "uv_lock_sha256": "2211952077d8411fbf4b67f3ea06999c65a12f32e2f0684f179518905d4d20e6"
+      },
+      "trajectory_hash": "0x0faa25a25fd84eb41bf33151549ea7d2e8954890bb85d9e47d2697987a612122",
+      "commitment": "0xad09364f2711eab0a5189c9738258c1f07ca68ee9a7bddf6514de06505c2856a",
+      "settled_on_chain": {
+        "chain_mode": "local",
+        "chain_id": 31337,
+        "escrow": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3",
+        "listing_id": "0xc74df3f7bc20ebaa8d3edd0d66f0abd02ddac1a2bc18b8a280849a64ee5bd709",
+        "register_tx": "0x5dfbfab0131b671ea573f28dddffb2d14b1f7cd4d736195fa0a4b42a581207fa",
+        "order_status": "SETTLED_VALID",
+        "settle_tx": "0xf976fee4d6181cc5158939e142eececb8b57835e13e58d092c8d7b714f93c20f"
+      },
+      "created_at": "2026-09-11T06:56:58.351Z"
+    },
+    {
+      "finding_id": "0xa822870c0306a71e18890a97015297d9634c364eab8aa3230c74cf830107a359",
+      "controller_id": "stop-before-obstacle-v1",
+      "controller_hash": "sha256:7620971c1ea6d527fbe9b91c026a921b7f23abee8cb274ea136022c60d169760",
+      "envelope_id": "tb-envelope-1",
+      "scenario": {
+        "actuator_delay_ms": 20,
+        "floor_friction": 0.3,
+        "payload_kg": 20,
+        "sensor_delay_ms": 180
+      },
+      "in_tuned_range": {
+        "sensor_delay_ms": false,
+        "actuator_delay_ms": true,
+        "floor_friction": false,
+        "payload_kg": true
+      },
+      "outcome": "COLLISION",
+      "limit_state_margin_m": 0.000614,
+      "impact_speed_mps": 0.043177,
+      "impact_kinetic_energy_j": 0.049,
+      "total_mass_kg": 53,
+      "verdict": "VALID",
+      "delivery_verdict": "INVALID",
+      "verification_status": "VERIFIED",
+      "verification_method": "exact-trajectory-hash",
+      "source": "bounded grid search",
+      "search_cost": {
+        "sim_steps": 336350,
+        "simulations": 144,
+        "wall_time_s": 8.535
+      },
+      "run_id": "run-1df57b754a8c33be",
+      "git_sha": "cb837f3d72df33d732c5b1dc92609476dcfdc7f6",
+      "git_dirty": true,
+      "environment": {
+        "control_dt_s": 0.02,
+        "engine": "mujoco",
+        "engine_version": "3.13.0",
+        "integrator": "implicitfast",
+        "numpy_version": "2.5.3",
+        "physics_timestep_s": 0.002,
+        "platform": "Darwin-arm64",
+        "python_version": "3.12.13",
+        "substeps_per_tick": 10,
+        "threads": 1,
+        "uv_lock_sha256": "2211952077d8411fbf4b67f3ea06999c65a12f32e2f0684f179518905d4d20e6"
+      },
+      "trajectory_hash": "0xe84540331115509e0da66fd82e34df194a9733a3d41fd0a08de2c395808db34a",
+      "commitment": "0xa822870c0306a71e18890a97015297d9634c364eab8aa3230c74cf830107a359",
+      "settled_on_chain": {
+        "chain_mode": "local",
+        "chain_id": 31337,
+        "escrow": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3",
+        "listing_id": "0x28a094e275e9a32da3a04be5dd34fd9075b36a29a1729231f8afe00328335ed8",
+        "register_tx": "0x3ceada347adc88efeace60a498ed0e6bfdafcc247a6c0683738ea518eeaed8b9",
+        "order_status": "SETTLED_INVALID",
+        "settle_tx": "0x115f85f66b409b15d25de19a2078cb30d66e71d7c7af3d97d5e22e57ac4b5fe9"
+      },
+      "created_at": "2026-09-11T06:57:02.965Z"
+    }
+  ]
+}

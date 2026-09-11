@@ -24,7 +24,19 @@ git clone <repo> /opt/tail-bazaar && cd /opt/tail-bazaar
 cp .env.example .env            # then fill in keys/addresses; never commit .env
 # CHAIN_MODE=testnet, ESCROW_ADDRESS_BASE_SEPOLIA=<from scripts/testnet-deploy.sh>
 # PORT=3100  PUBLIC_BASE_URL=https://tail-bazaar.example.com
-# DEMO_TRIGGER_ENABLED=0 to stop anonymous visitors from triggering testnet transactions
+# OPERATOR_TOKEN=$(openssl rand -hex 32)   # optional; the only key to the pipeline trigger
+# DEMO_TRIGGER_ENABLED=0 to remove the pipeline trigger entirely
+```
+
+**Setting `PUBLIC_BASE_URL` is what turns on hosted mode**, and hosted mode is what keeps paid
+evidence private: the buyer-console reveal route and the baseline run then require a bearer token (the
+buyer session issued by a signed-challenge retrieval, or `OPERATOR_TOKEN`), and `POST /api/demo/run`
+requires `OPERATOR_TOKEN`. `deploy/start.sh` always exports `PUBLIC_BASE_URL`, so a host started
+through it is authenticated even if the operator forgets to set the variable. Verify after deploying:
+
+```bash
+curl -si https://tail-bazaar.example.com/api/status | grep -i hosted_mode        # expect true
+curl -si https://tail-bazaar.example.com/api/orders/<id>/reveal | head -1        # expect 401
 ```
 
 Run once by hand to build and smoke-test: `deploy/start.sh` (Ctrl-C to stop).
@@ -78,7 +90,12 @@ tail-bazaar.example.com {
 
 ## What the host exposes
 
-- Public: listings (summaries only), orders and timelines, the public baseline run, static UI.
-- Authenticated: `POST /api/retrieve` (signed challenge). `GET /api/orders/:id/reveal` shows packages
-  the local buyer agent already purchased (buyer console); set `DEMO_BUYER_CONSOLE=0` to hide it.
-- Never exposed: private keys, un-purchased packages, the SQLite file (`web/data/`).
+- Public: listings (public summaries only), orders and timelines, the verifier's checks, the published
+  envelope (`GET /api/envelope`), status, balances, static UI.
+- Authenticated in hosted mode (401 without a bearer token): `GET /api/orders/:id/reveal` (package
+  bytes), `GET /api/runs/baseline` (a full recorded trajectory). `POST /api/retrieve` is always
+  authenticated by the signed challenge. `POST /api/demo/run` needs `OPERATOR_TOKEN`.
+- Never exposed: private keys, un-purchased packages, the SQLite file (`web/data/`), the failure
+  ledger export (`npm run ledger` writes it for the operator; no HTTP route serves it, because every
+  row contains the scenario parameters buyers pay for).
+- `DEMO_BUYER_CONSOLE=0` removes the reveal route altogether (403 for everyone, including the buyer).

@@ -36,6 +36,37 @@ NOMINAL_SCENARIO: dict[str, Any] = {
     "payload_kg": 20.0,
 }
 
+# The range the controller was TUNED for, transcribed from the "Design assumptions" paragraph of the
+# docstring in controller.py. That file is never edited (its SHA-256 is the controller version id in
+# every evidence document), so this is a mirror of it, republished in machine-readable form.
+#
+# The searched ENVELOPE above is deliberately wider than this tuned range. A finding outside the tuned
+# range is therefore not a defect report: it is a measured boundary of how far the operating range can
+# be widened before the controller stops working. The controller checks none of these at runtime.
+CONTROLLER_TUNED_RANGE: dict[str, dict[str, Any]] = {
+    "sensor_delay_ms": {"max": 40},
+    "actuator_delay_ms": {"max": 20},
+    "floor_friction": {"min": 0.6},
+    "payload_kg": {"exactly": 20.0},
+}
+TUNED_RANGE_PROSE = "sensor latency <= 40 ms, actuator latency <= 20 ms, floor friction >= 0.6, payload 20 kg"
+PRODUCT_QUESTION = (
+    "Can this controller be deployed in a wider operating range than it was tuned for, "
+    "and where exactly does it stop working?"
+)
+
+
+def in_tuned_range(scn: dict[str, Any]) -> dict[str, bool]:
+    """Per parameter: is this value inside the range the controller was tuned for?"""
+    out: dict[str, bool] = {}
+    for k, spec in CONTROLLER_TUNED_RANGE.items():
+        v = float(scn[k])
+        if "exactly" in spec:
+            out[k] = v == float(spec["exactly"])
+        else:
+            out[k] = (v >= spec["min"]) if "min" in spec else (v <= spec["max"])
+    return out
+
 # Two scenarios closer than this in normalized L-infinity distance are treated as
 # approximate duplicates. This is a published, deliberately simple rule; it does not
 # measure semantic novelty of the resulting failure.

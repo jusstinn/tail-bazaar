@@ -1,4 +1,4 @@
-import { getJSON, postJSON, type DemoRun, type Listing, type Order, type Pkg, type RunLike, type Status, type Ev } from "./api.js";
+import { getJSON, getToken, HttpError, postJSON, setToken, type DemoRun, type EnvelopeDoc, type Listing, type OperatingContext, type Order, type Pkg, type RunLike, type Status, type Ev } from "./api.js";
 import { addrCell, esc, eth, num, short, txCell, when } from "./format.js";
 import { createReplay, type Replay } from "./replay.js";
 
@@ -6,6 +6,31 @@ const view = document.getElementById("view")!;
 let status: Status | null = null;
 let replay: Replay | null = null;
 let pollTimer: number | null = null;
+let envelopeDoc: EnvelopeDoc | null = null;
+
+async function loadEnvelope(): Promise<EnvelopeDoc> {
+  if (!envelopeDoc) envelopeDoc = await getJSON<EnvelopeDoc>("/api/envelope");
+  return envelopeDoc;
+}
+
+/** The product question, stated next to both ranges: the controller was tuned for a narrower range
+ *  than the one the hunter searches, so a finding outside the tuned range is a boundary, not a defect. */
+function operatingRangeBlock(env: EnvelopeDoc, ctx: OperatingContext | null): string {
+  return `
+    <div class="card-head"><h2>What this market answers</h2><span class="muted small">${esc(env.envelope_id)} · ${esc(env.yaml)}</span></div>
+    <p class="question"><strong>${esc(ctx?.question ?? env.product_question)}</strong></p>
+    <table><thead><tr><th>Axis</th><th>Group</th><th>Controller tuned for</th><th>Searched envelope</th><th>Nominal</th><th>Units</th></tr></thead><tbody>
+      ${env.axes.map((a) => `<tr>
+        <td class="mono">${esc(a.name)}</td><td>${esc(a.group)}</td>
+        <td class="mono">${esc(a.tuned_range)}</td>
+        <td class="mono">${esc(a.low)} – ${esc(a.high)}</td>
+        <td class="mono">${esc(a.nominal)}</td>
+        <td class="muted">${esc(a.units)}<div class="tiny muted">${esc(a.quantization)}</div></td>
+      </tr>`).join("")}
+    </tbody></table>
+    <p class="small muted">Tuned range source: ${esc(env.controller_tuned_range.source)}. ${esc(env.note)}</p>
+    <p class="small muted">${esc(env.distribution)}</p>`;
+}
 
 function badge(text: string, cls = ""): string { return `<span class="badge ${cls}">${esc(text)}</span>`; }
 function statusClass(s: string): string {
@@ -42,13 +67,14 @@ function showError(e: unknown): void {
 // ------------------------------------------------------------------ marketplace
 async function renderMarket(): Promise<void> {
   const st = await loadStatus();
-  const [listings, orders, demo] = await Promise.all([getJSON<Listing[]>("/api/listings"), getJSON<Order[]>("/api/orders"), getJSON<{ enabled: boolean; run: DemoRun }>("/api/demo/status")]);
+  const [listings, orders, demo, env] = await Promise.all([getJSON<Listing[]>("/api/listings"), getJSON<Order[]>("/api/orders"), getJSON<{ enabled: boolean; run: DemoRun }>("/api/demo/status"), loadEnvelope()]);
   view.innerHTML = `
     <section class="hero">
       <h1>Reproducible failure scenarios for warehouse robot controllers</h1>
       <p>Autonomous hunter agents search a published operating envelope for admissible conditions under which a fixed controller collides. A verifier re-simulates each claim in its own pinned environment, publishes a coarse summary, and registers the salted package commitment on chain. Buyers pay into escrow, retrieve the private package with a signed challenge, and the verifier settles or refunds.</p>
       <p class="muted small">Adversarially selected failures do not estimate real-world failure frequency. Simulation requires calibration against physical robots before supporting underwriting decisions. Severity bands are an impact-speed proxy, not a damage estimate.</p>
     </section>
+    <section class="card">${operatingRangeBlock(env, null)}</section>
     <section class="card">
       <div class="card-head"><h2>Listings</h2><span class="muted small">pre-purchase view: controller, envelope, admissibility, verification, severity band, seller history. Parameters and trajectories stay private.</span></div>
       ${listings.length === 0 ? `<p class="muted">No listings yet. Run the demonstration pipeline below.</p>` : `
@@ -134,9 +160,13 @@ function checksTable(checks: { name: string; ok: boolean; detail?: string }[]): 
 
 async function renderOrder(orderId: string): Promise<void> {
   await loadStatus();
-  const o = await getJSON<Order>(`/api/orders/${orderId}`);
+  const [o, env] = await Promise.all([getJSON<Order>(`/api/orders/${orderId}`), loadEnvelope()]);
   const l = o.listing!;
   const s = l.public_summary;
+  const ctx: OperatingContext = s.operating_context ?? {
+    controller_tuned_range: env.controller_tuned_range.prose, searched_envelope: env.searched_envelope.prose,
+    question: env.product_question, note: env.note, reference: "GET /api/envelope",
+  };
   const events = (o.events ?? []) as Ev[];
   view.innerHTML = `
     <a class="back" href="#/">← marketplace</a>
@@ -148,9 +178,12 @@ async function renderOrder(orderId: string): Promise<void> {
           <h3>Pre-purchase summary (public)</h3>
           <dl>
             <dt>Controller</dt><dd>${esc(s.controller.id)} <span class="mono tiny muted">${esc(s.controller.hash)}</span></dd>
+            <dt>Tuned for</dt><dd>${esc(ctx.controller_tuned_range)} <span class="tiny muted">(${esc(env.controller_tuned_range.source)})</span></dd>
+            <dt>Searched envelope</dt><dd>${esc(ctx.searched_envelope)} <span class="tiny muted">wider than the tuned range on purpose</span></dd>
+            <dt>Question</dt><dd>${esc(ctx.question)}</dd>
             <dt>Envelope</dt><dd>${esc(s.envelope_id)}</dd>
             <dt>Admissible</dt><dd>${s.admissible ? "yes" : "no"}</dd>
-            <dt>Verification</dt><dd>${badge(s.verification.status, "ok")} ${esc(s.verification.method ?? "")} · ${esc(s.verification.verifier_version)} · fingerprint <span class="mono tiny">${esc(short(s.verification.environment_fingerprint, 12, 6))}</span></dd>
+            <dt>Verification</dt><dd>${badge(s.verification.verdict ?? s.verification.status, "ok")} ${esc(s.verification.method ?? "")} · ${esc(s.verification.verifier_version)} · fingerprint <span class="mono tiny">${esc(short(s.verification.environment_fingerprint, 12, 6))}</span>${s.verification.evidence_binding ? `<div class="tiny muted">${esc(s.verification.evidence_binding)}</div>` : ""}</dd>
             <dt>Severity band</dt><dd>${badge(s.severity.band, "sev-" + s.severity.band)} <span class="tiny muted">${esc(s.severity.definition)}</span></dd>
             <dt>Seller</dt><dd>${addrCell(l.seller, l.chain_mode)} · settled orders now: <span class="mono">${l.seller_settled_orders ?? "—"}</span> (at listing: ${s.seller_settled_orders_at_listing})</dd>
             <dt>Price</dt><dd class="mono">${esc(eth(l.price_wei))}</dd>
@@ -185,12 +218,73 @@ async function renderOrder(orderId: string): Promise<void> {
     reveal.innerHTML = `<h3>Private package</h3><p class="muted">Not retrieved by the local buyer agent for this order${o.status === "SETTLED_INVALID" ? " — refunded orders do not unlock a package" : ""}.</p>`;
     return;
   }
-  reveal.innerHTML = `<h3>Revealed finding (buyer console, local demonstration mode)</h3><p class="muted">loading package and public baseline…</p>`;
-  const [pkg, baseline] = await Promise.all([getJSON<Pkg>(`/api/orders/${orderId}/reveal`), getJSON<RunLike>("/api/runs/baseline")]);
-  renderReveal(reveal, pkg, baseline, o);
+  reveal.innerHTML = `<h3>Revealed finding (buyer console)</h3><p class="muted">loading package and public baseline…</p>`;
+  try {
+    const [pkg, baseline] = await Promise.all([getJSON<Pkg>(`/api/orders/${orderId}/reveal`), getJSON<RunLike>("/api/runs/baseline")]);
+    renderReveal(reveal, pkg, baseline, o, env);
+  } catch (e) {
+    if (e instanceof HttpError && (e.status === 401 || e.status === 403)) renderLocked(reveal, orderId, o, env);
+    else throw e;
+  }
 }
 
-function renderReveal(host: HTMLElement, pkg: Pkg, baseline: RunLike, o: Order): void {
+/** HOSTED MODE: the paid evidence is not public. Only the buyer session issued by a signed-challenge
+ *  retrieval (or the operator token) unlocks it, and the token is held by this browser alone. */
+function renderLocked(host: HTMLElement, orderId: string, o: Order, env: EnvelopeDoc): void {
+  host.innerHTML = `
+    <div class="card-head"><h3>Private package</h3><span>${badge("authentication required", "bad")}</span></div>
+    <p>This instance is hosted at a public URL, so the paid evidence — exact scenario parameters, recorded trajectory, replay frames and salt — is not served to anonymous visitors. Unlock it with either:</p>
+    <ul class="changes">
+      <li>the <strong>buyer session</strong> returned by the retrieval route: <span class="mono tiny">POST /api/challenges</span> → sign the message with the buyer key → <span class="mono tiny">POST /api/retrieve</span> returns it in the <span class="mono tiny">x-tb-session</span> header;</li>
+      <li>or the <strong>operator token</strong>, if the operator of this host configured one.</li>
+    </ul>
+    <div class="row">
+      <input id="tok" type="password" placeholder="paste session or operator token" style="flex:1;min-width:240px;padding:6px 8px;border:1px solid var(--line);border-radius:4px;font-family:var(--mono);font-size:12px">
+      <button id="tok-go" class="btn">Unlock</button>
+      ${getToken() ? `<button id="tok-clear" class="btn small">forget stored token</button>` : ""}
+    </div>
+    <p class="tiny muted">The token is kept in this browser only and is sent to this app as a bearer header. What the buyer bought stays readable by the buyer; what a visitor sees is the public summary, the verifier's checks and the on-chain record.</p>
+    <p class="tiny muted">Public envelope and controller tuned range remain readable by anyone: ${esc(env.controller_tuned_range.prose)} versus a searched envelope of ${esc(env.searched_envelope.prose)}.</p>`;
+  const input = document.getElementById("tok") as HTMLInputElement;
+  document.getElementById("tok-go")!.addEventListener("click", () => {
+    setToken(input.value.trim());
+    renderOrder(o.order_id).catch(showError);
+  });
+  input.addEventListener("keydown", (e) => { if ((e as KeyboardEvent).key === "Enter") (document.getElementById("tok-go") as HTMLButtonElement).click(); });
+  document.getElementById("tok-clear")?.addEventListener("click", () => { setToken(""); renderOrder(orderId).catch(showError); });
+}
+
+/** Where the sold scenario sits relative to the controller's tuned range and the searched envelope.
+ *  Post-purchase only: it is derived from the exact parameters, so it never appears before payment. */
+function positionTable(pkg: Pkg, env: EnvelopeDoc): string {
+  const tuned = env.controller_tuned_range.per_parameter;
+  const rows = env.axes.map((a) => {
+    const v = Number(pkg.scenario[a.name]);
+    const t = tuned[a.name] ?? {};
+    const inTuned = t.exactly !== undefined ? v === t.exactly : (t.min === undefined || v >= t.min) && (t.max === undefined || v <= t.max);
+    return `<tr>
+      <td class="mono">${esc(a.name)}</td>
+      <td class="mono"><strong>${esc(v)}</strong> ${esc(a.units === "coefficient" ? "" : a.units)}</td>
+      <td class="mono">${esc(a.tuned_range)}</td>
+      <td class="mono">${esc(a.low)} – ${esc(a.high)}</td>
+      <td>${inTuned ? badge("inside tuned range", "ok") : badge("outside tuned range", "bad")}</td>
+    </tr>`;
+  }).join("");
+  const outside = env.axes.filter((a) => {
+    const t = tuned[a.name] ?? {};
+    const v = Number(pkg.scenario[a.name]);
+    return !(t.exactly !== undefined ? v === t.exactly : (t.min === undefined || v >= t.min) && (t.max === undefined || v <= t.max));
+  }).map((a) => a.name);
+  return `
+    <h3>Where this failure sits</h3>
+    <table><thead><tr><th>Axis</th><th>This finding</th><th>Controller tuned for</th><th>Searched envelope</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="small">${outside.length === 0
+      ? "Every parameter of this scenario is inside the range the controller was tuned for: the failure is inside the design assumptions."
+      : `This failure is <strong>outside the range the controller was tuned for</strong> on ${outside.map((n) => `<span class="mono">${esc(n)}</span>`).join(", ")}, and inside the published searched envelope on every axis. It is therefore not evidence that the controller is broken where it was designed to work; it is a measured boundary of how far the operating range can be widened before it stops working.`}</p>
+    <p class="tiny muted">${esc(env.note)}</p>`;
+}
+
+function renderReveal(host: HTMLElement, pkg: Pkg, baseline: RunLike, o: Order, env: EnvelopeDoc): void {
   const failureRun: RunLike = { scenario: pkg.scenario, scene: pkg.scene, metrics: pkg.metrics, events: pkg.events, ticks: pkg.ticks, frames: pkg.replay.frames, trajectory_hash: pkg.replay.trajectory_hash, controller: pkg.controller, environment: pkg.environment };
   const hashMatch = o.delivery_check ? o.delivery_check.valid : null;
   const bOnset = baseline.events.find((e: any) => e.type === "brake_onset");
@@ -201,7 +295,7 @@ function renderReveal(host: HTMLElement, pkg: Pkg, baseline: RunLike, o: Order):
   const bTrueRangeAtOnset = bOnset ? obs - bOnset.x_front_m : null;
   const changed = pkg.changed_conditions.map((c) => `<li><strong>${esc(c.parameter)}</strong>: ${esc(String(c.nominal))} → <strong>${esc(String(c.value))}</strong> ${esc(c.unit === "1" ? "" : c.unit)}</li>`).join("");
   host.innerHTML = `
-    <div class="card-head"><h3>Revealed finding (buyer console, local demonstration mode)</h3>
+    <div class="card-head"><h3>Revealed finding (buyer console)</h3>
       <span>${hashMatch === null ? "" : badge(hashMatch ? "package hash = on-chain commitment" : "package hash ≠ on-chain commitment", hashMatch ? "ok" : "bad")} ${pkg.tampered_by_demo ? badge("TAMPERED (demo)", "bad") : ""}</span></div>
     <div id="viewport"></div>
     <div class="controls">
@@ -212,6 +306,7 @@ function renderReveal(host: HTMLElement, pkg: Pkg, baseline: RunLike, o: Order):
       <button class="btn small jump" data-t="${fOnset ? fOnset.t_s : 0}">brake onset</button>
       <button class="btn small jump" data-t="${fContact ? fContact.t_s : 0}">first contact</button>
     </div>
+    ${positionTable(pkg, env)}
     <div class="grid2">
       <div>
         <h3>What changed</h3>
