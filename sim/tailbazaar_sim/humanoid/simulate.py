@@ -460,8 +460,6 @@ def run_scenario(scenario: dict[str, Any], record_frames: bool = True) -> dict[s
             events.append({"t_s": round(float(data.time), 6), "type": "diverged", "reason": diverged_reason})
             last_tick = tick + 1
             break
-    else:
-        last_tick = MAX_TICKS + POST_FALL_TICKS
 
     data.xfrc_applied[torso_id, :3] = 0.0
     if record_frames and (not frames or frames[-1][0] != round(last_tick * DT_CTRL_S, 6)):

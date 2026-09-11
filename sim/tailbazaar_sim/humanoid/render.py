@@ -20,7 +20,6 @@ pose of every primitive, which is all a viewer needs.
 
 from __future__ import annotations
 
-import math
 from typing import Any
 
 import numpy as np
