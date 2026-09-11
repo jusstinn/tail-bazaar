@@ -70,7 +70,7 @@ const SOURCE_LABEL: Record<string, string> = {
 
 /** The nominal suites are produced by the simulators, not by the web layer; report each with its
  *  source file so a count is never presented as something this export measured itself. */
-function nominalSuites(): { target_id: string; n_nominal_runs: number | null; all_passed: boolean | null; source: string | null }[] {
+function nominalSuites(): { target_id: string; n_nominal_runs: number | null; all_passed: boolean | null; gate_passed: boolean | null; cases_that_failed: string[] | null; source: string | null }[] {
   const candidates: Record<TargetId, string[]> = {
     cart: [path.join("evidence", "local", "nominal-suite.json"), path.join("evidence", "milestone", "nominal-suite.json")],
     humanoid: [path.join("evidence", "local", "humanoid", "nominal-suite.json"), path.join("evidence", "humanoid", "nominal-suite.json")],
@@ -82,10 +82,16 @@ function nominalSuites(): { target_id: string; n_nominal_runs: number | null; al
       try {
         const doc = JSON.parse(fs.readFileSync(file, "utf8"));
         const cases = Array.isArray(doc.cases) ? doc.cases.length : Array.isArray(doc.results) ? doc.results.length : null;
-        return { target_id: id, n_nominal_runs: cases, all_passed: doc.all_passed ?? doc.published_conditions_all_passed ?? null, source: rel };
+        // Two different questions, reported separately because they mean different things: `all_passed`
+        // is "every nominal case behaved as written", `gate_passed` is "the harness reproduces the
+        // target as its author published it". The humanoid's suite keeps a benign perturbation that
+        // FAILS (one 15 ms control tick fells the policy); that is a finding about the policy, not a
+        // broken harness, so collapsing the two into one flag would misreport it.
+        const failed = Array.isArray(doc.cases_that_fell) ? doc.cases_that_fell.map(String) : Array.isArray(doc.failed_cases) ? doc.failed_cases.map(String) : null;
+        return { target_id: id, n_nominal_runs: cases, all_passed: doc.all_passed ?? null, gate_passed: doc.published_conditions_all_passed ?? doc.all_passed ?? null, cases_that_failed: failed, source: rel };
       } catch { /* unreadable: reported as unknown below */ }
     }
-    return { target_id: id, n_nominal_runs: null, all_passed: null, source: null };
+    return { target_id: id, n_nominal_runs: null, all_passed: null, gate_passed: null, cases_that_failed: null, source: null };
   });
 }
 

@@ -1,6 +1,6 @@
 {
   "schema": "tb-ledger-2",
-  "generated_at": "2026-09-11T08:50:27.148Z",
+  "generated_at": "2026-09-11T09:02:39.366Z",
   "targets": [
     {
       "target_id": "cart",
@@ -38,7 +38,7 @@
     "escrow": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3"
   },
   "provenance": {
-    "git_sha": "4465b1efa62bfed38dfc8ed2e20bfdc70d8fe932",
+    "git_sha": "233420350276d0bf732edfa9436dc4f9f1cbbcee",
     "git_dirty": true,
     "envelope_ids": [
       "tb-envelope-1",
@@ -46,19 +46,25 @@
     ],
     "envelope_id": "tb-envelope-1 + tb-humanoid-envelope-1",
     "envelope_config_hash": "0xb4bc0770162ab354a4f1d53899f2729ca9193876fcc35a5dd9b06ca955990882",
-    "captured_at": "2026-09-11T08:50:27.147Z"
+    "captured_at": "2026-09-11T09:02:39.364Z"
   },
   "nominal_suites": [
     {
       "target_id": "cart",
       "n_nominal_runs": 6,
       "all_passed": true,
+      "gate_passed": true,
+      "cases_that_failed": null,
       "source": "evidence/milestone/nominal-suite.json"
     },
     {
       "target_id": "humanoid",
       "n_nominal_runs": 8,
       "all_passed": false,
+      "gate_passed": true,
+      "cases_that_failed": [
+        "one-tick-latency"
+      ],
       "source": "evidence/humanoid/nominal-suite.json"
     }
   ],
@@ -130,7 +136,7 @@
         "wall_time_s": 7.435
       },
       "run_id": "run-df19fdfa278dc734",
-      "git_sha": "4465b1efa62bfed38dfc8ed2e20bfdc70d8fe932",
+      "git_sha": "233420350276d0bf732edfa9436dc4f9f1cbbcee",
       "git_dirty": true,
       "environment": {
         "control_dt_s": 0.02,
@@ -202,7 +208,7 @@
         "wall_time_s": 7.435
       },
       "run_id": "run-6d1aed2aadf47242",
-      "git_sha": "4465b1efa62bfed38dfc8ed2e20bfdc70d8fe932",
+      "git_sha": "233420350276d0bf732edfa9436dc4f9f1cbbcee",
       "git_dirty": true,
       "environment": {
         "control_dt_s": 0.02,
@@ -279,7 +285,7 @@
         "wall_time_s": 10.032
       },
       "run_id": "run-1d4da8269d7c4c13",
-      "git_sha": "4465b1efa62bfed38dfc8ed2e20bfdc70d8fe932",
+      "git_sha": "233420350276d0bf732edfa9436dc4f9f1cbbcee",
       "git_dirty": true,
       "environment": {
         "control_dt_s": 0.015,
@@ -357,7 +363,7 @@
         "wall_time_s": 10.032
       },
       "run_id": "run-0e410a1c706cae37",
-      "git_sha": "4465b1efa62bfed38dfc8ed2e20bfdc70d8fe932",
+      "git_sha": "233420350276d0bf732edfa9436dc4f9f1cbbcee",
       "git_dirty": true,
       "environment": {
         "control_dt_s": 0.015,

@@ -1,17 +1,155 @@
-# Tail Bazaar — 3-minute demo script
+# Tail Bazaar — three-minute demo script
 
-Before recording: `scripts/anvil-start.sh && scripts/local-deploy.sh && (cd web && npm run demo -- --reset --evidence ../evidence/local) && scripts/server-start.sh`.
-If Base Sepolia is funded, run `scripts/testnet-deploy.sh` instead and set `CHAIN_MODE=testnet` so the header shows the testnet badge and explorer links.
-Open http://127.0.0.1:3100. Keep the browser at 1400 px wide.
+Recorded against the **local server** (`http://127.0.0.1:3100`), with the Base Sepolia order pages
+open in a second tab so the explorer links on screen are real transactions. One target per beat;
+every failure is visibly on screen, never only described.
 
-**0:00 – 0:25 — Problem.** "Warehouse-robot developers can't inspect a failure scenario before they pay for it, or the seller has given it away. Tail Bazaar is a market for reproducible failures: hunter agents find conditions inside the robot's published envelope where its controller crashes; a verifier re-simulates; buyers pay into escrow and get the exact scenario and replay." Point at the disclaimer line under the title: adversarially selected failures are not failure rates; simulation needs calibration against physical robots.
+## Before recording
 
-**0:25 – 0:55 — Marketplace.** Start at "What this market answers": the controller was tuned for sensor latency ≤ 40 ms and floor friction ≥ 0.6, the hunter searches 0–300 ms and 0.2–1.0, and the question being sold is "can this controller be deployed in a wider operating range than it was tuned for, and where exactly does it stop working?" Then the listings table: controller id and hash, envelope, admissibility, VERIFIED with method `exact-trajectory-hash`, severity band LOW (impact-speed proxy), seller settled-order count read live from the contract, price, on-chain status with the registration transaction (labeled LOCAL ANVIL or linking to Basescan). "Nothing here lets a buyer reconstruct the scenario."
+```bash
+export PATH="$HOME/.foundry/bin:$PATH"
+scripts/anvil-start.sh && scripts/local-deploy.sh
+(cd sim && uv run python -m tailbazaar_sim.humanoid.cli policy)     # warms sim/.cache; no network later
+(cd web && npm run build && npm run demo -- --reset --evidence ../evidence/local)
+scripts/server-start.sh                                             # http://127.0.0.1:3100
+```
 
-**0:55 – 1:25 — The agents ran for real.** Scroll to "Local demonstration pipeline" and show the log: 144 MuJoCo simulations, 43 collisions, the verifier's check list (admissible, not-duplicate, reproduces-collision, environment fingerprint match, trajectory-hash-identical, package-commitment), registerListing tx, buyer policy JSON, fund tx, markDelivered tx, signed challenge, retrieval over HTTP, settle, withdraw. (Optionally click "Run pipeline" and let it run in the background — it takes about 50 s.)
+That leaves four listings across both robots and four settled orders. Open these five tabs:
 
-**1:25 – 2:15 — Valid purchase.** Open order 1. Timeline: register → fund → markDelivered → retrieved with a signed challenge → settle(valid) → withdraw, each with its transaction and block. Verifier delivery check: keccak256(delivered) equals the on-chain commitment; buyer's own check agrees. Scroll to the replay: baseline (nominal) on the left stops 0.38 m short; failure on the right hits the obstacle at 0.415 m/s. Press "first contact", scrub back to "brake onset", read the HUD: the controller saw 0.89 m of range while the true range was 0.53 m because the range measurement was 200 ms stale, and with floor friction 0.3 the wheels could not deliver the requested deceleration. Metrics table: brake onset 3.28 s vs 3.52 s, clearance 0.378 m vs 0.003 m. "Where this failure sits": 200 ms and 0.3 are outside the range the controller was tuned for and inside the searched envelope — a measured boundary of the deployable range, not a claim that the controller is broken where it was designed to work. Expand "Scenario, hashes and reproduction" to show the exact parameters, trajectory hash, salt and the reproduction command.
+| # | Tab | URL |
+|---|---|---|
+| 1 | Marketplace | `http://127.0.0.1:3100/#/` |
+| 2 | Cart finding, valid | `#/orders/<cart order that SETTLED_VALID>` |
+| 3 | Cart finding, refunded | `#/orders/<cart order that SETTLED_INVALID>` |
+| 4 | Humanoid finding | `#/orders/<humanoid order>` |
+| 5 | Base Sepolia | `https://sepolia.basescan.org/address/0xfadf11662C46c0214B0A40938a26FB8f0CD785A3` |
 
-**2:15 – 2:45 — Invalid delivery and refund.** Open order 2 (labeled "demo: tampered delivery"). The seller asserted the registered hash but served altered bytes: the verifier check shows COMMITMENT MISMATCH with both hashes; the buyer's own check failed first and emitted requestRecheck on chain; settle(invalid) credited the buyer; the buyer withdrew the refund. The revealed section is flagged "package hash ≠ on-chain commitment / TAMPERED (demo)".
+`curl -s localhost:3100/api/listings | jq -r '.[] | "\(.target_id) \(.status) \(.listing_id)"'`
+prints the ids. Browser at 1440 px wide, zoom 100 %. Nothing needs to be clicked twice: each finding
+page autoplays through its own failure when it loads.
 
-**2:45 – 3:00 — Chain and honesty.** Show the escrow address in the header (Basescan contract page when on testnet; the state machine, deadlines and pull-payments are in the README). If the demo is being given on a hosted URL, point out the header badge "HOSTED MODE" and that the revealed finding is replaced by "authentication required" — paid evidence is not public; only the buyer's signed-challenge session (or the operator token) opens it. Close on the limitation: simplified cart physics in an illustrative envelope; verifier-adjudicated; no audit, no safety certification.
+---
+
+## 0:00 — the sentence (tab 1, top of the marketplace)
+
+> "Someone finds the conditions where a robot controller fails. You buy the recipe sealed, and an
+> independent verifier re-runs it before any money moves."
+
+Scroll to **"Two robots. Two different meanings of 'it failed'."** Read the two cards, slowly enough
+that both land:
+
+> "A warehouse cart that is supposed to stop short of an obstacle — failure is the simulator's own
+> contact flag. And a pretrained humanoid balance policy that is supposed to keep walking — failure
+> is Gymnasium's own health predicate, the torso leaving the height band the environment calls
+> healthy. This project implements no failure detector of its own for either one."
+
+Point at the hero counter: **232 simulations run by hunters, 2 sweeps.**
+
+## 0:20 — target 1, the cart (tab 2)
+
+Open the valid cart finding. It opens 0.6 s before impact and plays through once.
+
+> "The nominal run stops short of the obstacle — that's the grey ghost, one lane over. The purchased
+> run does not. Same controller, different conditions."
+
+Let the contact ring and the `COLLISION · 0.381 m/s` callout land. Say the search number out loud
+from the **"What this finding cost to find"** panel:
+
+> "The hunter ran 144 simulations over the published range; 42 of them collided. This is the mildest
+> one — the least you have to change before it stops working."
+
+Scroll to **"What was different"**: sensor delay 200 ms, floor friction 0.3.
+
+## 0:50 — the sealed claim (tab 2, scroll up to stage 1)
+
+> "Here is everything the buyer was allowed to see *before* paying: which robot, which failure class
+> and who decides it, the controller's version hash, the verifier's verdict, a coarse severity band,
+> and how many orders this seller has settled. What it does not contain: the conditions, the
+> trajectory, the replay frames, or the hunt that found them."
+
+Open **"Show the sealed summary and its hashes"** for one second — the commitment and terms hash.
+
+## 1:05 — the purchase (tab 2, stage 2)
+
+> "The buyer's agent funded the escrow with the exact price, before seeing any of it. Two deadlines
+> were fixed at that moment. If either the seller or the verifier goes quiet, anyone can call
+> `claimTimeout` and the buyer is refunded in full."
+
+Switch to **tab 5** for two seconds: the contract on Base Sepolia, real transactions.
+
+## 1:20 — reveal and replay (tab 2, stage 3)
+
+Press **"Replay the first contact"**.
+
+> "This is played back from the transforms recorded when it was simulated. Nothing is re-simulated in
+> your browser."
+
+Scroll to the **range bars**: the marker sits outside the tuned range on two axes and inside the
+searched envelope on every axis.
+
+> "So this is not 'the controller is broken'. It is a measured boundary of how far the operating
+> range can be widened before it stops working."
+
+## 1:50 — settlement (tab 2, stages 4 and 5)
+
+Open **"Show the verifier's checks"**.
+
+> "The verifier re-ran the scenario itself, recomputed the trajectory hash from the bytes it was
+> handed, checked that those frames are a physically possible trajectory of this scene, and compared
+> all of it with its own run. Then it settled valid and the seller withdrew."
+
+## 2:05 — the refund path (tab 3)
+
+> "The second cart listing was delivered tampered — the seller moved one axis back to nominal after
+> the commitment was registered and still asserted the original hash."
+
+Point at the red **COMMITMENT MISMATCH** line and the refund in the story:
+
+> "The bytes did not hash to the commitment on chain. Settled invalid, the buyer withdrew a full
+> refund, the seller was paid nothing. The buyer does not get the package either."
+
+## 2:25 — target 2, the humanoid (tab 4)
+
+Let it autoplay. The ghost keeps walking; the purchased run goes down.
+
+> "Same marketplace, same escrow, same verifier — a different robot. A pretrained policy somebody
+> else trained and published, pinned by the hash of its weights. At the published conditions it walks
+> for the full fifteen seconds — that's the ghost. One eight-newton-second shove inside the published
+> envelope, and the torso drops out of the healthy band at 2.8 seconds and hits the ground at
+> 4.8 metres per second."
+
+Point at the HUD: **torso 0.50 m, healthy ≥ 1.00 m.**
+
+> "That verdict is the environment's own health predicate, not ours. And the verifier re-ran it with
+> the humanoid's own simulator — same binding rules, its own physical-plausibility ceiling derived
+> from its own envelope."
+
+If time allows, one sentence on the search panel: 88 simulations, 53 falls.
+
+## 2:50 — close (tab 1, the limits band)
+
+> "Why a market at all? The team that tuned a controller for 40 milliseconds of sensor delay is the
+> team that never tests 200. Tail search cost explodes past a handful of axes. And hunters build a
+> prior buyers cannot.
+>
+> And the honest limits: these failures are adversarially selected, so they are not failure
+> frequencies. The physics needs calibration against real robots. There is one verifier and it is
+> trusted. Nothing here is audited. The humanoid's policy checkpoint declares no licence, and we do
+> not assert one for it."
+
+---
+
+## Backup answers
+
+- **"Is the chain real?"** Yes — Base Sepolia, contract `0xfadf1166…0CD785A3`, 14 confirmed receipts
+  in `evidence/testnet/`. The demo runs on local anvil so it is repeatable on camera; the UI labels
+  every local transaction "LOCAL ANVIL" and shows explorer links only for real testnet hashes.
+- **"Could the seller fake the replay?"** Three things have to hold at once: the bytes hash to the
+  commitment registered before payment, the trajectory hash recomputed from those frames equals the
+  verifier's own re-run, and the frames are a physically possible trajectory of that scene. An
+  external reviewer broke an earlier version by rewriting the frames, recomputing every hash, and
+  forcing an environment mismatch; that attack is now a test on both targets.
+- **"What if the environments differ?"** INCONCLUSIVE, and nothing is paid. Metrics that agree across
+  two environments say something about the scenario and nothing about which frames were delivered.
+- **"How hard is a third robot?"** One entry in `web/src/server/targets.ts` and one replay renderer.
+  No agent, route, ledger row or page has a per-robot special case.

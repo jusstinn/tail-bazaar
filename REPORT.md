@@ -212,11 +212,139 @@ byte, above), and all 14 recorded receipts remain valid as recorded.
   milestone artifact, because the demo pipeline does not run the nominal suite; the export names its
   source rather than presenting the number as something it measured.
 
+# Multi-target pass — the marketplace carries two robots
+
+The redesign pass left a marketplace with one target. This pass made the marketplace **multi-target**
+and integrated the finished humanoid balance policy as target 2, applied the 3D materials palette,
+and brought the documentation up to what the code now does. No file under `sim/` or `contracts/` was
+touched.
+
+## The target registry
+
+Everything a robot needs the marketplace to know lives in one data structure,
+`web/src/server/targets.ts`: id, label, the machine in plain language, the envelope YAML and its id,
+the **simulator entry point** (Python module + CLI shape), the environment fields that make up its
+fingerprint, its failure classes with who detects each one, its severity proxy and units, its
+admissibility / distance / duplicate rules, its physical-plausibility derivation, and a replay
+renderer id. `TARGETS` is a two-entry map; every agent, route, ledger row and page reads from it.
+
+| | cart | humanoid |
+|---|---|---|
+| envelope | `tb-envelope-1` (`sim/envelope.yaml`, 5 axes) | `tb-humanoid-envelope-1` (`sim/envelope-humanoid.yaml`, 7 continuous + 1 discrete) |
+| simulator | `uv run python -m tailbazaar_sim.cli --out DIR run\|hunt\|nominal …` | `uv run python -m tailbazaar_sim.humanoid.cli --out DIR run\|hunt\|nominal\|repeat …` |
+| subject bound by | SHA-256 of `controller.py` | actor-tensor sha256 of the pinned SAC checkpoint |
+| failure classes | `COLLISION`, `LOAD_SHED` (simulator contact flag / slip criterion) | `FELL` (Gymnasium's own health predicate) |
+| severity proxy | `impact_speed_mps`, bands 0.5 / 1.0 m/s | `torso_impact_speed_mps`, bands anchored to `sqrt(2·g·1.0 m) = 4.43 m/s` — a free fall from the height at which the environment already calls the torso unhealthy |
+| plausibility ceiling | `sqrt(2·(1+μ_max)·g·d_max) + sqrt(2·g·h_obstacle)` = **67.0 m/s** | `J_max/(m·s_min) + sqrt(2·(1+μ_max)·g·d_max) + sqrt(2·g·h_stand)` = **78.871 m/s** |
+| honest replay peaks at | 2.0 m/s | 8.1–10.0 m/s |
+| renderer | `cart-3d` | `humanoid-3d` |
+
+The verifier applies the **same** rules to both: admissibility against that target's envelope, the
+duplicate rule within target and subject, a failure class that target actually has, a re-run with that
+target's own CLI, the claimed subject digest equal to the one re-run, the trajectory hash **recomputed**
+from the delivered frames, the per-target plausibility bound, and — the rule that matters —
+**an environment fingerprint that does not match is INCONCLUSIVE, never VALID**. All of it runs again
+on the bytes actually delivered.
+
+Also in this pass: buyer policy takes a target filter and a budget (the demo runs one policy per robot
+so the filter is visible in the log); `GET /api/envelope` publishes one envelope document per target;
+`GET /api/market` publishes aggregate search cost; the `listings` and `ledger` tables gained
+`target_id` with an additive migration that reads a null as "cart", which was the only target when
+those rows were written.
+
+## Search cost, published where it is safe
+
+Post-purchase, the finding page states the aggregate for the sweep that found it — "the hunter ran 88
+simulations in this sweep, and 53 of them produced FELL — 60 % of the sweep" — with the wall time,
+physics steps, distinct findings and near-duplicates. The marketplace shows a market-wide counter and
+a per-robot total. Neither is a per-listing disclosure of parameters: a count of simulations narrows
+no scenario, and the integration suite asserts that no envelope-axis identifier of **either** target
+appears in `/api/listings`, `/api/orders` or `/api/market`.
+
+## The humanoid replay renderer
+
+`web/src/client/replay.ts` became a generic engine (camera, timeline, freeze and slow motion through
+the moment, ghost overlay, split mode, snapshot, visibility check) with one `SceneRenderer` per
+target. The humanoid renderer draws the MJCF primitives the run publishes in `scene.render_bodies` —
+one capsule, sphere or box per geom, posed local to a named body — and poses those bodies from the
+recorded world transforms. Nothing about the humanoid is hard-coded in the browser. It opens 0.6 s
+before the fall, draws the surviving nominal run as a translucent ghost one lane over, marks the fall
+**and** the ground impact on the scrubber, and carries the measured torso impact speed in the callout.
+It also draws the environment's own healthy-height floor as a thin outline at `healthy_z_range[0]`,
+because that line is the failure definition, and turns the HUD's torso height warm-red below it.
+No physics runs in the browser, on either target.
+
+Two bugs found and fixed by looking at the rendered result rather than the code: the humanoid's
+per-tick array is decimated by the same stride as its frames, so indexing it by the raw 15 ms control
+tick read the wrong tick (the HUD claimed a 0.22 m torso height a second before the fall); and a
+filled translucent plate at 1 m read as a table the humanoid was standing under, which is the opposite
+of what it means.
+
+## 3D palette
+
+`web/src/client/palette.ts` is now the single source for both viewports: charcoal chassis, sand load,
+terracotta obstacle, mid-grey wheels, humanoid in a neutral warm stone, off-white floor with a faint
+graphite grid. The baseline ghost is a translucent graphite; the single warm red `#B42318` — the same
+one the page uses for every piece of failure evidence — is reserved for the contact ring and the
+callout and used for nothing else. **There is no blue in any viewport.** The page's legend swatches
+are generated from the same constants, so the two cannot drift.
+
+## Commands run in this pass and actual results
+
+| Command | Result |
+|---|---|
+| `cd web && npm test` | **59 passed, 0 failed** (was 46: + 7 humanoid envelope, registry and plausibility, + 5 humanoid verifier binding, + 1 humanoid failure-class narration from a committed run document) |
+| `cd web && CHAIN_MODE=local npm run test:integration` | **11 passed, 0 failed** (was 7: + both targets on the market, + one envelope per target, + aggregate search cost, + target id on every ledger row, + renderer declared equals renderer published) |
+| `cd contracts && forge test` | **22 passed, 0 failed** (no contract source was touched) |
+| `cd web && npm run demo -- --reset --evidence ../evidence/local` | **4 listings across 2 targets, 4 orders.** Cart grid hunt: 144 sims, 336 070 physics steps, 7.435 s, 102 SUCCESS / 42 COLLISION (3 also LOAD_SHED) / 0 inconclusive, 42 distinct. Humanoid push grid: 88 sims, 240 465 steps, 10.032 s, 35 survived / 53 FELL / 0 inconclusive, 30 distinct, 23 near-duplicates. Findings: cart 0.380667 m/s (low) and 0.597248 m/s (medium); humanoid 4.801319 m/s at t = 2.835 s and 4.549013 m/s at t = 2.985 s (both high). Three settled VALID → seller paid; the tampered cart delivery → COMMITMENT MISMATCH → recheck → INVALID → buyer refunded |
+| `npm run ledger` | 4 findings `{"VALID": 4}`, `findings_by_target {"cart": 2, "humanoid": 2}`, over 232 search simulations / 576 535 physics steps |
+| hosted-mode matrix on a real order id (`0x7340e290…15131dd71`, humanoid) | anonymous: `/api/orders/<id>/reveal` **401**, `/api/runs/baseline` **401**, `/api/runs/baseline?target=humanoid` **401**, demo log redacted (`log_redacted: true`, 0 lines); public routes still 200. With the operator token: reveal **200** (`x-access-via: operator`), humanoid baseline **200**. Wrong token: **401** |
+| pre-purchase leak test (anonymous `/api/listings`, `/api/orders`, `/api/market`) | **PASS** — none of the 17 markers (both targets' axis identifiers, `salt_hex`, `"frames"`, `"ticks"`, `trajectory_hash`, `reproduce`) appears |
+| UI captures | `evidence/ui/marketplace.png`, `order-cart-collision.png`, `order-humanoid-fell.png`, `order-invalid-refund.png`, `how-it-works.png`, `hosted-reveal-locked.png`, plus `replay-cart-impact.png` / `replay-humanoid-impact.png` crops of the two viewports at their failure moment |
+
+`window.tbReplay.visibility()` on the humanoid finding reports the torso at NDC (−0.043, −0.259) in
+overlay mode and both tracks inside the frame in split mode — the framing check the redesign
+introduced now covers the second renderer too.
+
+**Base Sepolia was not re-run and did not need to be.** This pass is entirely off-chain and
+`contracts/` is unchanged; the deployment at `0xfadf11662C46c0214B0A40938a26FB8f0CD785A3` and its 14
+recorded receipts stand as recorded. The testnet UI captures (`evidence/ui/testnet-*.png`) show the
+pre-multi-target interface and are kept as the record of that run.
+
+## Factual limitations added or sharpened in this pass
+
+- **Adversarially selected failures are not failure frequencies.** The search-cost ratio now shown on
+  a finding page describes the hunter's sweep, not the field. No distribution D is stated for either
+  envelope.
+- **Both simulators need calibration.** Target 2 is Gymnasium's 42.116 kg `humanoid.xml` mannequin
+  driven by somebody else's research checkpoint: no perception stack, no compliance, no real actuator
+  model. Nothing here transfers to hardware.
+- **One verifier, trusted.** Unchanged, and now stated as its own limitation rather than buried in the
+  trust list.
+- **Unaudited.** No contract audit, no Sybil resistance, no meaningful rate limiting.
+- **The hosted-mode buyer session is a bearer token.** Bound to one order and issued only to the
+  buyer's signature, but not sender-constrained: whoever holds the string has that access until it
+  expires.
+- **The humanoid policy's licence is undeclared.** The model repository states none; this project
+  asserts none on its behalf, vendors nothing and redistributes nothing. See the README's "Target 2"
+  and `evidence/humanoid/README.md` §1 — both say what was checked and which alternatives were tried.
+- The humanoid's nominal suite keeps a case that **fails** (one 15 ms control tick fells the policy).
+  The ledger now reports `all_passed` and `gate_passed` separately so that a finding about the policy
+  is not misreported as a broken harness.
+- The two humanoid findings the demo lists both land in the `high` severity band, so the buyer's
+  band ranking does no discriminating work between them on this run; the 15 ms latency finding, which
+  lands in `medium`, comes from the `grid-systems` sweep that the demo does not run.
+- `web/src/server/__tests__/failure.test.ts` now reads committed, pipeline-generated run documents
+  under `evidence/` instead of whatever the last local demo happened to write into the gitignored
+  `web/data/`. Same assertions, same recorded numbers, but `npm test` no longer depends on a demo
+  having been run on this machine first.
+
 ## Running state left on this machine
 
 anvil (pid in `.local/anvil.pid`) and the web server (pid in `.local/server.pid`,
 http://127.0.0.1:3100) are left running for review; `scripts/server-stop.sh`, `scripts/anvil-stop.sh`.
-After the polish pass the server runs in **local** chain mode against the regenerated demo database,
+After the multi-target pass the server runs in **local** chain mode against the regenerated demo
+database (4 listings, both robots),
 in local demonstration mode (no `PUBLIC_BASE_URL`), so the reveal view works without a token. To see
 the hosted behaviour: `scripts/server-stop.sh`, then
 `PUBLIC_BASE_URL=https://example.test node web/dist/server/index.js` — the same order page then shows

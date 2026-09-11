@@ -8,13 +8,26 @@
 
 Tail Bazaar is a Black Box Bazaar candidate (Blockchain at Berkeley take-home) built as a first step
 toward **Loop**, a longer-term robotics-insurance idea. Autonomous *hunter* agents search the published
-operating envelope of a fixed warehouse-cart controller for admissible conditions under which it
-collides with an obstacle. A *verifier* re-simulates each claim in its own pinned environment,
+operating envelope of a fixed robot controller for admissible conditions under which it fails. A
+*verifier* re-simulates each claim **with that robot's own simulator** in its own pinned environment,
 publishes a coarse public summary, and registers a salted commitment to the private evidence package
 on chain. A *buyer* agent funds an escrow without seeing the scenario, retrieves the package with a
 signed challenge, and the verifier releases or refunds the payment.
 
-![the moment of contact, with the nominal baseline drawn as a ghost](evidence/ui/order-valid-impact.png)
+**The marketplace is multi-target.** Two robots are listed today:
+
+| Target | The machine | What "failure" means | Who decides that | Severity proxy |
+|---|---|---|---|---|
+| `cart` (`tb-envelope-1`) | a braking warehouse cart carrying a payload | `COLLISION` — it reaches the obstacle instead of stopping short; `LOAD_SHED` — the payload breaks loose under braking | the simulator's own contact flag / slip criterion | impact speed (m/s) |
+| `humanoid` (`tb-humanoid-envelope-1`) | a 42.116 kg Gymnasium MuJoCo humanoid under a pretrained SAC balance policy | `FELL` — the torso leaves the height band the environment calls healthy | **Gymnasium's own health predicate**; this project implements no fall detector | torso impact speed (m/s) |
+
+Everything target-specific lives in one registry, `web/src/server/targets.ts`: id, label, envelope
+YAML, simulator entry point and CLI shape, failure classes, severity proxy and units, the
+physical-plausibility derivation, and a replay-renderer id. Adding a third robot is one entry there
+plus one renderer; no agent, route, ledger row or page needs a special case.
+
+![the fall, with the surviving nominal run drawn as a ghost](evidence/ui/replay-humanoid-impact.png)
+![the moment of contact, with the nominal baseline drawn as a ghost](evidence/ui/replay-cart-impact.png)
 
 ## The experience
 
@@ -29,16 +42,34 @@ links rather than a log dump.
 
 **Seeing the failure.** The replay opens **0.6 s before the failure moment** and plays through it
 once on load, instead of resting at the parked end of the run. Both viewports share **one camera
-anchor**, so baseline and failure are literally the same framing and both carts stay in frame (the
-replay handle exposes `visibility()`, and the headless captures assert it). By default the nominal
-baseline is drawn inside the failure viewport as a translucent **ghost** — one lane over, its
-position *along* the track exact — together with the line where it came to rest, so "stops in time"
-and "does not" are visible in one frame; side by side stays as a toggle. The moment itself gets an
-expanding contact ring on the body its event names, a short hold and slow motion through it, a
-persistent `CONTACT · 0.415 m/s` callout anchored to that instant on the scrubber, and ticks for
-brake onset, the failure, and where the baseline stopped. `prefers-reduced-motion` disables every
-entrance reveal, counter and hover lift, and opens the replay **paused on the failure frame** instead
-of autoplaying. The renderer still consumes only the saved simulation transforms; it runs no physics.
+anchor**, so baseline and failure are literally the same framing and both subjects stay in frame (the
+replay handle exposes `visibility()`, and the headless captures assert it). By default the surviving
+nominal baseline is drawn inside the failure viewport as a translucent **ghost** — one lane over, its
+position *along* the track exact — so "survives" and "does not" are visible in one frame; side by
+side stays as a toggle. The moment itself gets an expanding ring, a short hold and slow motion
+through it, a persistent callout carrying the measured severity anchored to that instant on the
+scrubber, and ticks for every cue the run recorded. `prefers-reduced-motion` disables every entrance
+reveal, counter and hover lift, and opens the replay **paused on the failure frame** instead of
+autoplaying. The renderer consumes only the saved simulation transforms; it runs no physics.
+
+**One engine, one renderer per robot** (`web/src/client/replay.ts` + `replay-cart.ts` /
+`replay-humanoid.ts`). The cart renderer draws the boxes and cylinders the run's `scene` block
+publishes. The humanoid renderer draws the MJCF primitives the run publishes in
+`scene.render_bodies` — one capsule, sphere or box per geom, each posed *local* to a named body —
+and poses those bodies from the recorded world transforms. Nothing about the humanoid is hard-coded
+in the browser: the body list, the shapes, their sizes and their offsets all come out of the run
+document, which is the same contract `sim/tailbazaar_sim/humanoid/render.py` consumes. It also draws
+the environment's own **healthy-height floor** as a thin outline at `healthy_z_range[0]`, because
+that line *is* the failure definition, and the HUD turns the torso height warm-red below it. Frames
+stay small: the humanoid records at a stride of 2 (33.3 Hz, 4 decimal places), so a 3 s fall is
+119 KB and the 15 s survivor 404 KB.
+
+**The 3D palette is neutral and warm, with exactly one colour that means something.** Charcoal
+chassis, sand load, terracotta obstacle, mid-grey wheels, humanoid in a neutral warm stone, off-white
+floor with a faint graphite grid. The single warm red (`--alert`, the same one the page uses for
+every piece of failure evidence) is reserved for the contact ring and the callout; the baseline ghost
+is a translucent graphite so "what should have happened" reads as absent rather than as a second
+subject. **There is no blue in any viewport** (`web/src/client/palette.ts`).
 
 **The failure class is data, not code** (`web/src/server/failure.ts`). A run document names its own
 class in `outcome`, and the page derives the readable name, the failure moment, the number that
@@ -52,14 +83,28 @@ the controller was tuned for inside it, the nominal operating point, and — pos
 this finding sits. The pre-purchase view never renders the finding marker, because that marker is
 derived from the exact parameters.
 
-Captures: `evidence/ui/marketplace.png`, `order-valid.png`, `order-valid-impact.png`,
-`order-valid-side-by-side.png`, `order-invalid-refund.png`, `how-it-works.png`,
-`hosted-reveal-locked.png`, and the same pages in testnet mode (`testnet-*.png`).
+**The marketplace is grouped and filterable by robot.** The page opens with the two machines side by
+side — what each one is, what "failure" means for it, who decides that, its severity definition, both
+published ranges, and what the hunters have already spent searching it — before any mechanism is
+explained; the findings list below is grouped by robot with `All / Cart / Humanoid` filters.
+
+Captures: `evidence/ui/marketplace.png`, `order-cart-collision.png`, `order-humanoid-fell.png`,
+`replay-cart-impact.png`, `replay-humanoid-impact.png`, `order-invalid-refund.png`,
+`how-it-works.png`, `hosted-reveal-locked.png`, and the Base Sepolia run in the pre-multi-target UI
+(`testnet-*.png`).
 
 ## The question this market answers
 
 > **Can this controller be deployed in a wider operating range than it was tuned for, and where
 > exactly does it stop working?**
+
+The same question, once per robot. Each target's author documented the conditions the artefact was
+built for; the envelope the hunter searches is deliberately **wider** than that, so a finding outside
+those conditions is a measured boundary of the deployable range, never a defect report. Both ranges
+are published together in every listing summary, on the order page, and at `GET /api/envelope` (one
+document per target); the exact parameters of a listing stay hidden until it is bought.
+
+### Target 1 — the warehouse cart (`tb-envelope-1`)
 
 The controller under test documents the range it was tuned for in its own docstring
 (`sim/tailbazaar_sim/controller.py`, "Design assumptions"). The envelope the hunter searches is
@@ -75,15 +120,74 @@ deliberately **wider** than that range:
 
 `load_friction` is the one axis for which the controller's docstring states no tuned range, so a
 finding cannot be inside or outside it; the UI's range bar for that axis draws the searched envelope
-only and says so. So a finding outside the tuned range is **not** a claim that the controller is broken where it was
-designed to work. It is a measured boundary of how far the operating range can be widened before it
-stops working. The demo's sold failure sits at `sensor_delay_ms = 200` and `floor_friction = 0.3`,
-outside the tuned range on both axes and inside the searched envelope on every axis, and the UI says
-so on the order page ("where this failure sits") rather than calling it a defect. The controller
-checks none of its tuned-range assumptions at runtime; both ranges are illustrative design
-assumptions, not measurements of a physical robot. Both ranges are published together in the listing
-summary, on the order page and at `GET /api/envelope`; the exact parameters of a listing stay hidden
-until it is bought.
+only and says so. The controller checks none of its tuned-range assumptions at runtime; both ranges
+are illustrative design assumptions, not measurements of a physical robot.
+
+### Target 2 — the humanoid balance policy (`tb-humanoid-envelope-1`)
+
+> **This policy is published with a mean return of 8127 on stock Humanoid-v5. How far can the
+> operating range be widened — a shove, a slippery floor, a heavier body, noisy or delayed
+> actuation — before it falls over?**
+
+The artefact under test is a **pretrained policy somebody else trained and published**. Nothing in
+this project trains, fine-tunes or scripts anything; the checkpoint is treated exactly the way the
+cart target treats `controller.py` — a fixed artefact pinned by hash, never edited, whose operating
+range is the product question.
+
+| | |
+|---|---|
+| Hugging Face repo | [`farama-minari/Humanoid-v5-SAC-expert`](https://huggingface.co/farama-minari/Humanoid-v5-SAC-expert/tree/f9130b25c70584670ceac33eb1d06fbc418d691a) |
+| Pinned revision | `f9130b25c70584670ceac33eb1d06fbc418d691a` (a commit, not `main`) |
+| Archive / weights | `humanoid-v5-sac-expert.zip` 7 179 847 B, sha256 `5a7b38be…18cd6`; `policy.pth` 3 222 902 B, sha256 `6437d3dd…3e18ef` |
+| Actor-tensor digest | `1a1eb409…8fe311` — sha256 over exactly the six tensors used for control. **This is what a listing is bound to**, so a real failure of one checkpoint cannot be sold under another one's name |
+| Algorithm / network | SAC (Stable-Baselines3 2.4.0a10), MLP 348 → 256 → 256 → 17, ReLU, tanh-squashed, deterministic mean action |
+| Publisher's claim | `mean_reward 8127.00 ± 46.46` over 10 deterministic episodes |
+| Environment | Gymnasium `Humanoid-v5`, **unmodified** `humanoid.xml`, 42.116 kg, 17 actuators |
+
+All four digests are checked **at load time**, not merely recorded. The weights are evaluated in
+numpy (a restricted unpickler reads the `.pth` container directly), so torch is not a run-time
+dependency; the reimplementation reproduces the publisher's own number — measured mean return
+**8112.91** against the claimed 8127.00 ± 46.46.
+
+| Axis | Group | Publisher evaluated at | Searched envelope | Nominal | Units |
+|---|---|---|---|---|---|
+| `push_impulse_ns` | physical | = 0 | 0 – 120 | 0 | N·s (constant world-frame force held 0.15 s on the torso) |
+| `push_heading_deg` | physical | not stated | 0 – 360 | 0 | deg (circular) |
+| `push_time_s` | physical | not stated | 0.6 – 7.8 | 2.1 | s (quantized to the 15 ms control tick) |
+| `floor_friction` | physical | = 1.0 | 0.4 – 1.4 | 1.0 | coefficient |
+| `body_mass_scale` | physical | = 1.0 | 0.8 – 1.25 | 1.0 | coefficient (mass **and** matching inertia) |
+| `actuator_noise_frac` | systems | = 0 | 0 – 0.3 | 0 | fraction of the actuator half-range |
+| `control_latency_ms` | systems | = 0 | 0 – 90 | 0 | ms (quantized to the 15 ms control tick) |
+| `init_seed` | physical (discrete) | not stated | {0…7} | 0 | a **stratification**, not a coordinate: two runs from different initial states are never duplicates |
+
+**The failure class is the environment's, not ours.** `FELL` is the `terminated` flag Gymnasium's
+`HumanoidEnv` computes from its own `is_healthy` property — the torso height left
+`healthy_z_range = (1.0, 2.0) m`. The simulator cross-checks `terminated == (not env.is_healthy)` at
+every control tick; across all 293 simulations in `evidence/humanoid/` the mismatch count is **0**.
+Severity is `torso_impact_speed_mps`, the torso's world-frame linear velocity at the first floor
+contact of a geom that is not a foot, looked for only *after* the predicate fires. The coarse bands
+are anchored to the only non-arbitrary speed the scene offers: `sqrt(2·g·1.0 m) = 4.43 m/s`, a free
+fall from the height at which the environment already calls the torso unhealthy — low below half of
+it, medium up to it, high above it. It is kinematics, not damage, injury or cost.
+
+**Licence — the one constraint this work could not fully satisfy.** *(Copied honestly from
+`evidence/humanoid/README.md` §1.)* **The model repository declares no licence**: no `license:` field
+in its card metadata, no `license:*` tag, no `LICENSE` file. Alternatives were checked —
+`sb3/sac-Humanoid-v3`, the `cleanrl`/`sdpkjc` Humanoid-v4 checkpoints (all undeclared), and
+`hwihwalab/neuromotion-humanoid-v5-ppo`, which is MIT but whose own card reports mean survival of
+**88.5 control steps (≈1.3 s)**, so it does not balance and cannot be a balance target. The choice
+was between an unlicensed policy that works and a licensed one that does not. What this project does
+instead of asserting a licence it does not have: the weights are **downloaded at run time, never
+vendored into this repository, never modified and never redistributed** — only their sha256 digests
+and the measured behaviour are published; the publisher is named and linked everywhere the policy
+appears; and `policy.py::LICENCE_NOTE` records exactly what was checked, with `declared_spdx: null`.
+The Farama Foundation's own source projects are MIT and it publishes these checkpoints as the
+behaviour policies behind its Minari datasets, but that licence is **not restated on the model
+repository**, so none is asserted here on its behalf. **Anyone redistributing these weights should
+resolve the licence with the publisher first.**
+
+Full provenance, the nominal suite, every hunt and the repeatability checks:
+[`evidence/humanoid/README.md`](evidence/humanoid/README.md).
 
 ## The vertical
 
@@ -101,66 +205,138 @@ Participants and incentives:
 | Verifier | re-simulates, publishes summaries, registers listings, adjudicates delivery | reputation as the market's oracle | colluding with a seller (mitigated only by transparency of its checks, not by the contract) |
 | Buyer | selects by policy under a budget, funds escrow, retrieves, checks | verified findings for its controller at bounded cost | disputing a valid delivery (mitigated: a dispute is an event, not a refund) |
 
+## Why wouldn't the buyer just search for this themselves?
+
+In this demonstration they could. The cart hunter ran 144 simulations in 7.4 s over four published
+axes and the humanoid hunter 88 in 10.0 s over two, and the buyer owns both artefacts. What is
+demonstrated here is the mechanism, not the necessity of the market. Three things make the market
+real once the target stops being a toy:
+
+1. **The buyer is the worst-placed party to find their own blind spots.** The team that tuned this
+   controller for sensor delay under 40 ms is the team that never thought to test 200 ms; the team
+   that trained a humanoid on a zero-latency environment is the team that never tried one 15 ms
+   control tick of delay — which puts this published policy on the floor from every initial state we
+   tried. Failures live in the gap between what was assumed and what the world does, and an outside
+   searcher brings a different prior. Bug bounties exist next to internal fuzzing for the same reason.
+2. **Search cost explodes past a handful of axes.** Four axes grid in seconds; twenty do not grid at
+   all. The failures worth paying for sit far out in the tail, where random sampling needs on the
+   order of a million rollouts to estimate a one-in-ten-thousand event, and specialised rare-event
+   methods are required per policy, per checkpoint, indefinitely. A market converts that fixed
+   internal cost into pay-only-for-what-was-found.
+3. **Hunters accumulate a prior the buyer cannot.** After hundreds of targets a hunter knows which
+   axis combinations are productive and searches far fewer points to find the same failure. That is
+   an experience effect, and it transfers across targets.
+
+The market is not selling compute. It is solving the fact that a claim about a private failure cannot
+be evaluated without giving the failure away (Arrow's information paradox). Escrow, a hash committed
+before payment, and an independent verifier that re-runs the scenario itself are what make such a
+claim priceable at all.
+
+Where this is weakest: when the target is fully public, as in both of these demos. It is strongest
+when the buyer exposes an endpoint rather than the policy, so hunters can probe but not clone, or
+when findings come from physical fleet data that no simulator search produces.
+
 ## What actually runs
 
 ```
-sim/                MuJoCo cart + fixed controller + bounded hunter + canonical JSON (Python 3.12, uv)
-sim/envelope.yaml   the searched envelope and the controller's tuned range, in GUARD's axis shape
-contracts/          FailureEscrow.sol (Solidity 0.8.28, Foundry) + 22 tests
-web/src/server/     Hono API, node:sqlite storage, seller/verifier/buyer agents, signed-challenge
-                    delivery + hosted-mode gate, provenance, failure-ledger export, pipeline
-web/src/server/failure.ts
-                    failure-class vocabulary read from the run document (COLLISION, LOAD_SHED, …)
-web/src/client/     marketplace / finding / how-it-works pages, the five-stage finding narrative,
-                    Three.js replay of recorded transforms (no second physics), operating-range bars
-scripts/            anvil, local deploy, cast flow, testnet deploy, ABI export
-deploy/             start.sh, systemd unit, Caddy snippet for an Ubuntu VM
-evidence/           milestone runs, local demo artifacts + ledger.json, UI captures, testnet receipts
+sim/                        MuJoCo cart + fixed controller + bounded hunter + canonical JSON (uv, 3.12)
+sim/tailbazaar_sim/humanoid/  target 2: pinned SAC policy (numpy evaluation), Gymnasium Humanoid-v5
+                              scene, bounded hunter, its own CLI
+sim/envelope.yaml           the cart envelope + tuned range, in GUARD's axis shape
+sim/envelope-humanoid.yaml  the humanoid envelope + published conditions, same shape
+contracts/                  FailureEscrow.sol (Solidity 0.8.28, Foundry) + 22 tests
+web/src/server/targets.ts   THE TARGET REGISTRY: id, label, envelope YAML, simulator entry point and
+                            CLI shape, failure classes, severity proxy + units, plausibility
+                            derivation, replay-renderer id
+web/src/server/plausibility.ts
+                            reads delivered frames as a trajectory against a per-target ceiling
+web/src/server/failure.ts   failure-class vocabulary read from the run document (COLLISION, LOAD_SHED,
+                            FELL, …) — the class, its moment, its severity proxy and its scrubber marks
+web/src/server/             Hono API, node:sqlite storage, seller/verifier/buyer agents, signed-challenge
+                            delivery + hosted-mode gate, provenance, failure-ledger export, pipeline
+web/src/client/             marketplace / finding / how-it-works pages, the five-stage finding narrative,
+                            operating-range bars
+web/src/client/replay.ts    one replay engine; replay-cart.ts / replay-humanoid.ts are the per-target
+                            renderers, palette.ts is the shared 3D palette, target-view.ts the per-target
+                            narration and metric table
+scripts/                    anvil, local deploy, cast flow, testnet deploy, ABI export
+deploy/                     start.sh, systemd unit, Caddy snippet for an Ubuntu VM
+evidence/                   milestone runs, humanoid target evidence, local demo artifacts +
+                            ledger.json, UI captures, testnet receipts
 ```
 
-1. **Seller discovery** — `sim/tailbazaar_sim/hunter.py`: a grid over sensor delay (0–300 ms) × floor
-   friction (0.2–1.0), 144 MuJoCo simulations (~9 s). The controller and the scene are never modified;
-   out-of-envelope scenarios are rejected before simulation. Collisions come from MuJoCo contact data,
-   never from a script. Selection policy: mildest distinct collision first (smallest normalized
-   distance to nominal, ties by impact speed), duplicates removed by the published rule
-   (normalized L∞ distance < 0.05).
-2. **Verifier** — `web/src/server/agents/verifier.ts`: admissibility, duplicate check against its
-   failure ledger, claim must be a COLLISION, **re-run in the verifier's own pinned environment**, then
-   exact trajectory-hash comparison when the environment fingerprint matches (same engine, NumPy,
-   Python, platform, integrator, timestep, `uv.lock` hash) or metrics-within-tolerance otherwise
-   (impact speed ±0.05 m/s, contact time ±0.05 s). Divergence → INCONCLUSIVE; non-reproduction,
-   out-of-envelope, invalid initial state, duplicates → REJECTED. Then it checks the private package
-   (canonical, hashes to the stated commitment, same scenario/trajectory/claim, 32-byte salt), writes
-   the public summary, and calls `registerListing` — only the verifier address can.
+1. **Seller discovery, per target** — each target declares its own hunter and CLI in the registry, and
+   the seller runs one bounded sweep per robot. Cart (`sim/tailbazaar_sim/hunter.py`): a grid over
+   sensor delay (0–300 ms) × floor friction (0.2–1.0), 144 MuJoCo simulations. Humanoid
+   (`sim/tailbazaar_sim/humanoid/hunter.py`): a grid over push impulse × heading, 88 simulations.
+   Every mode builds its full scenario list **before** the first run — nothing adapts, no model is in
+   the loop, and there is no LLM call anywhere in either package. The controller, the policy and both
+   scenes are never modified; out-of-envelope scenarios are rejected before simulation. Failure is
+   the simulator's own flag in both cases (MuJoCo contact data; Gymnasium's health predicate), never a
+   script. Selection policy: mildest distinct failure first (smallest normalized distance to nominal
+   within its own stratum, ties by severity proxy), duplicates removed by that target's published
+   rule.
+2. **Verifier, per target, same rules** — `web/src/server/agents/verifier.ts`. The target is read from
+   the submission and every rule comes from its registry entry; the rules themselves are identical for
+   every robot. Admissibility against **that target's** envelope, duplicate check against the failure
+   ledger within the same target and subject, the claim must name a failure class that target actually
+   has, then a **re-run with that target's own CLI in the verifier's own pinned environment**
+   (`tailbazaar_sim.cli` for the cart, `tailbazaar_sim.humanoid.cli` for the humanoid). Non-
+   reproduction, out-of-envelope, invalid initial state and duplicates → REJECTED; a non-conclusive
+   outcome → INCONCLUSIVE. Then it checks the private package (canonical, hashes to the stated
+   commitment, same target/scenario/trajectory/claim, 32-byte salt), writes the public summary, and
+   calls `registerListing` — only the verifier address can.
    **Evidence binding** — the verifier only certifies what it actually re-ran, so a declared hash is
    never taken on trust:
-   - the **claimed controller id and SHA-256** must equal the controller the verifier just re-ran
-     (`claimed-controller-is-the-one-re-run`), so a real failure of one controller cannot be sold
-     under another version's name;
+   - the **claimed subject id and digest** must equal the artefact the verifier just re-ran
+     (`claimed-subject-is-the-one-re-run`) — the SHA-256 of `controller.py` for the cart, the
+     actor-tensor digest of the pinned checkpoint for the humanoid — so a real failure of one version
+     cannot be sold under another's name;
    - the **trajectory hash is recomputed** from the delivered replay frames
-     (`keccak256(canonical(frames))`) and compared with the declared field and with the verifier's own
-     re-run (`package-frames-hash-to-declared-trajectory`,
-     `package-frames-reproduce-verified-trajectory`), so frames altered behind an intact declared hash
-     are rejected;
-   - both checks run again on the bytes the seller actually serves at delivery
-     (`delivered-frames-hash-to-verified-trajectory`, `delivered-controller-is-the-one-re-run`).
+     (`keccak256(canonical(frames))`, the identical construction on both targets) and compared with the
+     declared field and with the verifier's own re-run
+     (`package-frames-hash-to-declared-trajectory`, `package-frames-reproduce-verified-trajectory`),
+     so frames altered behind an intact declared hash are rejected;
+   - the frames must be a **physically possible trajectory of that scene**. The ceiling is derived per
+     target from its own published envelope and the scene the run carries, never tuned: the cart's is
+     `sqrt(2·(1+μ_max)·g·d_max) + sqrt(2·g·h_obstacle)` ≈ 67 m/s, the humanoid's adds the largest
+     velocity change the published push axis can impart to the lightest admissible body,
+     `J_max/(m·s_min) + sqrt(2·(1+μ_max)·g·d_max) + sqrt(2·g·h_stand)` ≈ 78.9 m/s, with `d_max = 100 m`
+     the simulator's own DIVERGED bound in both cases. Honest runs peak at 8–10 m/s;
+   - **an environment fingerprint that does not match is INCONCLUSIVE, never VALID.** A replay produced
+     under a different pin cannot be bound to the re-run by any hash. Metrics that happen to agree
+     across two environments say something about the *scenario* and nothing about which frames were
+     delivered, so they are recorded as evidence and certify nothing;
+   - every one of these runs again on the bytes the seller actually serves at delivery.
 
-   Two tests drive exactly these two attacks through the real verifier and the real simulator and
-   require a rejection (`web/src/server/__tests__/verifier-binding.test.ts`).
-3. **Buyer** — `web/src/server/agents/buyer.ts`: deterministic policy, no model calls. Eligible =
-   on-chain Listed, VERIFIED and admissible, controller id+hash and envelope id equal the buyer's
-   target, price within the per-purchase cap (`BUYER_BUDGET_WEI`) and remaining budget. Ranking =
-   severity band (high > medium > low), then lower price, then earlier listing. It funds escrow,
+   Three suites drive exactly these attacks through the real verifier and the real simulators and
+   require a rejection, on both targets (`verifier-binding.test.ts`, `verifier-adversarial.test.ts`,
+   `verifier-humanoid.test.ts`).
+3. **Buyer** — `web/src/server/agents/buyer.ts`: deterministic policy, no model calls. The policy takes
+   a **target filter and a budget**. Eligible = on-chain Listed, the listing's target is one this buyer
+   shops for, VERIFIED and admissible, subject id+hash and envelope id equal the buyer's target, price
+   within the per-purchase cap (`BUYER_BUDGET_WEI`) and remaining budget. Ranking = severity band
+   (high > medium > low), then lower price, then earlier listing. The demo runs one policy per robot,
+   so the log shows every listing of the other robot being skipped with its reason. It funds escrow,
    signs the retrieval challenge, retrieves over HTTP, checks the package itself, and emits
    `requestRecheck` on chain if its check fails.
 4. **Delivery and settlement** — the seller calls `markDelivered`; the verifier compares the delivered
    bytes with the on-chain commitment and the advertised summary and calls `settle(valid)`;
    payouts are pull-payments (`withdraw`).
 
-The second listing in every demo run is delivered **tampered** (the seller alters the scenario after
-the commitment was registered and still asserts the original hash). The verifier detects the
-commitment mismatch, settles invalid, and the buyer withdraws the refund. This is a labeled
-demonstration switch (`demo_tamper`), not a real dishonest seller.
+One listing in every demo run is delivered **tampered**: the seller moves one axis of the scenario back
+to the nominal operating point after the commitment was registered — so the package now claims the
+failure happened under milder conditions than it did — and still asserts the original hash. Which axis
+is read from that target's own changed-conditions list, so the demonstration needs no per-robot
+special case. The verifier detects the commitment mismatch, settles invalid, and the buyer withdraws
+the refund. This is a labeled demonstration switch (`demo_tamper`), not a real dishonest seller.
+
+**Search cost is published as an aggregate, and only where it is safe.** `GET /api/market` carries a
+market-wide total (how many simulations every hunt on this instance ran, per target, and how many
+produced each failure class); the finding page shows the same aggregate for the sweep that found it,
+**after purchase** — "the hunter ran 88 simulations in this sweep, and 53 of them produced FELL".
+A count of simulations narrows no scenario, so it is not a pre-purchase disclosure of parameters; the
+integration suite asserts that no envelope-axis identifier ever appears in either projection.
 
 ## Quick start (local anvil, everything runs on this machine)
 
@@ -169,18 +345,26 @@ Chrome-class browser for the UI.
 
 ```bash
 cp .env.example .env                   # then put three TEST-ONLY keys in it (cast wallet new)
-(cd sim && uv sync --frozen && uv run python -m tailbazaar_sim.cli --out ../evidence/local nominal)
+(cd sim && uv sync --frozen)
+(cd sim && uv run python -m tailbazaar_sim.cli --out ../evidence/local nominal)            # target 1
+(cd sim && uv run python -m tailbazaar_sim.humanoid.cli policy && \
+           uv run python -m tailbazaar_sim.humanoid.cli selfcheck)                         # target 2:
+                                       # pinned provenance + verified digests, then the envelope.py /
+                                       # envelope-humanoid.yaml drift check. `policy` downloads 7.2 MB
+                                       # from Hugging Face into sim/.cache (git-ignored); offline, set
+                                       # TAILBAZAAR_HUMANOID_ARCHIVE — the sha256 check applies either way
 (cd contracts && forge test)           # 22 tests
 scripts/export-abi.sh                  # contracts/out -> web/abi/FailureEscrow.json
 scripts/anvil-start.sh                 # anvil on :8545, funds the three test addresses (local ether)
 scripts/local-deploy.sh                # writes ESCROW_ADDRESS_LOCAL into .env
 scripts/local-flow.sh                  # whole state machine with cast (valid + invalid), before any web code
-(cd web && npm ci && npm run build && npm test)                       # 46 unit tests (canonical JSON, envelope,
-                                       # hosted-mode auth, verifier evidence binding, failure-class presentation;
-                                       # the verifier groups re-run the simulator, so uv must be on PATH — no chain
-                                       # and no keys needed)
-(cd web && npm run demo -- --reset --evidence ../evidence/local)      # seller -> verifier -> chain -> buyer, 2 orders
-(cd web && npm run test:integration)   # 7 tests against the demo database + local chain
+(cd web && npm ci && npm run build && npm test)                       # 59 unit tests (canonical JSON, both
+                                       # envelopes, hosted-mode auth, verifier evidence binding on BOTH targets,
+                                       # failure-class presentation; the verifier groups re-run the simulators,
+                                       # so uv must be on PATH — no chain and no keys needed)
+(cd web && npm run demo -- --reset --evidence ../evidence/local)      # both targets end to end: 4 listings,
+                                       # 4 orders, one tampered delivery refunded
+(cd web && npm run test:integration)   # 11 tests against the demo database + local chain
 (cd web && npm run ledger)             # evidence/local/ledger.json for a GUARD-style pipeline (operator artifact)
 scripts/server-start.sh                # http://127.0.0.1:3100  (scripts/server-stop.sh, scripts/anvil-stop.sh)
 ```
@@ -193,26 +377,49 @@ The UI has a "Run pipeline" button that does what `npm run demo` does, with a li
   boundaries at exactly the deadline and one second after, unauthorized verifier, wrong buyer,
   seller funding own listing, repeated settlement, wrong payment, commitment mismatch, withdraw to a
   rejecting receiver, constructor and registration argument checks).
-- Simulator: nominal suite 6/6 SUCCESS (clearance 0.318–0.394 m, target 0.40 ± 0.15); grid hunt 144
-  runs, 101 SUCCESS, 43 COLLISION, 0 inconclusive; bitwise repeatability across in-process and
-  subprocess runs in the pinned environment (`evidence/milestone/repeatability-*.json`).
-- Web: 46 unit tests — canonical JSON (byte-identical re-serialization of Python-written run files and
-  reproduction of their trajectory hashes), envelope and the published tuned range (which cannot drift
-  from `controller.py` or `sim/envelope.yaml` without failing), hosted-mode access control, the
-  verifier's evidence binding (a mislabelled controller and altered replay frames behind an intact
-  declared hash are both rejected by the real verifier against a real re-run, while the honest package
-  still verifies), and the failure-class presentation the experience is built on (the sold COLLISION
-  finding and the recorded LOAD_SHED run are each narrated from their own events, severity proxy and
-  units; a run that fails both ways keeps both moments; an unregistered class still resolves; the
-  playhead opens 0.6 s before the failure and never at the parked end of the run) — and 7 integration
-  tests (no private field leaks from any public endpoint;
-  retrieval rejects the wrong signer, wrong binding, nonce replay, cross-order use and expiry;
-  refunded orders are not retrievable; hosted mode closes the reveal route to visitors and a real
-  signed retrieval reopens it).
-- Local demo (`evidence/local/`): order 1 VERIFIED/VALID (exact trajectory hash, controller and
-  delivered frames bound to the verifier's own re-run) → funded → delivered → retrieved → VALID →
-  seller paid; order 2 tampered → COMMITMENT MISMATCH → recheck event → INVALID → buyer refunded.
-  `evidence/local/ledger.json` is the exported failure ledger; UI captures in `evidence/ui/`.
+- Simulator, target 1 (cart): nominal suite 6/6 SUCCESS (clearance 0.318–0.394 m, target 0.40 ± 0.15);
+  grid hunt 144 runs in 7.4 s, 102 SUCCESS, 42 COLLISION (3 of them also LOAD_SHED), 0 inconclusive,
+  42 distinct findings; bitwise repeatability across in-process and subprocess runs in the pinned
+  environment (`evidence/milestone/repeatability-*.json`).
+- Simulator, target 2 (humanoid): 293 simulations in `evidence/humanoid/`, 507 215 physics steps,
+  24.0 s of wall time, **0 health-predicate cross-check mismatches** and 0 inconclusive runs across all
+  of them. Nominal suite 8 cases: the four published-conditions episodes all survive the full 15 s
+  (mean return 8112.91 against the publisher's claimed 8127.00 ± 46.46), and the suite deliberately
+  **keeps a benign case that fails** — one single 15 ms control tick of actuation delay fells the
+  policy at 6.96 / 8.47 / 2.29 / 1.27 s across four initial states, with 0 ms surviving all four. That
+  is a finding about the policy, not a broken harness, so the ledger reports `gate_passed` and
+  `all_passed` separately. Both selected findings are byte-identical across three in-process re-runs
+  plus a fresh subprocess, on two independent digests
+  (`evidence/humanoid/repeatability-*.json`, `identical: true`).
+- Web: **59 unit tests** — canonical JSON (byte-identical re-serialization of Python-written run files
+  and reproduction of their trajectory hashes, on both targets), **both** envelope mirrors (which
+  cannot drift from `controller.py`, `sim/envelope.yaml` or `sim/envelope-humanoid.yaml` without
+  failing), the humanoid's admissibility, circular-heading and initial-state-stratified duplicate rule
+  and free-fall-anchored severity bands, hosted-mode access control, the verifier's evidence binding
+  **on both targets** (a mislabelled controller, a mislabelled policy checkpoint, altered replay frames
+  behind an intact declared hash, and a fabricated replay whose every hash was recomputed are all
+  rejected by the real verifier against a real re-run, and an honest package from a different
+  environment is INCONCLUSIVE rather than VALID, while the honest package still verifies), the
+  per-target plausibility ceilings (derived from each envelope and scene, quoting no envelope
+  parameter because the derivation reaches the public delivery record), and the failure-class
+  presentation the experience is built on (COLLISION, LOAD_SHED and FELL each narrated from their own
+  events, severity proxy and units; a run that fails both ways keeps both moments; an unregistered
+  class still resolves; the playhead opens 0.6 s before the failure and never at the parked end of the
+  run) — and **11 integration tests** (no private field leaks from any public endpoint, for either
+  target's axis names; both targets on the market with matching row and sealed summary; one envelope
+  per target in GUARD's axis shape; search cost published only as an aggregate; every ledger row
+  carrying a target id; the replay renderer a package declares equalling the one its target publishes;
+  retrieval rejecting the wrong signer, wrong binding, nonce replay, cross-order use and expiry;
+  refunded orders not retrievable; hosted mode closing the reveal route to visitors and a real signed
+  retrieval reopening it).
+- Local demo (`evidence/local/`, one `npm run demo -- --reset` run): **4 listings across 2 targets, 4
+  orders**. Cart: finding 1 COLLISION at 0.381 m/s (low band) and finding 2 at 0.597 m/s (medium),
+  from a 144-simulation grid; humanoid: two FELL findings at 4.801 m/s (t = 2.835 s) and 4.549 m/s
+  (t = 2.985 s), both high band, from an 88-simulation push grid. The buyer shopped target by target
+  and bought all four. Three settled VALID → seller paid; the tampered cart delivery →
+  COMMITMENT MISMATCH → recheck event → INVALID → buyer refunded in full. 232 simulations and 576 535
+  physics steps of search cost in total. `evidence/local/ledger.json` is the exported failure ledger,
+  now carrying `target_id` on every row; UI captures in `evidence/ui/`.
 
 ## Base Sepolia (public testnet)
 
@@ -274,21 +481,25 @@ NaN/Infinity rejected.
 - **commitment** = `keccak256(canonical_bytes(private_package))`; the package carries a random
   32-byte `salt_hex`, so the commitment reveals nothing to someone who can guess the scenario.
 - **terms hash** = `keccak256(canonical_bytes(public_summary))`; `listing_id = keccak256(commitment ‖ termsHash)`.
-- **trajectory hash** = `keccak256(canonical_bytes(frames))`, where `frames` are per-tick body
-  positions and quaternions of chassis, load and four wheels.
+- **trajectory hash** = `keccak256(canonical_bytes(frames))` — the identical construction on both
+  targets, where `frames` are the recorded per-tick body positions and quaternions (chassis, load and
+  four wheels for the cart; thirteen MuJoCo bodies for the humanoid, decimated by a declared stride).
 
-Private package schema `tb-package-1`: schema/format ids, salt, seller, controller id + SHA-256,
-envelope id, engine and environment pins (MuJoCo, NumPy, Python, platform, integrator, timestep,
-`uv.lock` hash), scene description, scenario, nominal scenario and changed conditions, advertised
-claim, observed metrics, events, per-tick observations and commands, initial state, replay frames,
-MJCF hash, and the reproduction command. Public summary schema `tb-summary-1` carries only controller
-id + hash, envelope id, admissibility, verification status/verdict/method/verifier version/environment
-fingerprint and what the verifier bound the evidence to, the coarse severity band, seller address,
-seller settled-order count at listing, price, chain, and the operating context (the controller's tuned
-range and the searched envelope in prose, plus the product question) — never parameters, trajectories,
-nor any per-listing statement about where this scenario sits in the envelope, which would narrow it
-down. Listings registered before the operating-context field existed keep the summary whose terms hash
-is on chain; the UI falls back to `GET /api/envelope`, which states the same constants.
+Private package schema `tb-package-2`: schema/format ids, salt, seller, **target id and label**,
+subject id + digest, envelope id, engine and environment pins (MuJoCo, NumPy, Python, platform,
+timestep, `uv.lock` hash, and for the humanoid Gymnasium and the four policy digests), scene
+description, scenario, nominal scenario and changed conditions, advertised claim, observed metrics,
+events, the **aggregate cost of the hunt that found it**, per-tick observations, initial state, replay
+frames plus the renderer id, MJCF hash, and the reproduction command. Public summary schema
+`tb-summary-2` carries only the **target** (id, label, machine, subject label, renderer), the
+**failure class** (id, label, and who detects it), subject id + hash, envelope id, admissibility,
+verification status/verdict/method/verifier version/environment fingerprint and what the verifier
+bound the evidence to, the coarse severity band, seller address, seller settled-order count at
+listing, price, chain, and the operating context (both published ranges in prose, plus the product
+question) — never parameters, trajectories, the hunt, nor any per-listing statement about where this
+scenario sits in the envelope, which would narrow it down. Listings registered before a field existed
+keep the summary whose terms hash is on chain; the UI falls back to `GET /api/envelope`, which states
+the same constants, and treats a listing with no target id as the cart, which was then the only one.
 
 ## Delivery authentication
 
@@ -345,23 +556,35 @@ bought; TLS plus trusted server storage is the prototype's whole confidentiality
 
 ## Trust assumptions
 
-- The **named verifier is the oracle**: the contract enforces authorization, payment, deadlines and one
-  terminal settlement; it cannot check that a package is semantically correct. Verifier collusion or
-  error is not prevented, only made visible (every check it ran is published after settlement).
-- Reproduction is a claim **about the pinned environment** (`uv.lock` hash, MuJoCo 3.13.0, NumPy
-  2.5.3, Python 3.12.13, single thread). Across machines the verifier falls back to metric tolerance;
-  a seed alone is never assumed to guarantee reproducibility.
-- The seller's hunter is trusted only for search; everything it claims is re-simulated, and the
-  claimed controller hash and the delivered replay frames are re-derived from the bytes rather than
-  believed (see "Evidence binding" above).
+- There is **one verifier and it is trusted**: the contract enforces authorization, payment, deadlines
+  and one terminal settlement; it cannot check that a package is semantically correct. Verifier
+  collusion or error is not prevented, only made visible — every check it ran is published after
+  settlement. A real market would need several independent verifiers and a way to disagree.
+- Reproduction is a claim **about the pinned environment** (`uv.lock` hash, MuJoCo 3.13.0, NumPy 2.5.3,
+  Python 3.12.13, single thread; for the humanoid also Gymnasium 1.3.0 and the four policy digests).
+  Across machines the verifier does **not** fall back to anything: it cannot bind the delivered replay
+  to what it ran, so it returns INCONCLUSIVE and nothing is paid. A seed alone is never assumed to
+  guarantee reproducibility.
+- The seller's hunter is trusted only for search; everything it claims is re-simulated with that
+  target's own simulator, and the claimed artefact digest and the delivered replay frames are
+  re-derived from the bytes rather than believed (see "Evidence binding" above).
 - The buyer trusts the public summary because the verifier signed the registration transaction; the
   summary's terms hash is on chain.
-- The envelope, controller and severity bands are **illustrative assumptions**, not measurements of any
-  physical robot. The tuned range is the controller author's documented assumption, not a certified
-  limit.
+- Both envelopes and both severity band schemes are **illustrative assumptions**, not measurements of
+  any physical robot. The cart's tuned range is its author's documented assumption; the humanoid's
+  published conditions are transcribed from the checkpoint's model card. Neither is a certified limit.
+- **The humanoid policy's licence is undeclared.** The model repository states none, and this project
+  asserts none on its behalf — the weights are fetched at run time, never vendored and never
+  redistributed here. See "Target 2" above before reusing them.
 - Confidentiality is **server-side trust plus TLS**, in both modes: the operator/verifier sees every
   payload and a buyer can redistribute what it bought. Hosted mode stops a *visitor* from reading paid
   evidence; it does not make the evidence confidential from the operator.
+- Hosted mode's buyer session is a **bearer token**: whoever holds the string returned in
+  `x-tb-session` can read that order's package until it expires. It is issued only to a signature from
+  the address the escrow records as the buyer and it is bound to one order, but it is not
+  sender-constrained — anyone who captures it (a leaked log, a shared browser, a proxy that keeps
+  response headers) has the same access the buyer does. A deployed version would use a
+  wallet-signed, short-lived, sender-constrained credential instead.
 - Verdicts use GUARD's vocabulary — VALID (≡ the recorded status VERIFIED), INVALID (≡ REJECTED),
   INCONCLUSIVE. **INCONCLUSIVE never pays**: it is not a failed delivery, it is a refusal to certify.
 
@@ -376,21 +599,36 @@ buyer's policy be a pure function of on-chain and summary data. The cost is cent
 is only as honest as its verifier, which is why every verifier check is published and why the contract
 never lets the verifier take funds.
 
-## One important limitation
+## Limitations, stated plainly
 
-The physics is a **simplified cart** (rigid load, torque-model brake at physics rate, straight-line
-motion, delays quantized to one 20 ms control tick) in an **illustrative envelope**. A collision here is
-evidence about *this controller in this simulator*, not about a physical robot. Hunted failures are
-adversarially selected, so their frequency says nothing about field failure rates, and the severity
-proxy is uncalibrated. Loop-style underwriting would need calibration against physical robots and a
-much richer scene model before any of this evidence could inform a premium.
+- **Adversarially selected failures are not failure frequencies.** Both hunters run bounded searches
+  whose objective is to find failures. The number they find, and the ratio published as search cost,
+  describe the *search*, not how often anything fails in the field. No distribution D over either
+  envelope is stated or estimated (both YAMLs leave GUARD's `marginal`/`scale` null on purpose), and
+  no probability appears anywhere in this repository.
+- **The simulation needs calibration before it can support an underwriting decision.** Target 1 is a
+  simplified cart (rigid load, torque-model brake at physics rate, straight-line motion, delays
+  quantized to one 20 ms control tick). Target 2 is Gymnasium's 42.116 kg `humanoid.xml` mannequin — an
+  articulated toy with no perception stack, no compliance and no real actuator model, driven by
+  somebody else's research checkpoint. A failure here is evidence about *that artefact in that
+  simulator*, not about a physical robot, and nothing here transfers to hardware.
+- **Severity is uncalibrated kinematics.** An impact speed in m/s is not damage, injury or cost, and
+  nothing in this project converts it into any of those. No biomechanical tier, no monetary value.
+- **There is a single trusted verifier.** It is the market's oracle; the contract cannot check
+  semantics. Collusion or error is made visible, not prevented.
+- **Nothing here is audited.** No security audit of the contract, no Sybil resistance, no rate
+  limiting worth the name, and the hosted-mode buyer session is a plain bearer token (see "Trust
+  assumptions").
+- **The humanoid policy's licence is undeclared** by its publisher, and this project asserts none on
+  its behalf.
 
 ## For Loop: what is reusable, and what this is not
 
-Versioned scenario schema and envelope (`tb-envelope-1`), controller and engine identifiers, canonical
-evidence hashing, admissibility checks, the verifier's failure ledger (`ledger` table with scenario,
-trajectory hash, status and method), reproducible runs with environment pins, and the escrow/commitment
-pattern for paying for evidence one cannot inspect first.
+Versioned scenario schemas and envelopes (`tb-envelope-1`, `tb-humanoid-envelope-1`), the **target
+registry** that makes a second robot a data change rather than a code change, artefact and engine
+identifiers, canonical evidence hashing, admissibility checks, the verifier's failure ledger (`ledger`
+table with target, scenario, trajectory hash, status and method), reproducible runs with environment
+pins, and the escrow/commitment pattern for paying for evidence one cannot inspect first.
 
 **What Tail Bazaar contributes to a GUARD-style underwriting pipeline, and what it explicitly does
 not.** GUARD's job is a calibrated P(catastrophic) with error bars against a *stated* deployment
@@ -408,29 +646,33 @@ The alignment is deliberate and named:
 
 | GUARD | Tail Bazaar |
 |---|---|
-| `configs/guard_theta.yaml` axis schema (`name, low, high, nominal, marginal, scale, units, group`; groups physical/systems) | `sim/envelope.yaml`, same shape, served as JSON by `GET /api/envelope`; `marginal`/`scale` present and null (no D is stated) |
-| `guard/severity.py`: limit state g(θ), `impact_energy = ½·m·v²` in joules | `limit_state_margin_m` (= the recorded `min_range_m`), `impact_speed_mps`, `impact_kinetic_energy_j`, `total_mass_kg` — measured, uncalibrated, no tier. GUARD's ISO/TS 15066 numbers are marked PLACEHOLDER_UNVERIFIED there and are not imported here |
+| `configs/guard_theta.yaml` axis schema (`name, low, high, nominal, marginal, scale, units, group`; groups physical/systems) | `sim/envelope.yaml` **and** `sim/envelope-humanoid.yaml`, same shape, both served as JSON by `GET /api/envelope` (one document per target); `marginal`/`scale` present and null in both (no D is stated) |
+| `guard/severity.py`: limit state g(θ), `impact_energy = ½·m·v²` in joules | per target: `severity.{proxy, value, units, band}` on every row, plus `limit_state_margin_m` (= the cart's recorded `min_range_m`), `impact_speed_mps`, `impact_kinetic_energy_j`, `total_mass_kg` where the quantity really is that quantity and `null` where the target records nothing of that shape. Measured, uncalibrated, no tier. GUARD's ISO/TS 15066 numbers are marked PLACEHOLDER_UNVERIFIED there and are not imported here |
 | `guard/envelope.py` verdicts VALID / INVALID / INCONCLUSIVE | the same vocabulary on every verification and delivery (`verdict`), alongside the status names already recorded on chain: VERIFIED ≡ VALID, REJECTED ≡ INVALID. **INCONCLUSIVE never pays** |
 | `guard/manifest.py` provenance: git SHA, dirty flag, resolved config, deterministic run id | `web/src/server/provenance.ts`: `git_sha`, `git_dirty`, `envelope_config_hash`, and `run_id` = a function of stage + resolved config only. Reported by `GET /api/status`, logged by every pipeline run, stamped on every ledger row |
-| `guard/report.py` report rows | `evidence/<mode>/ledger.json` (`npm run ledger`), one row per finding: controller id + hash, envelope id, θ, per-axis in/out of the tuned range, limit-state margin, impact speed and energy, verdict and delivery verdict, `source` (bounded grid search / seeded random search), `search_cost`, `run_id`, provenance, environment pins, trajectory hash, commitment, on-chain settlement — plus a header with `n_nominal_runs`, `n_search_runs` and explicit `placeholder_warnings` |
+| `guard/report.py` report rows | `evidence/<mode>/ledger.json` (`npm run ledger`), one row per finding: **`target_id` and `target_label`**, subject id + hash, envelope id, θ, per-axis in/out of the published range, failure class, limit-state margin, the target's severity proxy/value/units/band, verdict and delivery verdict, `source` (which bounded search), `search_cost`, `run_id`, provenance, environment pins, trajectory hash, commitment, on-chain settlement — plus a header listing every target with its envelope, failure classes and both published ranges, one `nominal_suites` entry per target (`all_passed` and `gate_passed` reported separately), `n_search_runs`, `findings_by_target` and explicit `placeholder_warnings` |
 
 The ledger export is **operator-facing only**: every row contains the scenario parameters buyers pay
 for, so no HTTP route serves it (`npm run ledger -- <file>` writes it; the demo pipeline writes it into
 its evidence directory).
 
-`limit_state_margin_m` is the minimum recorded range to the obstacle; the simulator records no signed
-penetration depth, so it does not go negative on contact and the `COLLISION` outcome remains the
-authoritative failure flag. The simulator was not modified in this pass, so the GUARD field names are
-applied in the export, not inside the run documents.
+`limit_state_margin_m` is the cart's minimum recorded range to the obstacle; that simulator records no
+signed penetration depth, so it does not go negative on contact and the `COLLISION` outcome remains the
+authoritative failure flag. The humanoid records no scalar of that shape at all, so the field is
+`null` on its rows rather than invented. Neither simulator was modified by the web layer, so the GUARD
+field names are applied in the export, not inside the run documents.
 
 ## Repository map, docs and licenses
 
 - `STATUS.md` — simulator milestone report; `REPORT.md` — build report; `DEMO_SCRIPT.md` — 3-minute demo.
 - `deploy/README.md` — Ubuntu VM hosting (systemd + Caddy); `deploy/start.sh` — hosting entry point.
 - `ATTRIBUTION.md` — MuJoCo (Apache-2.0), Three.js (MIT), viem, Hono, Foundry and others. `LICENSE` — MIT.
-- `sim/envelope.yaml` — the published envelope and tuned range in GUARD's axis shape;
-  `evidence/local/ledger.json` — the exported failure ledger (operator artifact, written by
-  `npm run ledger`).
+- `sim/envelope.yaml` / `sim/envelope-humanoid.yaml` — the published envelopes and ranges in GUARD's
+  axis shape, one per target; `web/src/server/targets.ts` — the registry that ties each of them to a
+  simulator entry point, failure classes, a severity proxy and a replay renderer;
+  `evidence/humanoid/README.md` — the humanoid target's full provenance, licence position, nominal
+  suite, hunts and repeatability; `evidence/local/ledger.json` — the exported failure ledger (operator
+  artifact, written by `npm run ledger`).
 - `.env.example` — every setting, including `PUBLIC_BASE_URL` (hosted mode) and `OPERATOR_TOKEN`;
   `.env`, databases and private packages are gitignored. Sample artifacts under `evidence/` are
   demonstration fixtures from this repository's own demo runs, not secrets — they do contain the

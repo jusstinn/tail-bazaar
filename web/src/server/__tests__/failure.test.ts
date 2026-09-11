@@ -1,7 +1,10 @@
-// The experience reads its failure vocabulary from the run document. These tests drive the real
-// finding that was sold (COLLISION) and a second, unknown failure class through the same code, so a
-// class the simulator adds later — e.g. a payload that slides off the cart under braking — is
-// narrated from its own events instead of being mislabelled as a collision.
+// The experience reads its failure vocabulary from the run document. These tests drive REAL RECORDED
+// RUNS — a cart collision, a cart load shed, and a humanoid fall from the second target — through the
+// same code, so each class is narrated from its own events, severity proxy and units instead of being
+// mislabelled as a collision, and a class nobody has registered still resolves.
+//
+// Every fixture is a committed, pipeline-generated run document under evidence/. Nothing here is
+// hand-written, and nothing depends on a demo run having been executed on this machine first.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -9,8 +12,9 @@ import path from "node:path";
 import { autoplayStop, defaultPlayhead, formatValue, humanizeClass, labelForKey, presentFailure, unitFor } from "../failure.js";
 import { WEB_ROOT } from "../config.js";
 
-const FINDING = path.join(WEB_ROOT, "data", "sim", "seller", "runs", "finding-1.json");
-const BASELINE = path.join(WEB_ROOT, "data", "sim", "public", "runs", "baseline.json");
+const EVIDENCE = path.join(WEB_ROOT, "..", "evidence");
+const FINDING = path.join(EVIDENCE, "milestone", "runs", "failure.json");
+const BASELINE = path.join(EVIDENCE, "milestone", "runs", "baseline.json");
 const readRun = (f: string): any => JSON.parse(fs.readFileSync(f, "utf8"));
 
 test("the sold COLLISION finding is narrated from its own recorded events", () => {
@@ -65,9 +69,57 @@ test("the replay opens before the failure, not at the end of the run", () => {
   assert.equal(autoplayStop(4.9, 5), 5);
 });
 
+// TARGET 2's failure class, from the second simulator. `FELL` is decided by Gymnasium's own health
+// predicate, and its severity is measured on a DIFFERENT event from the failure moment: the torso
+// leaves the healthy band first, and hits the floor a fraction of a second later. The presentation
+// has to carry both instants and put the impact speed — not the speed at the predicate — in the
+// callout, which is exactly what a reader is being told.
+const HUMANOID_FINDING = path.join(EVIDENCE, "humanoid", "runs", "finding-push-8ns.json");
+const HUMANOID_BASELINE = path.join(EVIDENCE, "humanoid", "runs", "baseline-nominal.json");
+
+test("FELL is narrated from the environment's own predicate, with the impact measured on its own event", (t) => {
+  if (!fs.existsSync(HUMANOID_FINDING)) return t.skip("no humanoid run recorded in evidence/ yet");
+  const run = readRun(HUMANOID_FINDING);
+  const p = presentFailure(run, readRun(HUMANOID_BASELINE));
+  const fell = run.events.find((e: any) => e.type === "health_predicate_fired");
+  const hit = run.events.find((e: any) => e.type === "ground_contact");
+
+  assert.equal(p.class_id, "FELL");
+  assert.equal(p.known_class, true);
+  assert.equal(p.label, "Fell");
+  assert.equal(p.moment_label, "the fall");
+  // the failure moment is the predicate firing, not the ground contact and not the end of the run
+  assert.equal(p.moment_t_s, fell.t_s);
+  assert.equal(p.moment_t_s, 2.835);
+  assert.notEqual(p.moment_t_s, run.metrics.duration_s);
+  // the severity is measured later, on its own event, and that is what the callout carries
+  assert.equal(p.severity_moment_t_s, hit.t_s);
+  assert.equal(p.severity_label, "torso impact");
+  assert.equal(p.headline_quantity?.key, "torso_impact_speed_mps");
+  assert.equal(p.headline_quantity?.value, hit.torso_impact_speed_mps);
+  assert.equal(p.headline_quantity?.value, 4.801319);
+  assert.equal(p.headline_quantity?.unit, "m/s");
+  assert.equal(p.headline, "FELL · 4.801 m/s");
+  // both instants are on the scrubber, in time order, and the push that caused it is a cue
+  const byId = Object.fromEntries(p.markers.map((m) => [m.id, m]));
+  assert.equal(byId.moment.t_s, fell.t_s);
+  assert.equal(byId.moment.kind, "moment");
+  assert.equal(byId.severity.t_s, hit.t_s);
+  assert.equal(byId.severity.kind, "secondary");
+  assert.equal(byId.push_start.kind, "cue");
+  assert.equal(byId.push_start.t_s, 2.1);
+  assert.deepEqual(p.markers.map((m) => m.t_s), [...p.markers.map((m) => m.t_s)].sort((a, b) => a - b));
+  // the replay still opens 0.6 s before the FALL, and plays past the impact
+  const duration = run.metrics.duration_s as number;
+  assert.ok(Math.abs(defaultPlayhead(p.moment_t_s, duration) - (fell.t_s - 0.6)) < 1e-9);
+  assert.ok(autoplayStop(p.moment_t_s, duration) > hit.t_s, "the single autoplay pass runs past the ground contact");
+  // and the surviving baseline contributes no stop marker: it never stopped, it walked the episode out
+  assert.equal(byId.baseline_stop, undefined);
+});
+
 // The second failure class the simulator publishes: the payload leaves the deck under braking.
 // Driven from the recorded run, so the page narrates it without a single line of collision code.
-const LOAD_SHED_RUN = path.join(WEB_ROOT, "..", "evidence", "load-shed", "runs", "load-shed-finding.json");
+const LOAD_SHED_RUN = path.join(EVIDENCE, "load-shed", "runs", "load-shed-finding.json");
 
 test("LOAD_SHED is narrated from its own recorded event, not as a collision", (t) => {
   if (!fs.existsSync(LOAD_SHED_RUN)) return t.skip("no LOAD_SHED run recorded in evidence/ yet");
