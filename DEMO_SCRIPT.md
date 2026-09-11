@@ -36,6 +36,8 @@ finding page autoplays through its own failure when it loads.
 
 ## 0:00 — the sentence (tab 1, top of the marketplace)
 
+The hero reads **"Every robot has a breaking point."** next to the animated humanoid; let it wave once, then say:
+
 > "Someone finds the conditions where a robot controller fails. You buy the recipe sealed, and an
 > independent verifier re-runs it before any money moves."
 

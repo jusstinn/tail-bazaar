@@ -39,3 +39,6 @@ contracts/broadcast/
 
 # local chain state (pids, logs, local deployment address)
 .local/
+
+# agent worktrees created by the coding harness
+.claude/
