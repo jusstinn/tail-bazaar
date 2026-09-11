@@ -1,0 +1,270 @@
+{
+  "order": {
+    "order_id": "0x6259e4aba2d543cc567060f7aef67202d1a0b71d40dc6116aa974dd4367dcbfd",
+    "listing_id": "0x6259e4aba2d543cc567060f7aef67202d1a0b71d40dc6116aa974dd4367dcbfd",
+    "buyer": "0x1B27C90FcD738E960D3D505682EC2732A08c7f99",
+    "price_wei": "1000000000000000",
+    "status": "SETTLED_VALID",
+    "fund_tx": "0x7fe6335e0e586030ed321d177c739e83d913c28ec5bbe9b9854a93037ffbd135",
+    "deliver_tx": "0x76bd445aca8271aa558a9dca0f15cbe18665c9431d8c7dadfccfad9017aabafe",
+    "recheck_tx": null,
+    "settle_tx": "0x361cb60ee11f2b683a08a42512069a499c69eb6f340169ad859d97e080c8065f",
+    "withdraw_tx": "0xf53889922c3efba50750d5ff17cf17eb55b7cfbb0627c4bbefaa301cfa999645",
+    "timeout_tx": null,
+    "delivery_hash": "0x75154fd68827b5fa20c094090415f90df38d141e6c7dfbfdc660d2ed63933112",
+    "retrieved_at": "2026-09-11T08:49:46.596Z",
+    "delivery_check": {
+      "valid": true,
+      "verdict": "VALID",
+      "reason": "delivered package hashes to the on-chain commitment, matches the advertised terms, and its replay frames are a physically possible trajectory that hashes to the run the verifier itself re-ran",
+      "on_chain_commitment": "0x75154fd68827b5fa20c094090415f90df38d141e6c7dfbfdc660d2ed63933112",
+      "delivered_hash": "0x75154fd68827b5fa20c094090415f90df38d141e6c7dfbfdc660d2ed63933112",
+      "asserted_delivery_hash": "0x75154fd68827b5fa20c094090415f90df38d141e6c7dfbfdc660d2ed63933112",
+      "checks": [
+        {
+          "name": "on-chain-status-delivered",
+          "ok": true,
+          "detail": "status 3"
+        },
+        {
+          "name": "delivered-bytes-present",
+          "ok": true,
+          "detail": "144957 bytes"
+        },
+        {
+          "name": "delivered-hash-equals-commitment",
+          "ok": true,
+          "detail": "keccak256(delivered) 0x75154fd68827... vs on-chain commitment 0x75154fd68827..."
+        },
+        {
+          "name": "seller-asserted-hash-honest",
+          "ok": true,
+          "detail": "seller asserted 0x75154fd68827..."
+        },
+        {
+          "name": "package-target-matches-summary",
+          "ok": true,
+          "detail": "cart vs cart"
+        },
+        {
+          "name": "package-subject-matches-summary",
+          "ok": true
+        },
+        {
+          "name": "package-envelope-matches-summary",
+          "ok": true
+        },
+        {
+          "name": "package-claim-matches-summary",
+          "ok": true,
+          "detail": "COLLISION / low"
+        },
+        {
+          "name": "package-scenario-admissible",
+          "ok": true
+        },
+        {
+          "name": "listing-was-certified-by-exact-trajectory-binding",
+          "ok": true,
+          "detail": "certification method exact-trajectory-hash, verifier re-run trajectory on record"
+        },
+        {
+          "name": "package-replay-matches-verified-run",
+          "ok": true,
+          "detail": "0x3445cbf3794f... vs verifier re-run 0x3445cbf3794f..."
+        },
+        {
+          "name": "delivered-frames-hash-to-verified-trajectory",
+          "ok": true,
+          "detail": "keccak256(canonical(delivered frames)) 0x3445cbf3794f... vs 0x3445cbf3794f..."
+        },
+        {
+          "name": "delivered-subject-is-the-one-re-run",
+          "ok": true,
+          "detail": "sha256:7620971c1ea6d... vs re-run sha256:7620971c1ea6d..."
+        },
+        {
+          "name": "delivered-frames-physically-plausible",
+          "ok": true,
+          "detail": "no recorded body exceeds the 67.071 m/s this scene can produce (sqrt(2*(1+mu_max)*g*d_max) + sqrt(2*g*h_obstacle) with mu_max=1 (largest surface friction the published envelope admits), g=9.81 m/s^2, d_max=100 m (the simulator's divergence bound) and h_obstacle=1 m (the scene's tallest structure))"
+        }
+      ],
+      "checked_at": "2026-09-11T08:49:46.635Z"
+    },
+    "buyer_check": {
+      "ok": true,
+      "reason": "package matches commitment and advertised terms",
+      "delivered_hash": "0x75154fd68827b5fa20c094090415f90df38d141e6c7dfbfdc660d2ed63933112",
+      "on_chain_commitment": "0x75154fd68827b5fa20c094090415f90df38d141e6c7dfbfdc660d2ed63933112",
+      "checks": [
+        {
+          "name": "hash-equals-on-chain-commitment",
+          "ok": true,
+          "detail": "0x75154fd68827... vs 0x75154fd68827..."
+        },
+        {
+          "name": "target-subject-and-envelope-match-summary",
+          "ok": true
+        },
+        {
+          "name": "claim-matches-summary",
+          "ok": true
+        },
+        {
+          "name": "scenario-admissible-and-replayable",
+          "ok": true
+        }
+      ]
+    },
+    "created_at": "2026-09-11T08:49:42.542Z"
+  },
+  "listing": {
+    "listing_id": "0x6259e4aba2d543cc567060f7aef67202d1a0b71d40dc6116aa974dd4367dcbfd",
+    "chain_mode": "local",
+    "chain_id": 31337,
+    "escrow_address": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3",
+    "target_id": "cart",
+    "seller": "0x28dAA9F3F9468382fFeD53cc339418403337cDeD",
+    "price_wei": "1000000000000000",
+    "commitment": "0x75154fd68827b5fa20c094090415f90df38d141e6c7dfbfdc660d2ed63933112",
+    "terms_hash": "0xd3ea096f3269e5ab7554c6496b95db5a27196605f5dda5589d92ae591ef7150f",
+    "public_summary": {
+      "admissible": true,
+      "chain": {
+        "chain_id": 31337,
+        "escrow": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3",
+        "mode": "local"
+      },
+      "claim_kind": "controller collides with the obstacle under admissible conditions inside the published envelope",
+      "controller": {
+        "hash": "sha256:7620971c1ea6d527fbe9b91c026a921b7f23abee8cb274ea136022c60d169760",
+        "id": "stop-before-obstacle-v1"
+      },
+      "envelope_id": "tb-envelope-1",
+      "failure_class": {
+        "detected_by": "the simulator's own contact flag between the cart chassis and the obstacle",
+        "id": "COLLISION",
+        "label": "Collision"
+      },
+      "format": "tb-cjson-1",
+      "hidden": "exact scenario parameters, trajectory, replay frames, the hunt that found it and the reproduction command are in the private package only",
+      "operating_context": {
+        "controller_tuned_range": "sensor latency <= 40 ms, actuator latency <= 20 ms, floor friction >= 0.6, payload 20 kg",
+        "controller_tuned_range_label": "range the controller was tuned for",
+        "note": "The searched envelope is deliberately wider than the range the controller was tuned for, so a finding outside the tuned range is not a defect report: it is a measured boundary of the deployable range. The controller checks none of its tuned-range assumptions at runtime. Both ranges are illustrative design assumptions, not measurements of a physical robot.",
+        "question": "Can this controller be deployed in a wider operating range than it was tuned for, and where exactly does it stop working?",
+        "reference": "GET /api/envelope (published axes for every target, same shape as GUARD configs/guard_theta.yaml)",
+        "searched_envelope": "sensor latency 0-300 ms, actuator latency 0-100 ms, floor friction 0.2-1.0, payload 5-60 kg, deck grip (load friction) 0.1-1.0"
+      },
+      "price_wei": "1000000000000000",
+      "schema": "tb-summary-2",
+      "seller": "0x28dAA9F3F9468382fFeD53cc339418403337cDeD",
+      "seller_settled_orders_at_listing": 5,
+      "severity": {
+        "band": "low",
+        "definition": "impact speed band: low < 0.5 m/s, medium 0.5-1.0 m/s, high > 1.0 m/s (proxy only, not a damage estimate)",
+        "proxy": "impact_speed_mps"
+      },
+      "target": {
+        "id": "cart",
+        "label": "Warehouse cart",
+        "machine": "a braking warehouse cart carrying a payload",
+        "replay_renderer": "cart-3d",
+        "subject_label": "Controller"
+      },
+      "verification": {
+        "environment_fingerprint": "0x21d3f473a40a6662a00ee606091058698878a5854087230f2712c4fd73802ad3",
+        "evidence_binding": "the seller's environment fingerprint equalled the verifier's own, and the controller id+hash and the trajectory hash RECOMPUTED from the delivered replay frames were compared against the verifier's own re-run with this target's own simulator; declared hashes are not trusted, the frames were checked to be a physically possible trajectory of this scene, and a replay the verifier cannot bind exactly is INCONCLUSIVE rather than certified",
+        "method": "exact-trajectory-hash",
+        "status": "VERIFIED",
+        "verdict": "VALID",
+        "verified_at": "2026-09-11T08:48:50.017Z",
+        "verifier": "0xe592C7DA96Cc42344952C452377eBCc7Cc0982AE",
+        "verifier_version": "tb-verifier-2"
+      }
+    },
+    "status": "SETTLED_VALID",
+    "register_tx": "0x9e1178f3b62875bd7cc4a76290bda3c7daa8adaeaecc924467ebcbb4579cf558",
+    "created_at": "2026-09-11T08:48:54.051Z",
+    "demo_note": null
+  },
+  "events": [
+    {
+      "id": 1,
+      "listing_id": "0x6259e4aba2d543cc567060f7aef67202d1a0b71d40dc6116aa974dd4367dcbfd",
+      "ts": "2026-09-11T08:48:54.054Z",
+      "actor": "verifier",
+      "kind": "verified",
+      "detail": "{\"target\":\"cart\",\"status\":\"VERIFIED\",\"method\":\"exact-trajectory-hash\",\"reason\":\"identical trajectory hash in a matching pinned environment; the controller and the delivered replay frames are bound to the verifier's own re-run, and the frames are a physically possible trajectory of this scene\",\"checks\":24}",
+      "tx_hash": null,
+      "block_number": null,
+      "chain_mode": "local"
+    },
+    {
+      "id": 2,
+      "listing_id": "0x6259e4aba2d543cc567060f7aef67202d1a0b71d40dc6116aa974dd4367dcbfd",
+      "ts": "2026-09-11T08:48:54.054Z",
+      "actor": "verifier",
+      "kind": "registered",
+      "detail": "{\"seller\":\"0x28dAA9F3F9468382fFeD53cc339418403337cDeD\",\"price_wei\":\"1000000000000000\",\"commitment\":\"0x75154fd68827b5fa20c094090415f90df38d141e6c7dfbfdc660d2ed63933112\",\"terms_hash\":\"0xd3ea096f3269e5ab7554c6496b95db5a27196605f5dda5589d92ae591ef7150f\",\"block\":10897}",
+      "tx_hash": "0x9e1178f3b62875bd7cc4a76290bda3c7daa8adaeaecc924467ebcbb4579cf558",
+      "block_number": 10897,
+      "chain_mode": "local"
+    },
+    {
+      "id": 15,
+      "listing_id": "0x6259e4aba2d543cc567060f7aef67202d1a0b71d40dc6116aa974dd4367dcbfd",
+      "ts": "2026-09-11T08:49:42.543Z",
+      "actor": "buyer",
+      "kind": "funded",
+      "detail": "{\"buyer\":\"0x1B27C90FcD738E960D3D505682EC2732A08c7f99\",\"price_wei\":\"1000000000000000\",\"block\":10946}",
+      "tx_hash": "0x7fe6335e0e586030ed321d177c739e83d913c28ec5bbe9b9854a93037ffbd135",
+      "block_number": 10946,
+      "chain_mode": "local"
+    },
+    {
+      "id": 16,
+      "listing_id": "0x6259e4aba2d543cc567060f7aef67202d1a0b71d40dc6116aa974dd4367dcbfd",
+      "ts": "2026-09-11T08:49:46.582Z",
+      "actor": "seller",
+      "kind": "delivered",
+      "detail": "{\"asserted_delivery_hash\":\"0x75154fd68827b5fa20c094090415f90df38d141e6c7dfbfdc660d2ed63933112\",\"bytes\":144957,\"tampered_demo\":false,\"block\":10950}",
+      "tx_hash": "0x76bd445aca8271aa558a9dca0f15cbe18665c9431d8c7dadfccfad9017aabafe",
+      "block_number": 10950,
+      "chain_mode": "local"
+    },
+    {
+      "id": 17,
+      "listing_id": "0x6259e4aba2d543cc567060f7aef67202d1a0b71d40dc6116aa974dd4367dcbfd",
+      "ts": "2026-09-11T08:49:46.623Z",
+      "actor": "buyer",
+      "kind": "retrieved",
+      "detail": "{\"bytes\":144957,\"signer\":\"0x1B27C90FcD738E960D3D505682EC2732A08c7f99\",\"local_check_ok\":true,\"reason\":\"package matches commitment and advertised terms\"}",
+      "tx_hash": null,
+      "block_number": null,
+      "chain_mode": "local"
+    },
+    {
+      "id": 18,
+      "listing_id": "0x6259e4aba2d543cc567060f7aef67202d1a0b71d40dc6116aa974dd4367dcbfd",
+      "ts": "2026-09-11T08:49:50.665Z",
+      "actor": "verifier",
+      "kind": "settled_valid",
+      "detail": "{\"reason\":\"delivered package hashes to the on-chain commitment, matches the advertised terms, and its replay frames are a physically possible trajectory that hashes to the run the verifier itself re-ran\",\"credited_to\":\"0x28dAA9F3F9468382fFeD53cc339418403337cDeD\",\"block\":10954}",
+      "tx_hash": "0x361cb60ee11f2b683a08a42512069a499c69eb6f340169ad859d97e080c8065f",
+      "block_number": 10954,
+      "chain_mode": "local"
+    },
+    {
+      "id": 19,
+      "listing_id": "0x6259e4aba2d543cc567060f7aef67202d1a0b71d40dc6116aa974dd4367dcbfd",
+      "ts": "2026-09-11T08:49:54.706Z",
+      "actor": "seller",
+      "kind": "withdrawn",
+      "detail": "{\"amount_wei\":\"1000000000000000\",\"block\":10958}",
+      "tx_hash": "0xf53889922c3efba50750d5ff17cf17eb55b7cfbb0627c4bbefaa301cfa999645",
+      "block_number": 10958,
+      "chain_mode": "local"
+    }
+  ]
+}

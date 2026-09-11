@@ -68,7 +68,7 @@ export const HUMANOID_RENDERER: SceneRenderer = {
   id: "humanoid-3d",
   anchorBody: "torso",
   ghostLaneOffset: 1.25,
-  aspect: { overlay: 0.5, split: 0.42 },
+  aspect: { overlay: 0.44, split: 0.38 },
   swatches: [
     { color: hex(COL.body), label: "purchased run" },
     { color: hex(COL.ghost), label: "baseline ghost — the same policy at nominal conditions, which survives, drawn one lane over", translucent: true },
@@ -91,17 +91,19 @@ export const HUMANOID_RENDERER: SceneRenderer = {
     }
     scene.add(grid);
 
-    // The environment's own healthy-height floor, drawn where it actually is.
+    // The environment's own healthy-height floor, drawn where it actually is — as an OUTLINE, not a
+    // filled plate: a filled sheet at 1 m reads as a table the humanoid is standing under, which is
+    // the opposite of what it means. Four thin bars read as a level marker.
     const z = healthyFloor(run);
     const plate = new THREE.Group();
-    const plateMat = new THREE.MeshBasicMaterial({ color: COL.line, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false });
-    const sheet = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.6), plateMat);
-    plate.add(sheet);
-    const edgeMat = new THREE.MeshBasicMaterial({ color: COL.line, transparent: true, opacity: 0.55, depthWrite: false });
-    for (const s of [-1, 1]) {
-      const e = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.012, 0.004), edgeMat);
-      e.position.set(0, s * 1.3, 0);
-      plate.add(e);
+    const edgeMat = new THREE.MeshBasicMaterial({ color: COL.line, transparent: true, opacity: 0.5, depthWrite: false });
+    const W = 1.5;
+    for (const sgn of [-1, 1]) {
+      const along = new THREE.Mesh(new THREE.BoxGeometry(2 * W, 0.01, 0.004), edgeMat);
+      along.position.set(0, sgn * W, 0);
+      const across = new THREE.Mesh(new THREE.BoxGeometry(0.01, 2 * W, 0.004), edgeMat);
+      across.position.set(sgn * W, 0, 0);
+      plate.add(along, across);
     }
     plate.position.z = z;
     scene.add(plate);
@@ -139,7 +141,7 @@ export const HUMANOID_RENDERER: SceneRenderer = {
   },
 
   camera(a) {
-    return { pos: [a.x - 1.9, a.y - 4.0, 1.95], look: [a.x + 0.25, a.y, 0.8] };
+    return { pos: [a.x - 1.3, a.y - 2.95, 1.35], look: [a.x + 0.15, a.y, 0.82] };
   },
 
   /** The fall is marked on the torso, which is the body the environment's health predicate reads. */
@@ -152,8 +154,10 @@ export const HUMANOID_RENDERER: SceneRenderer = {
     const ticks = run.ticks as any[] | undefined;
     const z = healthyFloor(run);
     if (!ticks?.length) return `<b>${t.toFixed(2)} s</b>`;
-    const dt = Number((run.scene as Record<string, any>)?.control_dt_s) || 0.015;
-    const tk = ticks[Math.min(Math.max(Math.floor(t / dt), 0), ticks.length - 1)];
+    // The per-tick array is decimated by the SAME stride as the frames (the run declares both), so the
+    // recording interval — not the raw control tick — is what indexes it.
+    const dt = Number(run.frames?.dt_s) || 0.03;
+    const tk = ticks[Math.min(Math.max(Math.round(t / dt), 0), ticks.length - 1)];
     const low = Number(tk.torso_z_m) < z;
     return `<b>${t.toFixed(2)} s</b><span class="${low ? "hud-alert" : ""}">torso ${n2(tk.torso_z_m)} m</span><span>healthy ≥ ${z.toFixed(2)} m</span><span>${n2(tk.torso_speed_mps)} m/s</span>${tk.push_on ? `<span class="hud-alert">push on</span>` : ""}`;
   },

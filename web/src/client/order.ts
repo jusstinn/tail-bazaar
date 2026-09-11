@@ -304,7 +304,7 @@ function renderReveal(host: HTMLElement, pkg: Pkg, baseline: RunLike, o: Order, 
         </div>
         <div class="tl-row">
           <button id="play" class="btn small">Pause</button>
-          <button id="again" class="btn ghost small">Replay the ${esc(p.moment_label)}</button>
+          <button id="again" class="btn ghost small">Replay ${esc(p.moment_label.startsWith("the ") ? p.moment_label : "the " + p.moment_label)}</button>
           <span id="tlabel" class="mono"></span>
           <label class="speed">speed <select id="speed"><option value="0.25">0.25×</option><option value="0.5" selected>0.5×</option><option value="1">1×</option></select></label>
         </div>

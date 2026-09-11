@@ -1,0 +1,55 @@
+{
+  "schema": "tb-summary-2",
+  "format": "tb-cjson-1",
+  "target": {
+    "id": "cart",
+    "label": "Warehouse cart",
+    "machine": "a braking warehouse cart carrying a payload",
+    "subject_label": "Controller",
+    "replay_renderer": "cart-3d"
+  },
+  "failure_class": {
+    "id": "COLLISION",
+    "label": "Collision",
+    "detected_by": "the simulator's own contact flag between the cart chassis and the obstacle"
+  },
+  "controller": {
+    "id": "stop-before-obstacle-v1",
+    "hash": "sha256:7620971c1ea6d527fbe9b91c026a921b7f23abee8cb274ea136022c60d169760"
+  },
+  "envelope_id": "tb-envelope-1",
+  "admissible": true,
+  "claim_kind": "controller collides with the obstacle under admissible conditions inside the published envelope",
+  "verification": {
+    "status": "VERIFIED",
+    "verdict": "VALID",
+    "method": "exact-trajectory-hash",
+    "verifier_version": "tb-verifier-2",
+    "verifier": "0xe592C7DA96Cc42344952C452377eBCc7Cc0982AE",
+    "environment_fingerprint": "0x21d3f473a40a6662a00ee606091058698878a5854087230f2712c4fd73802ad3",
+    "evidence_binding": "the seller's environment fingerprint equalled the verifier's own, and the controller id+hash and the trajectory hash RECOMPUTED from the delivered replay frames were compared against the verifier's own re-run with this target's own simulator; declared hashes are not trusted, the frames were checked to be a physically possible trajectory of this scene, and a replay the verifier cannot bind exactly is INCONCLUSIVE rather than certified",
+    "verified_at": "2026-09-11T08:48:54.413Z"
+  },
+  "operating_context": {
+    "controller_tuned_range": "sensor latency <= 40 ms, actuator latency <= 20 ms, floor friction >= 0.6, payload 20 kg",
+    "controller_tuned_range_label": "range the controller was tuned for",
+    "searched_envelope": "sensor latency 0-300 ms, actuator latency 0-100 ms, floor friction 0.2-1.0, payload 5-60 kg, deck grip (load friction) 0.1-1.0",
+    "question": "Can this controller be deployed in a wider operating range than it was tuned for, and where exactly does it stop working?",
+    "note": "The searched envelope is deliberately wider than the range the controller was tuned for, so a finding outside the tuned range is not a defect report: it is a measured boundary of the deployable range. The controller checks none of its tuned-range assumptions at runtime. Both ranges are illustrative design assumptions, not measurements of a physical robot.",
+    "reference": "GET /api/envelope (published axes for every target, same shape as GUARD configs/guard_theta.yaml)"
+  },
+  "severity": {
+    "proxy": "impact_speed_mps",
+    "band": "medium",
+    "definition": "impact speed band: low < 0.5 m/s, medium 0.5-1.0 m/s, high > 1.0 m/s (proxy only, not a damage estimate)"
+  },
+  "seller": "0x28dAA9F3F9468382fFeD53cc339418403337cDeD",
+  "seller_settled_orders_at_listing": 5,
+  "price_wei": "1000000000000000",
+  "chain": {
+    "mode": "local",
+    "chain_id": 31337,
+    "escrow": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3"
+  },
+  "hidden": "exact scenario parameters, trajectory, replay frames, the hunt that found it and the reproduction command are in the private package only"
+}

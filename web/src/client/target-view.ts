@@ -24,6 +24,13 @@ export type TargetView = {
 };
 
 const ev = (doc: { events?: any[] }, type: string): any | undefined => (doc.events ?? []).find((e) => e?.type === type);
+/** "torso impact · torso impact speed" reads as a stutter; the quantity's own label already says it. */
+const severityTile = (p: FailurePresentation): Stat | null => {
+  const q = p.headline_quantity;
+  if (!q) return null;
+  const where = p.severity_label || p.moment_label;
+  return { label: q.label.includes(where) ? q.label : `${where} · ${q.label}`, value: q.value, unit: q.unit, dec: 3 };
+};
 const m = (doc: { metrics?: Record<string, any> }, k: string): unknown => doc.metrics?.[k];
 
 // ------------------------------------------------------------------------------------- the cart
@@ -67,7 +74,7 @@ const CART: TargetView = {
 
   stats(pkg, baseline, p) {
     const out: (Stat | null)[] = [
-      p.headline_quantity ? { label: `${p.severity_label || p.moment_label} · ${p.headline_quantity.label}`, value: p.headline_quantity.value, unit: p.headline_quantity.unit, dec: 3 } : null,
+      severityTile(p),
       { label: "clearance left", value: m(pkg, "final_clearance_m"), unit: "m", dec: 3, note: "distance to the obstacle when the run ended" },
       { label: "baseline clearance", value: m(baseline, "final_clearance_m"), unit: "m", dec: 3, note: `target ${num(m(baseline, "target_clearance_m"), 2)} m` },
       { label: "brake onset to impact", value: m(pkg, "distance_brake_onset_to_impact_m"), unit: "m", dec: 3, note: "distance travelled after the brakes came on" },
@@ -128,7 +135,7 @@ const HUMANOID: TargetView = {
 
   stats(pkg, baseline, p) {
     const out: (Stat | null)[] = [
-      p.headline_quantity ? { label: `${p.severity_label || p.moment_label} · ${p.headline_quantity.label}`, value: p.headline_quantity.value, unit: p.headline_quantity.unit, dec: 3 } : null,
+      severityTile(p),
       { label: "survived for", value: m(pkg, "survival_time_s"), unit: "s", dec: 2, note: "until the environment called the torso unhealthy" },
       { label: "baseline survived", value: m(baseline, "survival_time_s"), unit: "s", dec: 2, note: "the full episode, at the published conditions" },
       { label: "peak torso acceleration", value: m(pkg, "peak_torso_accel_mps2"), unit: "m/s²", dec: 1, note: "largest control-tick change in torso velocity after the fall" },

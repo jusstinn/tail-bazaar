@@ -115,7 +115,9 @@ export const CART_RENDERER: SceneRenderer = {
   hud(run, t) {
     const ticks = run.ticks as any[] | undefined;
     if (!ticks?.length) return `<b>${t.toFixed(2)} s</b>`;
-    const tk = ticks[Math.min(Math.max(Math.floor(t / 0.02), 0), ticks.length - 1)];
+    // The recording interval the run itself declares, never a hard-coded tick.
+    const dt = Number(run.frames?.dt_s) || 0.02;
+    const tk = ticks[Math.min(Math.max(Math.round(t / dt), 0), ticks.length - 1)];
     const trueRange = (run.scene as Record<string, any>).obstacle_front_x_m - tk.x_front_m;
     return `<b>${t.toFixed(2)} s</b><span>${n2(tk.v_odom_mps)} m/s</span><span>sees ${tk.range_used_m >= 0 ? n2(tk.range_used_m) : "—"} m</span><span>really ${n2(trueRange)} m</span><span>brake ${(tk.brake_applied * 100).toFixed(0)}%</span>`;
   },

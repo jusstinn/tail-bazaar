@@ -155,7 +155,7 @@ input[type=password], input[type=text] { flex: 1; min-width: 240px; padding: 12p
 .sw-track { background: #EDEBE8; }
 .sw-nominal { width: 2px; height: 14px; border-radius: 0; background: var(--ink-3); }
 .sw-find { width: 2px; height: 14px; border-radius: 0; background: var(--alert); }
-.sw-fail { background: #3B3833; }
+.sw-fail { background: #45413A; }
 .sw-ghost { background: rgba(110,106,100,.4); }
 .sw-thin { width: 3px; height: 14px; border-radius: 0; }
 .sw-stop { width: 2px; height: 14px; border-radius: 0; background: var(--ghost); }
@@ -379,5 +379,6 @@ footer p { max-width: 78ch; margin: 0 0 8px; }
 .sc-head { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); margin-bottom: 10px; }
 .searchcost .prose { margin-bottom: 8px; color: var(--ink-2); font-size: 15px; }
 .searchcost .fineprint { margin: 0; }
+.searchcost .mono { word-break: normal; overflow-wrap: anywhere; }
 
 .vp-hud .hud-alert { color: var(--alert); font-weight: 600; }

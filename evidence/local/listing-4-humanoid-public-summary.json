@@ -1,0 +1,55 @@
+{
+  "schema": "tb-summary-2",
+  "format": "tb-cjson-1",
+  "target": {
+    "id": "humanoid",
+    "label": "Humanoid balance policy",
+    "machine": "a 42 kg humanoid walking under a pretrained balance policy",
+    "subject_label": "Policy",
+    "replay_renderer": "humanoid-3d"
+  },
+  "failure_class": {
+    "id": "FELL",
+    "label": "Fell",
+    "detected_by": "Gymnasium's own health predicate: HumanoidEnv terminates when the torso height leaves healthy_z_range (1.0-2.0 m). This project implements no fall detector."
+  },
+  "controller": {
+    "id": "farama-minari-humanoid-v5-sac-expert",
+    "hash": "sha256:1a1eb40969a86e533ad8b9e62ef7f8e361d69063ac23eda495de2dfda18fe311"
+  },
+  "envelope_id": "tb-humanoid-envelope-1",
+  "admissible": true,
+  "claim_kind": "the balance policy falls over under admissible conditions inside the published envelope",
+  "verification": {
+    "status": "VERIFIED",
+    "verdict": "VALID",
+    "method": "exact-trajectory-hash",
+    "verifier_version": "tb-verifier-2",
+    "verifier": "0xe592C7DA96Cc42344952C452377eBCc7Cc0982AE",
+    "environment_fingerprint": "0x3f773b1fe738262d9913b6e9425a7d4788208cbe16e47bef5455f9a61bb14546",
+    "evidence_binding": "the seller's environment fingerprint equalled the verifier's own, and the policy checkpoint id+hash and the trajectory hash RECOMPUTED from the delivered replay frames were compared against the verifier's own re-run with this target's own simulator; declared hashes are not trusted, the frames were checked to be a physically possible trajectory of this scene, and a replay the verifier cannot bind exactly is INCONCLUSIVE rather than certified",
+    "verified_at": "2026-09-11T08:49:14.233Z"
+  },
+  "operating_context": {
+    "controller_tuned_range": "unmodified Gymnasium Humanoid-v5: no external push, floor friction 1.0, stock body masses, no actuator noise, no control latency",
+    "controller_tuned_range_label": "conditions the policy's publisher evaluated it under",
+    "searched_envelope": "push impulse 0-120 N·s from any heading, push time 0.6-7.8 s, floor friction 0.4-1.4, body mass ×0.8-1.25, actuator noise 0-30 %, control latency 0-90 ms, over eight published initial states",
+    "question": "This policy is published with a mean return of 8127 on stock Humanoid-v5. How far can the operating range be widened — a shove, a slippery floor, a heavier body, noisy or delayed actuation — before it falls over?",
+    "note": "The searched envelope is deliberately wider than the conditions the policy was published for, so a finding outside them is not a defect report: the publisher evaluated unmodified Humanoid-v5 and claims nothing about pushes, latency, noise, friction or mass. These bounds are illustrative assumptions for a demonstration; the 'robot' is Gymnasium's 42.116 kg MuJoCo mannequin, not a product.",
+    "reference": "GET /api/envelope (published axes for every target, same shape as GUARD configs/guard_theta.yaml)"
+  },
+  "severity": {
+    "proxy": "torso_impact_speed_mps",
+    "band": "high",
+    "definition": "torso impact speed banded against the 4.43 m/s a free fall from the 1.0 m healthy-height floor reaches: low below half of it, medium up to it, high above it (a measured kinematic proxy, never a damage, injury or cost estimate)"
+  },
+  "seller": "0x28dAA9F3F9468382fFeD53cc339418403337cDeD",
+  "seller_settled_orders_at_listing": 5,
+  "price_wei": "1000000000000000",
+  "chain": {
+    "mode": "local",
+    "chain_id": 31337,
+    "escrow": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3"
+  },
+  "hidden": "exact scenario parameters, trajectory, replay frames, the hunt that found it and the reproduction command are in the private package only"
+}

@@ -10,10 +10,10 @@
 // nothing else. The baseline ghost is a translucent graphite, so "what should have happened" reads as
 // absent rather than as a second subject.
 export const COL = {
-  chassis: 0x3b3833,   // warm charcoal
+  chassis: 0x45413a,   // warm charcoal
   load: 0xd9c39a,      // sand
   obstacle: 0xb4643c,  // terracotta
-  wheel: 0x7c7873,     // mid grey
+  wheel: 0x8a8680,     // mid grey
   spoke: 0xd2cec7,     // pale graphite, so a turning wheel reads as turning
   body: 0xc4b49e,      // humanoid: neutral warm stone
   floor: 0xf2f0ec,     // off-white

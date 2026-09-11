@@ -1,8 +1,8 @@
 {
   "chain_mode": "local",
   "chain_id": 31337,
-  "hash": "0x73a80d5bb10c17cbdc9c3d515cc0bb528e80834fc402933e629bc9913957c010",
-  "block_number": 4203,
+  "hash": "0xf53889922c3efba50750d5ff17cf17eb55b7cfbb0627c4bbefaa301cfa999645",
+  "block_number": 10958,
   "status": "success",
   "from": "0x28daa9f3f9468382ffed53cc339418403337cded",
   "to": "0xfadf11662c46c0214b0a40938a26fb8f0cd785a3",
