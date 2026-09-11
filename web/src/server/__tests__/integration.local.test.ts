@@ -248,6 +248,36 @@ test("a refunded order cannot be retrieved even by its buyer", async () => {
   assert.equal(res.status, 403);
 });
 
+// LIVE FLOWS against the real chain and the real cart simulator: list one new cart finding through
+// listingFlow, then buy it through purchaseFlow (the same agent steps the pipeline runs, one at a
+// time). The buyer retrieves over HTTP, so the app is served on a free port for the duration.
+test("live flows: list one cart finding, then buy it, and the order settles VALID with a settle tx", async () => {
+  const { listingFlow, purchaseFlow } = await import("../flows.js");
+  const { serve } = await import("@hono/node-server");
+  let server: ReturnType<typeof serve> | null = null;
+  const port = await new Promise<number>((resolve) => { server = serve({ fetch: app.fetch, port: 0, hostname: "127.0.0.1" }, (info) => resolve(info.port)); });
+  try {
+    const listed = await listingFlow("cart", `http://127.0.0.1:${port}`).done;
+    assert.equal(listed.status, "done", listed.error ?? "");
+    assert.ok(listed.listing_id, "the flow carries the new listing id");
+    assert.deepEqual(listed.steps.map((s) => s.status), ["done", "done", "done", "done"]);
+    assert.ok(listed.steps[3].tx_hash && listed.steps[3].block_number, "register landed on chain");
+    assert.equal((getDb().prepare("SELECT status FROM listings WHERE listing_id = ?").get(listed.listing_id!) as any).status, "LISTED");
+
+    const bought = await purchaseFlow(listed.listing_id!, `http://127.0.0.1:${port}`).done;
+    assert.equal(bought.status, "done", bought.error ?? "");
+    assert.deepEqual(bought.steps.map((s) => s.status), ["done", "done", "done", "done", "done"]);
+    assert.equal(bought.steps[4].detail, "Settled: seller paid");
+    const o = getDb().prepare("SELECT * FROM orders WHERE order_id = ?").get(listed.listing_id!) as unknown as OrderRow;
+    assert.equal(o.status, "SETTLED_VALID");
+    assert.ok(o.fund_tx && o.deliver_tx && o.settle_tx && o.withdraw_tx, "every transaction is on the order");
+    assert.equal(bought.steps[3].tx_hash, o.settle_tx, "the settle step carries the settle tx");
+    assert.equal(((await (await app.request(`/api/orders/${listed.listing_id}`)).json()) as any).on_chain.status, "SettledValid");
+  } finally {
+    (server as any)?.close();
+  }
+});
+
 test("the tampered order's verifier check recorded a commitment mismatch and a refund", async () => {
   const invalid = orders().find((o) => o.status === "SETTLED_INVALID")!;
   const res = await app.request(`/api/orders/${invalid.order_id}`);

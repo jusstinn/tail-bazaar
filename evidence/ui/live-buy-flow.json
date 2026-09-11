@@ -1,0 +1,52 @@
+{
+  "flow_id": "buy-mtxa9no5-4j5h",
+  "kind": "buy",
+  "target_id": "cart",
+  "listing_id": "0xe2028e5848efd2b4112d6c5d55b5b13e8aa91b92878e4c07cd9b923adbe14a69",
+  "status": "done",
+  "started_at": "2026-09-11T18:22:08.405Z",
+  "finished_at": "2026-09-11T18:22:24.721Z",
+  "error": null,
+  "steps": [
+    {
+      "name": "fund",
+      "status": "done",
+      "tx_hash": "0x14608ce77f965421ee0678f3d9275b795a24429b5660d052ed6eeb6ac44153d9",
+      "block_number": 45295,
+      "detail": "1000000000000000 wei paid into escrow",
+      "at": "2026-09-11T18:22:12.530Z"
+    },
+    {
+      "name": "deliver",
+      "status": "done",
+      "tx_hash": "0xb35530c637c9ed472c6f7265e67b5ebc9736ee5bee11c239fab3fab09202fb4c",
+      "block_number": 45299,
+      "detail": "sealed package delivered",
+      "at": "2026-09-11T18:22:16.580Z"
+    },
+    {
+      "name": "retrieve",
+      "status": "done",
+      "tx_hash": null,
+      "block_number": null,
+      "detail": "retrieved; the bytes hash to the seal and match the advertised terms",
+      "at": "2026-09-11T18:22:16.623Z"
+    },
+    {
+      "name": "verify-and-settle",
+      "status": "done",
+      "tx_hash": "0xafb3ff0212bf2a9aaa32f572f06dfee820558f2043e7d98276e6275df53c5e52",
+      "block_number": 45303,
+      "detail": "VALID",
+      "at": "2026-09-11T18:22:20.688Z"
+    },
+    {
+      "name": "withdraw",
+      "status": "done",
+      "tx_hash": "0x1d4e228251bb3a7fb4589797c14ba93e901198ab344b1ec666fbc812ed5e6ee8",
+      "block_number": 45307,
+      "detail": "Settled: seller paid",
+      "at": "2026-09-11T18:22:24.720Z"
+    }
+  ]
+}

@@ -33,6 +33,7 @@ import { getDb, listEvents, publicListing, publicOrder, type ListingRow, type Or
 import { DEFAULT_TARGET, envelopesDoc, isTargetId, TARGET_IDS, TARGETS, targetFor } from "./targets.js";
 import { provenance } from "./provenance.js";
 import { ensureBaseline, pipelineStatus, PUBLIC_OUT, runDemoPipeline } from "./pipeline.js";
+import { currentFlow, flowBusyReason, flowStatus, listingFlow, purchaseFlow } from "./flows.js";
 
 function bearerToken(c: Context): string | null {
   const m = /^Bearer\s+(\S+)$/i.exec((c.req.header("authorization") ?? "").trim());
@@ -354,9 +355,52 @@ export function buildApp() {
     if (!access.ok) return c.json({ error: access.error, hosted_mode: true }, 401);
     const st = pipelineStatus();
     if (st && st.status === "running") return c.json({ error: "already running", run: st }, 409);
+    const busy = flowBusyReason();
+    if (busy) return c.json({ error: busy }, 409);
     runDemoPipeline({ baseUrl: `http://127.0.0.1:${port}` }).catch(() => { /* recorded in run status */ });
     await new Promise((r) => setTimeout(r, 200));
     return c.json({ started: true, run: pipelineStatus() });
+  });
+
+  // LIVE FLOWS (flows.ts): buy one listing, or list one new finding for one robot, from the page,
+  // one on-chain step at a time. Starting one writes to the chain and — in hosted mode — spends the
+  // operator's test ETH, so there it needs the operator token; local demonstration mode is open.
+  // Reading a flow is public in both modes: the record carries step names, statuses, transaction
+  // hashes, block numbers and one-line details, and nothing private (see flows.ts).
+  app.post("/api/listings/:id/buy", (c) => {
+    const id = c.req.param("id");
+    const r = getDb().prepare("SELECT * FROM listings WHERE listing_id = ?").get(id) as unknown as ListingRow | undefined;
+    if (!r) return c.json({ error: "not found" }, 404);
+    const access = privateAccess(c, null, true);
+    if (!access.ok) return c.json({ error: access.error, hosted_mode: true }, 401);
+    if (r.status !== "LISTED") return c.json({ error: `this listing is ${r.status}, not LISTED, so it cannot be bought` }, 409);
+    const busy = flowBusyReason();
+    if (busy) return c.json({ error: busy }, 409);
+    try {
+      const { flow } = purchaseFlow(r.listing_id, `http://127.0.0.1:${port}`);
+      return c.json({ flow_id: flow.flow_id, order_id: r.listing_id, flow });
+    } catch (e: any) {
+      return c.json({ error: String(e?.message ?? e) }, 409);
+    }
+  });
+  app.post("/api/targets/:id/list", (c) => {
+    const id = c.req.param("id");
+    if (!isTargetId(id)) return c.json({ error: `unknown target ${id}`, known: TARGET_IDS }, 404);
+    const access = privateAccess(c, null, true);
+    if (!access.ok) return c.json({ error: access.error, hosted_mode: true }, 401);
+    const busy = flowBusyReason();
+    if (busy) return c.json({ error: busy }, 409);
+    try {
+      const { flow } = listingFlow(id, `http://127.0.0.1:${port}`);
+      return c.json({ flow_id: flow.flow_id, flow });
+    } catch (e: any) {
+      return c.json({ error: String(e?.message ?? e) }, 409);
+    }
+  });
+  app.get("/api/flows/current", (c) => c.json({ flow: currentFlow(), busy: flowBusyReason() }));
+  app.get("/api/flows/:id", (c) => {
+    const f = flowStatus(c.req.param("id"));
+    return f ? c.json(f) : c.json({ error: "not found" }, 404);
   });
 
   app.get("/api/balances", async (c) => {

@@ -18,8 +18,28 @@ import { provenance } from "./provenance.js";
 import { runScenario } from "./sim.js";
 import { TARGET_IDS, TARGETS, type TargetId, type TargetSpec } from "./targets.js";
 import { buyerFund, buyerRetrieveAndCheck, buyerWithdraw, describePolicy, selectListing, type BuyerPolicy } from "./agents/buyer.js";
-import { buildPrivatePackage, buildSubmission, sellerDeliver, sellerDiscover, sellerWithdraw } from "./agents/seller.js";
+import { buildPrivatePackage, buildSubmission, sellerDeliver, sellerDiscover, sellerWithdraw, type Finding, type HunterRecord } from "./agents/seller.js";
 import { verifierCheckDeliveryAndSettle, verifyAndList } from "./agents/verifier.js";
+
+/** One finding from the seller's hunt to the verifier: package it, record the submission, and have
+ *  the verifier re-run it and (if VERIFIED) register the listing. Shared by the demonstration
+ *  pipeline and the live listing flow (flows.ts); the log line is the pipeline's own. */
+export async function submitFinding(target: TargetSpec, f: Finding, hunter: HunterRecord, sellerAddress: string, opts: { tamper: boolean }, L: (m: string) => void) {
+  const pkgDoc = buildPrivatePackage(target, f.run, sellerAddress, hunter);
+  const { submission, packageBytes, packageCommitment } = buildSubmission(f, hunter, pkgDoc);
+  L(`seller[${target.id}]: submitting finding #${f.rank} (claim: ${submission.claim.failure_class}, ${submission.claim.severity_band} severity band) with salted package commitment ${packageCommitment.slice(0, 14)}...${opts.tamper ? " [DEMO: this listing's delivery will be tampered]" : ""}`);
+  return verifyAndList(submission, packageBytes, { priceWei: listingPriceWei, demoTamper: opts.tamper }, L);
+}
+
+/** After settlement the credited party withdraws: the seller when the delivery was VALID, the buyer
+ *  (a full refund) when it was INVALID. Records the withdraw transaction on the order and as an
+ *  event. Shared by the demonstration pipeline and the live purchase flow. */
+export async function withdrawAfterSettlement(order: OrderRow, valid: boolean, L: (m: string) => void) {
+  const w = valid ? await sellerWithdraw(L) : await buyerWithdraw(L);
+  getDb().prepare("UPDATE orders SET withdraw_tx = ? WHERE order_id = ?").run(w.hash, order.order_id);
+  addEvent(order.listing_id, valid ? "seller" : "buyer", valid ? "withdrawn" : "refund_withdrawn", { amount_wei: order.price_wei, block: w.block_number }, chainMode, w.hash, w.block_number);
+  return w;
+}
 
 export type PipelineLog = { ts: string; msg: string }[];
 let running: { run_id: string; started_at: string; log: PipelineLog; status: "running" | "done" | "failed"; error?: string } | null = null;
@@ -111,10 +131,7 @@ export async function runDemoPipeline(opts: { evidenceDir?: string | null; baseU
       const listed: Hex[] = [];
       for (const f of disc.findings) {
         const tamper = id === TAMPERED.target && f.rank === TAMPERED.rank;
-        const pkgDoc = buildPrivatePackage(target, f.run, addrs.seller, disc.hunter);
-        const { submission, packageBytes, packageCommitment } = buildSubmission(f, disc.hunter, pkgDoc);
-        L(`seller[${id}]: submitting finding #${f.rank} (claim: ${submission.claim.failure_class}, ${submission.claim.severity_band} severity band) with salted package commitment ${packageCommitment.slice(0, 14)}...${tamper ? " [DEMO: this listing's delivery will be tampered]" : ""}`);
-        const res = await verifyAndList(submission, packageBytes, { priceWei: listingPriceWei, demoTamper: tamper }, L);
+        const res = await submitFinding(target, f, disc.hunter, addrs.seller, { tamper }, L);
         if (res.listingId) {
           listed.push(res.listingId);
           listedCount++;
@@ -158,17 +175,8 @@ export async function runDemoPipeline(opts: { evidenceDir?: string | null; baseU
         L("buyer: requesting verification of the delivered package");
         const settled = await verifierCheckDeliveryAndSettle(fresh(), L);
         await receipts(`order-${n}-${id}-settle`, settled.tx);
-        if (settled.check.valid) {
-          const w = await sellerWithdraw(L);
-          db.prepare("UPDATE orders SET withdraw_tx = ? WHERE order_id = ?").run(w.hash, order.order_id);
-          addEvent(order.listing_id, "seller", "withdrawn", { amount_wei: order.price_wei, block: w.block_number }, chainMode, w.hash, w.block_number);
-          await receipts(`order-${n}-${id}-withdraw-seller`, w.hash);
-        } else {
-          const w = await buyerWithdraw(L);
-          db.prepare("UPDATE orders SET withdraw_tx = ? WHERE order_id = ?").run(w.hash, order.order_id);
-          addEvent(order.listing_id, "buyer", "refund_withdrawn", { amount_wei: order.price_wei, block: w.block_number }, chainMode, w.hash, w.block_number);
-          await receipts(`order-${n}-${id}-withdraw-buyer`, w.hash);
-        }
+        const w = await withdrawAfterSettlement(order, settled.check.valid, L);
+        await receipts(`order-${n}-${id}-withdraw-${settled.check.valid ? "seller" : "buyer"}`, w.hash);
         // read the credited party's balance until the withdraw is visible (lagging RPC backends)
         const credited = (settled.check.valid ? addrs.seller : addrs.buyer) as Hex;
         const left = await retry(async () => { const x = await withdrawable(credited); if (x !== 0n) throw new Error("not yet"); return x; }, 8, 2500).catch(() => withdrawable(credited));

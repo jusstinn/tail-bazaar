@@ -88,6 +88,10 @@ export type Pkg = RunLike & {
   replay: { frames: Frames; trajectory_hash: string; mjcf_hash: string | null; renderer?: string }; reproduce: { command: string; note: string }; tampered_by_demo?: string;
 };
 export type DemoRun = { run_id: string; status: string; started_at: string; log: { ts: string; msg: string }[]; error: string | null } | null;
+/** GET /api/flows/:id — a live purchase or listing, step by step. Public: names, statuses, hashes,
+ *  block numbers and one-line details only. */
+export type FlowStep = { name: string; status: "pending" | "running" | "done" | "failed"; tx_hash: string | null; block_number: number | null; detail: string | null; at: string | null };
+export type Flow = { flow_id: string; kind: "buy" | "list"; target_id: string; listing_id: string | null; status: "running" | "done" | "failed"; started_at: string; finished_at: string | null; error: string | null; steps: FlowStep[] };
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) { super(message); }

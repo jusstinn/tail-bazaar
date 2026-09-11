@@ -1,9 +1,10 @@
 // The finding page, told in five stages: the sealed claim, the purchase, the reveal, the evidence,
 // the settlement. Each stage leads with one plain sentence; hashes, canonical JSON, envelopes,
 // provenance and raw metrics stay complete but live behind labelled disclosures.
-import { envelopeFor, getJSON, getToken, HttpError, setToken, type Check, type EnvelopeDoc, type EnvelopesDoc, type Ev, type OperatingContext, type Order, type Pkg, type RunLike, type Status } from "./api.js";
+import { envelopeFor, getJSON, getToken, HttpError, setToken, type Check, type EnvelopeDoc, type EnvelopesDoc, type Ev, type Flow, type Listing, type OperatingContext, type Order, type Pkg, type RunLike, type Status } from "./api.js";
 import { addrCell, esc, eth, num, short, txCell, when } from "./format.js";
 import { armPage, badge, band, counter, disclosure, facts, inTuned, rangeBars, reducedMotion, statusTone } from "./ui.js";
+import { mountLive } from "./live.js";
 import { createReplay, type Replay, type ViewMode } from "./replay.js";
 import { targetView, type TargetView } from "./target-view.js";
 import { autoplayStop, defaultPlayhead, presentFailure, type FailurePresentation } from "../server/failure.js";
@@ -41,8 +42,49 @@ function stageHead(id: string, n: number, title: string, sentence: string): stri
 }
 
 // ------------------------------------------------------------------ page
+/** The purchase flow for this order, if one is running on the server right now (order ids equal
+ *  listing ids, so the flow's listing id is the order id). */
+async function liveFlowFor(orderId: string): Promise<Flow | null> {
+  try {
+    const { flow } = await getJSON<{ flow: Flow | null }>("/api/flows/current");
+    return flow && flow.kind === "buy" && flow.status === "running" && (flow.listing_id ?? "").toLowerCase() === orderId.toLowerCase() ? flow : null;
+  } catch { return null; }
+}
+
+/** Before the fund transaction lands there is no order row yet: show the sealed claim and the live
+ *  panel, and render the full page once the flow finishes. */
+async function renderPurchaseInProgress(view: HTMLElement, orderId: string, live: Flow, st: Status): Promise<void> {
+  const l = await getJSON<Listing>(`/api/listings/${orderId}`);
+  const s = l.public_summary;
+  const targetId = s.target?.id ?? l.target_id ?? "cart";
+  view.innerHTML = `
+    <section class="band hero order-hero">
+      <div class="wrap">
+        <div class="eyebrow reveal"><a href="#/">Marketplace</a> <span>/</span> Finding · <span class="mono">${esc(short(orderId, 10, 6))}</span></div>
+        <h1 class="display reveal">Buying this finding,<br>one transaction at a time.</h1>
+        <p class="lede reveal">A buyer is paying <strong>${esc(eth(l.price_wei))}</strong> into escrow for a sealed ${esc(s.failure_class?.label?.toLowerCase() ?? "failure")} finding on the ${esc(s.target?.label?.toLowerCase() ?? "warehouse cart")} — without seeing the conditions. The steps below land on chain as they happen; the full story of the order takes this page over when they are done.</p>
+        <div class="cta-row reveal">
+          ${badge(s.target?.label ?? "Warehouse cart", "target target-" + esc(targetId))}
+          ${badge(st.chain_mode === "testnet" ? "Base Sepolia" : "Local anvil", st.chain_mode === "testnet" ? "testnet" : "local")}
+          ${badge(s.severity.band + " severity", "chip-" + esc(s.severity.band))}
+        </div>
+      </div>
+    </section>
+    <section class="band quiet"><div class="wrap"><div class="eyebrow reveal">Live</div><div id="live-host"></div></div></section>`;
+  armPage(view);
+  mountLive(document.getElementById("live-host")!, live, st, () => { renderOrder(view, orderId, st).catch(() => {}); });
+}
+
 export async function renderOrder(view: HTMLElement, orderId: string, st: Status): Promise<void> {
-  const [o, envs] = await Promise.all([getJSON<Order>(`/api/orders/${orderId}`), getJSON<EnvelopesDoc>("/api/envelope")]);
+  disposeReplay();
+  const live = await liveFlowFor(orderId);
+  let o: Order, envs: EnvelopesDoc;
+  try {
+    [o, envs] = await Promise.all([getJSON<Order>(`/api/orders/${orderId}`), getJSON<EnvelopesDoc>("/api/envelope")]);
+  } catch (e) {
+    if (live && e instanceof HttpError && e.status === 404) { await renderPurchaseInProgress(view, orderId, live, st); return; }
+    throw e;
+  }
   const l = o.listing!;
   const s = l.public_summary;
   const targetId = s.target?.id ?? l.target_id ?? "cart";
@@ -76,6 +118,8 @@ export async function renderOrder(view: HTMLElement, orderId: string, st: Status
         </div>
       </div>
     </section>
+
+    ${live ? `<section class="band quiet"><div class="wrap"><div class="eyebrow reveal">Live</div><div id="live-host"></div></div></section>` : ""}
 
     <nav class="rail" id="rail"><div class="wrap">${STAGES.map(([id, t], i) => `<button data-goto="stage-${id}"><span>${i + 1}</span>${esc(t)}</button>`).join("")}</div></nav>
 
@@ -163,6 +207,7 @@ export async function renderOrder(view: HTMLElement, orderId: string, st: Status
 
   armPage(view);
   wireRail();
+  if (live) mountLive(document.getElementById("live-host")!, live, st, () => { renderOrder(view, orderId, st).catch(() => {}); });
   await renderRevealStage(document.getElementById("reveal-wrap")!, o, env, valid, tv, targetId);
 }
 
