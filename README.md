@@ -175,7 +175,7 @@ scripts/export-abi.sh                  # contracts/out -> web/abi/FailureEscrow.
 scripts/anvil-start.sh                 # anvil on :8545, funds the three test addresses (local ether)
 scripts/local-deploy.sh                # writes ESCROW_ADDRESS_LOCAL into .env
 scripts/local-flow.sh                  # whole state machine with cast (valid + invalid), before any web code
-(cd web && npm ci && npm run build && npm test)                       # 45 unit tests (canonical JSON, envelope,
+(cd web && npm ci && npm run build && npm test)                       # 46 unit tests (canonical JSON, envelope,
                                        # hosted-mode auth, verifier evidence binding, failure-class presentation;
                                        # the verifier groups re-run the simulator, so uv must be on PATH — no chain
                                        # and no keys needed)
@@ -196,7 +196,7 @@ The UI has a "Run pipeline" button that does what `npm run demo` does, with a li
 - Simulator: nominal suite 6/6 SUCCESS (clearance 0.318–0.394 m, target 0.40 ± 0.15); grid hunt 144
   runs, 101 SUCCESS, 43 COLLISION, 0 inconclusive; bitwise repeatability across in-process and
   subprocess runs in the pinned environment (`evidence/milestone/repeatability-*.json`).
-- Web: 45 unit tests — canonical JSON (byte-identical re-serialization of Python-written run files and
+- Web: 46 unit tests — canonical JSON (byte-identical re-serialization of Python-written run files and
   reproduction of their trajectory hashes), envelope and the published tuned range (which cannot drift
   from `controller.py` or `sim/envelope.yaml` without failing), hosted-mode access control, the
   verifier's evidence binding (a mislabelled controller and altered replay frames behind an intact

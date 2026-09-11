@@ -159,8 +159,14 @@ export async function renderOrder(view: HTMLElement, orderId: string, st: Status
 function wireRail(): void {
   const rail = document.getElementById("rail");
   if (!rail) return;
+  // scroll the stage under the sticky header + rail, not behind them
+  const offset = (document.getElementById("topbar")?.offsetHeight ?? 60) + rail.offsetHeight + 8;
   rail.querySelectorAll<HTMLButtonElement>("button[data-goto]").forEach((b) => {
-    b.addEventListener("click", () => document.getElementById(b.dataset.goto!)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    b.addEventListener("click", () => {
+      const el = document.getElementById(b.dataset.goto!);
+      if (!el) return;
+      window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - offset, behavior: reducedMotion() ? "auto" : "smooth" });
+    });
   });
   if (!("IntersectionObserver" in window)) return;
   const obs = new IntersectionObserver((entries) => {

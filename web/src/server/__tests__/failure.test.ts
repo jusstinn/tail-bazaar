@@ -129,6 +129,33 @@ test("a run with no failure event degrades without inventing one", () => {
   assert.equal(presentFailure({ events: "nonsense" }).markers.length, 0);
 });
 
+test("the pre-purchase summary cannot be narrated: nothing about a scenario escapes this module", () => {
+  // What a visitor sees before paying is the public summary. It carries no events, no metrics and no
+  // outcome, so the presentation layer that drives the replay can say nothing about the scenario.
+  const summary = {
+    schema: "tb-summary-1",
+    controller: { id: "stop-before-obstacle-v1", hash: "sha256:7620971c" },
+    envelope_id: "tb-envelope-1", admissible: true,
+    claim_kind: "controller collides with the obstacle under admissible conditions inside the published envelope",
+    verification: { status: "VERIFIED", verdict: "VALID", method: "exact-trajectory-hash" },
+    severity: { band: "low", proxy: "impact_speed_mps" },
+    hidden: "exact scenario parameters, trajectory, replay frames and reproduction command are in the private package only",
+  };
+  const p = presentFailure(summary);
+  assert.equal(p.class_id, "UNKNOWN");
+  assert.equal(p.moment, null);
+  assert.equal(p.moment_t_s, null);
+  assert.deepEqual(p.quantities, []);
+  assert.deepEqual(p.attributes, []);
+  assert.deepEqual(p.markers, []);
+  assert.equal(p.headline_quantity, null);
+  // and nothing it emits names an envelope parameter or a value of one
+  const emitted = JSON.stringify(p);
+  for (const k of ["sensor_delay_ms", "actuator_delay_ms", "floor_friction", "payload_kg", "load_friction", "salt_hex", "trajectory_hash"]) {
+    assert.ok(!emitted.includes(k), `presentation leaks ${k}`);
+  }
+});
+
 test("units and labels come from the field name, with no unit invented", () => {
   assert.equal(unitFor("impact_speed_mps"), "m/s");
   assert.equal(unitFor("peak_decel_mps2"), "m/s²");
