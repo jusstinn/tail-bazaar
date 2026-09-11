@@ -1,0 +1,24 @@
+{
+  "chain_mode": "local",
+  "chain_id": 31337,
+  "hash": "0x7d6d6136465d9a56746a6977ca18b96eaaec8ee17dff76fc82e0ae772e631510",
+  "block_number": 825,
+  "status": "success",
+  "from": "0x28daa9f3f9468382ffed53cc339418403337cded",
+  "to": "0xfadf11662c46c0214b0a40938a26fb8f0cd785a3",
+  "gas_used": "53577",
+  "effective_gas_price": "1000000007",
+  "value": "0",
+  "input": "0x4c69bf787810de6433ffb4b1901abfb1a87dce9531c44b6fdc2dc165e5827a88fcb9c28e9cd6768ea1dfeb71eb169342225d7bdc3a24da4c815108a0a6d8027abd661315",
+  "logs": [
+    {
+      "address": "0xfadf11662c46c0214b0a40938a26fb8f0cd785a3",
+      "topics": [
+        "0x872024bb4356ecd19dc9cbc3cf9c28c766da9ea9e1276f6e463216e81acd3c92",
+        "0x7810de6433ffb4b1901abfb1a87dce9531c44b6fdc2dc165e5827a88fcb9c28e"
+      ],
+      "data": "0x9cd6768ea1dfeb71eb169342225d7bdc3a24da4c815108a0a6d8027abd661315"
+    }
+  ],
+  "explorer": null
+}

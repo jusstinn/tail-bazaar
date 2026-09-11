@@ -1,0 +1,30 @@
+{
+  "name": "tail-bazaar-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tail Bazaar marketplace server, agents (local demonstration mode) and replay UI",
+  "type": "module",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "build": "npm run build:server && npm run build:client",
+    "build:server": "tsc -p tsconfig.json",
+    "build:client": "esbuild src/client/main.ts --bundle --minify --format=iife --target=es2022 --outfile=dist/client/app.js --log-level=warning && node -e \"require('fs').cpSync('public','dist/client',{recursive:true})\"",
+    "start": "node dist/server/index.js",
+    "demo": "node dist/server/cli.js demo",
+    "test": "node --test \"dist/server/__tests__/*.test.js\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.0",
+    "dotenv": "^16.4.5",
+    "hono": "^4.7.0",
+    "viem": "^2.30.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/three": "^0.180.0",
+    "esbuild": "^0.25.0",
+    "three": "^0.180.0",
+    "typescript": "^5.8.0"
+  }
+}
