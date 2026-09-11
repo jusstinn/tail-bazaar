@@ -1,5 +1,6 @@
 // Router and shell. Three places to be: the marketplace, one finding, and the rules that decide who
 // gets paid. The nav says which one you are on; nothing else in the app moves.
+import { disposeHero } from "./hero.js";
 import { getJSON, type Status } from "./api.js";
 import { esc, short } from "./format.js";
 import { renderMarket, stopPolling } from "./market.js";
@@ -34,6 +35,7 @@ function showError(e: unknown): void {
 
 async function route(): Promise<void> {
   const hash = location.hash || "#/";
+  disposeHero();
   disposeReplay();
   stopPolling();
   window.scrollTo({ top: 0, behavior: "auto" });

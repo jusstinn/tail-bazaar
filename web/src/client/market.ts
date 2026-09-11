@@ -10,6 +10,7 @@
 import { envelopeFor, getJSON, postJSON, type DemoRun, type EnvelopesDoc, type Listing, type MarketDoc, type Order, type Status } from "./api.js";
 import { addrCell, esc, eth, short, txCell } from "./format.js";
 import { armPage, badge, band, counter, disclosure, rangeBars, statusTone } from "./ui.js";
+import { heroMarkup, mountHero } from "./hero.js";
 
 const STEPS: [string, string][] = [
   ["Search", "A hunter agent sweeps one robot's published operating range, simulating the same controller or policy under conditions it was never tuned for, and keeps the mildest conditions that break it."],
@@ -22,8 +23,6 @@ const targetOf = (l: Listing): string => l.public_summary.target?.id ?? l.target
 
 const COUNT_WORD = ["no", "one", "two", "three", "four", "five", "six"];
 const countWord = (n: number): string => COUNT_WORD[n] ?? String(n);
-/** "a, b and c" — the robots on sale are read out, never hard-coded to a number of them. */
-const oxford = (parts: string[]): string => (parts.length <= 1 ? parts[0] ?? "" : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`);
 
 function findingCard(l: Listing, order: Order | undefined): string {
   const s = l.public_summary;
@@ -87,14 +86,20 @@ export async function renderMarket(view: HTMLElement, st: Status): Promise<void>
   const counts = new Map(shown.map((t) => [t.target_id, listings.filter((l) => targetOf(l) === t.target_id).length]));
 
   view.innerHTML = `
-    <section class="band hero">
+    <section class="band hero market-hero">
       <div class="wrap">
-        <div class="eyebrow reveal">Reproducible failure scenarios for robot controllers</div>
-        <h1 class="display reveal">Someone finds the conditions<br>where a robot controller fails.<br>You buy the recipe sealed.</h1>
-        <p class="lede reveal">${esc(countWord(shown.length).replace(/^./, (x) => x.toUpperCase()))} robots are on sale here: ${oxford(shown.map((t) => `a <strong>${esc(t.label.toLowerCase())}</strong>`))}. A hunter agent searches each one's published range of operating conditions for the ones where it fails. A verifier re-runs every claim with that robot's own simulator and seals the evidence with a hash on a public blockchain. The buyer pays into escrow <em>before</em> being allowed to look — and is refunded automatically if the delivered bytes do not match the seal.</p>
-        <div class="cta-row reveal">
-          ${firstOrder ? `<a class="btn" href="#/orders/${esc(firstOrder.order_id)}">See a settled finding</a>` : ""}
-          <a class="btn ghost" href="#/how-it-works">How settlement works</a>
+        <div class="hero-layout">
+          <div class="hero-copy">
+            <div class="eyebrow reveal">A marketplace for reproducible robot failures</div>
+            <h1 class="display reveal">Every robot has<br>a breaking point.</h1>
+            <p class="lede reveal">A hunter finds the conditions that break a robot. A verifier reproduces the failure. You buy the recipe sealed — with your payment held in escrow until the delivered evidence matches the seal.</p>
+            <div class="hero-targets reveal">${shown.map((t) => `<span class="badge target target-${esc(t.target_id)}">${esc(t.short_label)}</span>`).join("")}<span class="hero-target-note">${esc(shown.length)} robots. Real simulation evidence.</span></div>
+            <div class="cta-row reveal">
+              ${firstOrder ? `<a class="btn" href="#/orders/${esc(firstOrder.order_id)}">See a settled finding <span aria-hidden="true">↗</span></a>` : ""}
+              <a class="btn ghost" href="#/how-it-works">How settlement works</a>
+            </div>
+          </div>
+          ${heroMarkup()}
         </div>
         <div class="stat-strip">
           <div class="metric reveal"><div class="metric-v">${counter(listings.length, "", 0)}</div><div class="metric-k">findings listed</div><div class="metric-n">across ${esc(shown.length)} robot${shown.length === 1 ? "" : "s"}</div></div>
@@ -176,6 +181,7 @@ export async function renderMarket(view: HTMLElement, st: Status): Promise<void>
     })}`;
 
   armPage(view);
+  mountHero(view);
   wireEnvelopePanes(view);
   wireFilters(view);
 

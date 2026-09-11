@@ -391,3 +391,71 @@ footer p { max-width: 78ch; margin: 0 0 8px; }
 .searchcost .mono { word-break: normal; overflow-wrap: anywhere; }
 
 .vp-hud .hud-alert { color: var(--alert); font-weight: 600; }
+
+/* Procedural hero illustration, distinct from purchased simulation evidence. */
+.market-hero { overflow: hidden; }
+.market-hero.band.hero { padding-top: clamp(36px, 5vw, 74px); }
+.hero-layout { display: grid; grid-template-columns: 1.12fr 1fr; gap: 24px; align-items: center; }
+.hero-copy { padding: 18px 0; }
+.hero-copy .display { font-size: clamp(38px, 4.4vw, 60px); max-width: 17ch; line-height: 1.04; letter-spacing: -.045em; }
+.hero-copy .eyebrow { font-size: 10.5px; letter-spacing: .12em; }
+.hero-copy .lede { max-width: 43ch; font-size: 17px; line-height: 1.7; margin-top: 26px; }
+.hero-copy .cta-row { gap: 10px; margin-bottom: 0; }
+.hero-copy .btn { padding: 13px 17px; font-size: 13.5px; }
+.hero-targets { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 25px; }
+.hero-target-note { flex-basis: 100%; font-size: 11.5px; color: var(--ink-3); margin-top: 4px; }
+.robot-study { position: relative; margin: 0; min-width: 0; padding: 18px 0 0; }
+.study-heading { display: flex; justify-content: space-between; gap: 8px; font: 9px/1.4 var(--mono); letter-spacing: .06em; color: var(--ink-3); border-top: 1px solid var(--line-2); padding-top: 15px; }
+.study-live { display: inline-flex; align-items: center; gap: 6px; }
+.study-live i { width: 4px; height: 4px; border-radius: 50%; background: #a46e46; }
+.study-stage { position: relative; height: 440px; background: radial-gradient(ellipse at 50% 60%, #efede650, transparent 68%); }
+.study-render, .study-fallback { position: absolute; inset: 0; width: 100%; height: 100%; }
+.study-render canvas { display: block; width: 100%; height: 100%; }
+.study-ready .study-fallback { display: none; }
+.study-annotation { position: absolute; pointer-events: none; font: 9px/1.4 var(--mono); color: #918b80; }
+.study-annotation::before { content: ""; display: block; width: 40px; height: 1px; background: #ccc6bc; margin-bottom: 7px; }
+.study-annotation-top { top: 60px; left: 0; }
+.study-annotation-bottom { bottom: 68px; right: 0; text-align: right; }
+.study-annotation-bottom::before { margin-left: auto; }
+.study-controls { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line-2); padding: 0 0 13px; }
+.study-modes { display: flex; gap: 2px; }
+.study-controls button { cursor: pointer; border: 0; background: transparent; font: 11px/1 var(--sans); color: var(--ink-3); padding: 8px 11px; border-radius: 5px; }
+.study-controls button:hover { background: #eeece7; color: var(--ink); }
+.study-controls button[aria-pressed="true"] { background: #e9e6df; color: var(--ink); }
+.study-controls button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.study-controls button:disabled { opacity: .45; cursor: default; }
+.study-pause span { margin-left: 8px; }
+.robot-study figcaption { margin-top: 11px; font: 9px/1.6 var(--mono); color: var(--ink-3); }
+.market-hero .stat-strip { margin-top: 38px; }
+@media (max-width: 1050px) and (min-width: 761px) {
+  .hero-layout { gap: 28px; grid-template-columns: 1.1fr 1fr; }
+  .hero-copy .display { font-size: 44px; }
+  .hero-copy .lede { font-size: 15.5px; }
+  .study-stage { height: 415px; }
+  .study-annotation { display: none; }
+  .study-heading { font-size: 8px; }
+}
+@media (max-width: 760px) {
+  .hero-layout { grid-template-columns: 1fr; gap: 24px; }
+  .hero-copy { padding-top: 4px; }
+  .hero-copy .display { font-size: clamp(39px, 8.4vw, 58px); }
+  .hero-copy .lede { max-width: 48ch; font-size: 16px; }
+  .robot-study { width: 100%; max-width: 480px; margin: 0 auto; }
+  .study-stage { height: 390px; }
+  .market-hero .stat-strip { margin-top: 34px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .market-hero .reveal { opacity: 1; transform: none; }
+}
+@media (max-width: 760px) {
+  .hero-layout { gap: 18px; }
+  .hero-copy { display: contents; }
+  .hero-copy .eyebrow { grid-row: 1; margin-bottom: 0; }
+  .hero-copy .display { grid-row: 2; }
+  .hero-copy .lede { grid-row: 4; margin-top: 8px; margin-bottom: 0; }
+  .hero-targets { grid-row: 5; margin-top: 0; }
+  .hero-copy .cta-row { grid-row: 6; margin-top: 6px; }
+  .robot-study { grid-row: 3; }
+  .study-stage { height: 330px; }
+  .study-annotation { display: none; }
+}
