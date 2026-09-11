@@ -16,7 +16,7 @@ export const COL = {
   wheel: 0x8a8680,     // mid grey
   spoke: 0xd2cec7,     // pale graphite, so a turning wheel reads as turning
   body: 0xc4b49e,      // humanoid: neutral warm stone
-  link: 0x6a655d,      // arm: graphite links (a box per MJCF geom, the mesh's own bounding box)
+  link: 0x6a655d,      // arm: graphite links (the robot's own link meshes; a bounding box only until each has loaded)
   pad: 0x33302b,       // arm: the two gripper finger pads, darker so the hand reads against the links
   table: 0xd6bf96,     // arm: the sand work surface the part starts on
   part: 0xb4643c,      // arm: the carried part, in the same warm accent as the cart's obstacle

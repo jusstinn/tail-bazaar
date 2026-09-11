@@ -12,15 +12,20 @@
 //   * `role` — the Fetch model ships MuJoCo's mocap gizmo, three 2 m bars marking the weld target the
 //     environment drags the gripper with. They collide with nothing, the run labels them
 //     `visual_marker`, and drawing them would put a giant coordinate cross through every frame.
-//   * `box_half_extent_m` + `proxy` — the arm's links are meshes, which a from-data viewer cannot
-//     tessellate. Each mesh geom publishes MuJoCo's own bounding half-extents and says plainly that a
-//     box is a proxy for the shape. The things the failure is actually about — the part, the finger
-//     pads, the table, the floor — are real boxes and planes and are exact.
+//   * `box_half_extent_m` + `proxy` — the arm's links are meshes, which the run document cannot carry.
+//     Each mesh geom publishes MuJoCo's own bounding half-extents and says plainly that a box is a
+//     proxy for the shape. The box is drawn first and swapped for the robot's OWN link mesh — the
+//     Fetch STL the environment's MJCF names, served beside the page from /meshes/fetch/ (see
+//     fetch-meshes.ts, including why the mesh sits at the MJCF geom frame and not at the published
+//     `pos_m`) — the moment it loads; a link whose mesh never arrives keeps its honest box. The
+//     things the failure is actually about — the part, the finger pads, the table, the floor — are
+//     real boxes and planes and are exact, and are never swapped.
 //   * the goal. It is a SITE, not a body, so it is not in `frames`; the run publishes its fixed world
 //     position and the package carries it. It is drawn as an open outline, never a solid: a filled
 //     box at the goal would read as an object the arm has to avoid.
 import * as THREE from "three";
 import type { Frames, RunLike } from "./api.js";
+import { FETCH_MESH_BY_GEOM, fetchMeshObject, loadFetchMesh, type FetchMesh } from "./fetch-meshes.js";
 import { COL, hex } from "./palette.js";
 import type { Anchor, SceneRenderer } from "./replay.js";
 
@@ -44,8 +49,8 @@ function material(colour: number, ghost: boolean): THREE.MeshLambertMaterial {
 }
 
 /** One MJCF primitive as a mesh posed in its body's local frame. A mesh geom is drawn at MuJoCo's own
- *  bounding half-extents, which the run document itself labels a proxy. */
-function primitiveMesh(p: Primitive, mat: THREE.Material): THREE.Object3D | null {
+ *  bounding half-extents, which the run document itself labels a proxy — see swapForMesh. */
+function primitiveMesh(p: Primitive, mat: THREE.Material): THREE.Mesh | null {
   const half = Array.isArray(p.half_extent_m) ? p.half_extent_m : Array.isArray(p.box_half_extent_m) ? p.box_half_extent_m : null;
   let geo: THREE.BufferGeometry | null = null;
   if (half && half.length >= 3) geo = new THREE.BoxGeometry(2 * Number(half[0]), 2 * Number(half[1]), 2 * Number(half[2]));
@@ -57,6 +62,24 @@ function primitiveMesh(p: Primitive, mat: THREE.Material): THREE.Object3D | null
   const q = p.quat_wxyz ?? [1, 0, 0, 0];
   mesh.quaternion.set(Number(q[1] ?? 0), Number(q[2] ?? 0), Number(q[3] ?? 0), Number(q[0] ?? 1)); // recorded w,x,y,z
   return mesh;
+}
+
+/** Replace a link's proxy box with the robot's own mesh once that has loaded. The mesh hangs off the
+ *  SAME body group the box did, so the recorded body transform poses it exactly as it posed the box
+ *  and nothing in the engine changes. It sits at the MJCF geom frame, not at the box's `pos_m`: the
+ *  published frame is MuJoCo's re-centred one, which is right for the bounding box and wrong for the
+ *  raw STL (fetch-meshes.ts spells this out). A load that fails leaves the box, which is the honest
+ *  fallback the run document describes, and says so once in the console. */
+function swapForMesh(body: THREE.Object3D, box: THREE.Mesh, fm: FetchMesh, mat: THREE.Material): void {
+  loadFetchMesh(fm.file).then(
+    (geo) => {
+      if (box.parent !== body) return; // the replay was torn down before the mesh arrived
+      body.add(fetchMeshObject(fm, geo, mat));
+      body.remove(box);
+      box.geometry.dispose();
+    },
+    (err: unknown) => console.warn(`arm replay: ${fm.file} did not load; that link keeps its bounding box`, err),
+  );
 }
 
 function bodyPosAt(frames: Frames, name: string, t: number): [number, number, number] {
@@ -119,7 +142,7 @@ export const ARM_RENDERER: SceneRenderer = {
   aspect: { overlay: 0.46, split: 0.40 },
   swatches: [
     { color: hex(COL.part), label: "the part being carried" },
-    { color: hex(COL.link), label: "the arm, drawn at each link's own bounding box (the links are meshes; the part, the pads and the table are exact)" },
+    { color: hex(COL.link), label: "the arm, drawn from the robot's own link meshes (the Fetch STLs its MJCF names, posed under each recorded body; a link shows its bounding box only until its mesh has loaded; the part, the pads and the table are exact)" },
     { color: hex(COL.pad), label: "the two gripper pads whose contact the drop predicate reads" },
     { color: hex(COL.ghost), label: "baseline ghost — the same policy at the published conditions, which places the part, drawn one bench over", translucent: true },
     { color: hex(COL.line), label: "the goal, at the environment's own success threshold", thin: true },
@@ -175,7 +198,14 @@ export const ARM_RENDERER: SceneRenderer = {
       let mat = mats.get(colour);
       if (!mat) { mat = material(colour, ghost); mats.set(colour, mat); }
       const mesh = primitiveMesh(p, mat);
-      if (mesh) groupFor(p.body).add(mesh);
+      if (!mesh) continue;
+      const group = groupFor(p.body);
+      group.add(mesh);
+      // A mesh geom's box stands in only until the link's own STL arrives. Matched on the geom name
+      // the run publishes; a geom this table does not know (or an exact box like the part) keeps
+      // whatever primitiveMesh drew.
+      const fm = Array.isArray(p.box_half_extent_m) && p.geom ? FETCH_MESH_BY_GEOM[p.geom] : undefined;
+      if (fm) swapForMesh(group, mesh, fm, mat);
     }
     return bodies;
   },
