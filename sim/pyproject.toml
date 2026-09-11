@@ -1,0 +1,11 @@
+[project]
+name = "tailbazaar-sim"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "matplotlib>=3.11.1",
+    "mujoco>=3.13.0",
+    "numpy>=2.5.3",
+    "pillow>=12.3.0",
+    "pycryptodome>=3.23.0",
+]

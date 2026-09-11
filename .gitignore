@@ -1,0 +1,38 @@
+# secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# node
+node_modules/
+web/dist/
+web/.cache/
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# databases and generated private data
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+web/data/
+evidence/private/
+evidence/runs/
+sim/out/
+
+# foundry
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+# (broadcast/ can contain the deployer address and raw txs; deployment receipts are copied
+#  by hand into evidence/testnet/ after review)
+
+# os / editors
+.DS_Store
+*.swp
