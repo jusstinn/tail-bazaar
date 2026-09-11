@@ -1,0 +1,270 @@
+{
+  "order": {
+    "order_id": "0xc2b9b52419958c1b881fe11812c67ab351695b42f1222d4f025e31465accfe33",
+    "listing_id": "0xc2b9b52419958c1b881fe11812c67ab351695b42f1222d4f025e31465accfe33",
+    "buyer": "0x1B27C90FcD738E960D3D505682EC2732A08c7f99",
+    "price_wei": "1000000000000000",
+    "status": "SETTLED_VALID",
+    "fund_tx": "0x78079678a6ae452cb88aa1564f4ec86540a926cdce65ba1b2ba77d6f50e4f0fe",
+    "deliver_tx": "0xf801a5e655babda99c12ebcbdecd3a7891ccdc9662d86d5e109a95aed8e39816",
+    "recheck_tx": null,
+    "settle_tx": "0x97a4bcea976d1898c2fe000a1bb7de3f3abb258b7cd1712253cb2bb072372ed1",
+    "withdraw_tx": "0x369858912996d520d940cd2c6b477e8bbb3cd76066b23471876c4dc28d4c3610",
+    "timeout_tx": null,
+    "delivery_hash": "0x4b67f92ac087422ff42d930fb166386f65b1179f29e9ab8b1e6b58ef6b05c3b3",
+    "retrieved_at": "2026-09-11T18:38:23.096Z",
+    "delivery_check": {
+      "valid": true,
+      "verdict": "VALID",
+      "reason": "delivered package hashes to the on-chain commitment, matches the advertised terms, and its replay frames are a physically possible trajectory that hashes to the run the verifier itself re-ran",
+      "on_chain_commitment": "0x4b67f92ac087422ff42d930fb166386f65b1179f29e9ab8b1e6b58ef6b05c3b3",
+      "delivered_hash": "0x4b67f92ac087422ff42d930fb166386f65b1179f29e9ab8b1e6b58ef6b05c3b3",
+      "asserted_delivery_hash": "0x4b67f92ac087422ff42d930fb166386f65b1179f29e9ab8b1e6b58ef6b05c3b3",
+      "checks": [
+        {
+          "name": "on-chain-status-delivered",
+          "ok": true,
+          "detail": "status 3"
+        },
+        {
+          "name": "delivered-bytes-present",
+          "ok": true,
+          "detail": "230875 bytes"
+        },
+        {
+          "name": "delivered-hash-equals-commitment",
+          "ok": true,
+          "detail": "keccak256(delivered) 0x4b67f92ac087... vs on-chain commitment 0x4b67f92ac087..."
+        },
+        {
+          "name": "seller-asserted-hash-honest",
+          "ok": true,
+          "detail": "seller asserted 0x4b67f92ac087..."
+        },
+        {
+          "name": "package-target-matches-summary",
+          "ok": true,
+          "detail": "g1 vs g1"
+        },
+        {
+          "name": "package-subject-matches-summary",
+          "ok": true
+        },
+        {
+          "name": "package-envelope-matches-summary",
+          "ok": true
+        },
+        {
+          "name": "package-claim-matches-summary",
+          "ok": true,
+          "detail": "FELL / low"
+        },
+        {
+          "name": "package-scenario-admissible",
+          "ok": true
+        },
+        {
+          "name": "listing-was-certified-by-exact-trajectory-binding",
+          "ok": true,
+          "detail": "certification method exact-trajectory-hash, verifier re-run trajectory on record"
+        },
+        {
+          "name": "package-replay-matches-verified-run",
+          "ok": true,
+          "detail": "0x28d6df334bca... vs verifier re-run 0x28d6df334bca..."
+        },
+        {
+          "name": "delivered-frames-hash-to-verified-trajectory",
+          "ok": true,
+          "detail": "keccak256(canonical(delivered frames)) 0x28d6df334bca... vs 0x28d6df334bca..."
+        },
+        {
+          "name": "delivered-subject-is-the-one-re-run",
+          "ok": true,
+          "detail": "sha256:cf668f75b90d1... vs re-run sha256:cf668f75b90d1..."
+        },
+        {
+          "name": "delivered-frames-physically-plausible",
+          "ok": true,
+          "detail": "no recorded body exceeds the 76.058 m/s this scene can produce (J_max/(m*s_min) + sqrt(2*(1+mu_max)*g*d_max) + sqrt(2*g*h_stand) with J_max=60 N*s (largest impulse the published envelope admits), m=32.1069 kg and s_min=0.8 (lightest admissible body), mu_max=1.4 (largest surface friction the envelope admits), g=9.81 m/s^2, d_max=100 m (the simulator's divergence bound) and h_stand=1.327 m (the publisher's initial pelvis height plus the head's reach above the pelvis, both from the run's own scene))"
+        }
+      ],
+      "checked_at": "2026-09-11T18:38:23.171Z"
+    },
+    "buyer_check": {
+      "ok": true,
+      "reason": "package matches commitment and advertised terms",
+      "delivered_hash": "0x4b67f92ac087422ff42d930fb166386f65b1179f29e9ab8b1e6b58ef6b05c3b3",
+      "on_chain_commitment": "0x4b67f92ac087422ff42d930fb166386f65b1179f29e9ab8b1e6b58ef6b05c3b3",
+      "checks": [
+        {
+          "name": "hash-equals-on-chain-commitment",
+          "ok": true,
+          "detail": "0x4b67f92ac087... vs 0x4b67f92ac087..."
+        },
+        {
+          "name": "target-subject-and-envelope-match-summary",
+          "ok": true
+        },
+        {
+          "name": "claim-matches-summary",
+          "ok": true
+        },
+        {
+          "name": "scenario-admissible-and-replayable",
+          "ok": true
+        }
+      ]
+    },
+    "created_at": "2026-09-11T18:38:19.039Z"
+  },
+  "listing": {
+    "listing_id": "0xc2b9b52419958c1b881fe11812c67ab351695b42f1222d4f025e31465accfe33",
+    "chain_mode": "local",
+    "chain_id": 31337,
+    "escrow_address": "0xC2D82022B3F2E06AB0E25B899B553dF729f3241e",
+    "target_id": "g1",
+    "seller": "0x28dAA9F3F9468382fFeD53cc339418403337cDeD",
+    "price_wei": "1000000000000000",
+    "commitment": "0x4b67f92ac087422ff42d930fb166386f65b1179f29e9ab8b1e6b58ef6b05c3b3",
+    "terms_hash": "0x1452b69bdecc4b6b37033fa72c34935719e24e9c671217f14276454f3433ab40",
+    "public_summary": {
+      "admissible": true,
+      "chain": {
+        "chain_id": 31337,
+        "escrow": "0xC2D82022B3F2E06AB0E25B899B553dF729f3241e",
+        "mode": "local"
+      },
+      "claim_kind": "the walking policy falls over under admissible conditions inside the published envelope",
+      "controller": {
+        "hash": "sha256:cf668f75b90d1abf73d2b87612a6e76bccc61ff7e083b63582d3f6aaa3c1759d",
+        "id": "unitree-rl-gym-g1-motion-pt"
+      },
+      "envelope_id": "tb-g1-envelope-1",
+      "failure_class": {
+        "detected_by": "THIS PROJECT'S predicate, stated because Unitree's runner has no fall flag of its own: FELL when the pelvis drops below 0.462 m (0.6 x the measured nominal standing height of 0.77 m) or tilts more than 60 degrees from vertical, whichever first, checked every 20 ms control tick; the run document records which condition fired and when.",
+        "id": "FELL",
+        "label": "Fell"
+      },
+      "format": "tb-cjson-1",
+      "hidden": "exact scenario parameters, trajectory, replay frames, the hunt that found it and the reproduction command are in the private package only",
+      "operating_context": {
+        "controller_tuned_range": "Unitree's own MuJoCo deployment configuration: no external push, MuJoCo's default floor friction 1.0, stock body masses, no actuator noise, no control latency, a forward velocity command of 0.5 m/s",
+        "controller_tuned_range_label": "the publisher's own deployment configuration",
+        "note": "The searched envelope is deliberately wider than the one configuration the policy is published with, so a finding outside it is not a defect report: Unitree's runner claims nothing about pushes, latency, noise, friction, mass or other commands. Unlike the Gymnasium humanoid, this environment has no health flag, so the fall predicate is this project's own and is stated in every run document. These bounds are illustrative assumptions for a demonstration; the 'robot' is Unitree's 32 kg 12-dof MuJoCo model of the G1, not a physical machine.",
+        "question": "Unitree ships this walking policy with one MuJoCo deployment configuration and no envelope. How far can the operating range be widened — a shove, a slippery floor, a heavier body, noisy or delayed actuation, a faster or slower command — before the G1 falls over?",
+        "reference": "GET /api/envelope (published axes for every target, same shape as GUARD configs/guard_theta.yaml)",
+        "searched_envelope": "push impulse 0-60 N·s from any heading, push time 1-8 s, floor friction 0.4-1.4, body mass ×0.8-1.25, actuator noise 0-30 %, control latency 0-100 ms, forward command 0-1 m/s"
+      },
+      "price_wei": "1000000000000000",
+      "schema": "tb-summary-2",
+      "seller": "0x28dAA9F3F9468382fFeD53cc339418403337cDeD",
+      "seller_settled_orders_at_listing": 9,
+      "severity": {
+        "band": "low",
+        "definition": "pelvis impact speed banded against the 3.01 m/s a free fall from the 0.462 m fall-height threshold reaches: low below half of it, medium up to it, high above it (a measured kinematic proxy, never a damage, injury or cost estimate)",
+        "proxy": "pelvis_impact_speed_mps"
+      },
+      "target": {
+        "id": "g1",
+        "label": "Unitree G1 walking policy",
+        "machine": "a 32 kg Unitree G1 humanoid walking under Unitree's own pretrained policy",
+        "replay_renderer": "g1-3d",
+        "subject_label": "Policy"
+      },
+      "verification": {
+        "environment_fingerprint": "0x8383c9f5ca1688e7b435a6dbf3839eb9cc4f6131e1cf8832547b00956a8f67a2",
+        "evidence_binding": "the seller's environment fingerprint equalled the verifier's own, and the policy checkpoint id+hash and the trajectory hash RECOMPUTED from the delivered replay frames were compared against the verifier's own re-run with this target's own simulator; declared hashes are not trusted, the frames were checked to be a physically possible trajectory of this scene, and a replay the verifier cannot bind exactly is INCONCLUSIVE rather than certified",
+        "method": "exact-trajectory-hash",
+        "status": "VERIFIED",
+        "verdict": "VALID",
+        "verified_at": "2026-09-11T18:37:54.664Z",
+        "verifier": "0xe592C7DA96Cc42344952C452377eBCc7Cc0982AE",
+        "verifier_version": "tb-verifier-2"
+      }
+    },
+    "status": "SETTLED_VALID",
+    "register_tx": "0x1f5e46b06247ac70fffd246f2e0741697c9803ceb75bb2d10047b74a48066489",
+    "created_at": "2026-09-11T18:37:58.696Z",
+    "demo_note": null
+  },
+  "events": [
+    {
+      "id": 60,
+      "listing_id": "0xc2b9b52419958c1b881fe11812c67ab351695b42f1222d4f025e31465accfe33",
+      "ts": "2026-09-11T18:37:58.700Z",
+      "actor": "verifier",
+      "kind": "verified",
+      "detail": "{\"target\":\"g1\",\"status\":\"VERIFIED\",\"method\":\"exact-trajectory-hash\",\"reason\":\"identical trajectory hash in a matching pinned environment; the policy checkpoint and the delivered replay frames are bound to the verifier's own re-run, and the frames are a physically possible trajectory of this scene\",\"checks\":25}",
+      "tx_hash": null,
+      "block_number": null,
+      "chain_mode": "local"
+    },
+    {
+      "id": 61,
+      "listing_id": "0xc2b9b52419958c1b881fe11812c67ab351695b42f1222d4f025e31465accfe33",
+      "ts": "2026-09-11T18:37:58.700Z",
+      "actor": "verifier",
+      "kind": "registered",
+      "detail": "{\"seller\":\"0x28dAA9F3F9468382fFeD53cc339418403337cDeD\",\"price_wei\":\"1000000000000000\",\"commitment\":\"0x4b67f92ac087422ff42d930fb166386f65b1179f29e9ab8b1e6b58ef6b05c3b3\",\"terms_hash\":\"0x1452b69bdecc4b6b37033fa72c34935719e24e9c671217f14276454f3433ab40\",\"block\":46241}",
+      "tx_hash": "0x1f5e46b06247ac70fffd246f2e0741697c9803ceb75bb2d10047b74a48066489",
+      "block_number": 46241,
+      "chain_mode": "local"
+    },
+    {
+      "id": 67,
+      "listing_id": "0xc2b9b52419958c1b881fe11812c67ab351695b42f1222d4f025e31465accfe33",
+      "ts": "2026-09-11T18:38:19.039Z",
+      "actor": "buyer",
+      "kind": "funded",
+      "detail": "{\"buyer\":\"0x1B27C90FcD738E960D3D505682EC2732A08c7f99\",\"price_wei\":\"1000000000000000\",\"block\":46262}",
+      "tx_hash": "0x78079678a6ae452cb88aa1564f4ec86540a926cdce65ba1b2ba77d6f50e4f0fe",
+      "block_number": 46262,
+      "chain_mode": "local"
+    },
+    {
+      "id": 68,
+      "listing_id": "0xc2b9b52419958c1b881fe11812c67ab351695b42f1222d4f025e31465accfe33",
+      "ts": "2026-09-11T18:38:23.081Z",
+      "actor": "seller",
+      "kind": "delivered",
+      "detail": "{\"asserted_delivery_hash\":\"0x4b67f92ac087422ff42d930fb166386f65b1179f29e9ab8b1e6b58ef6b05c3b3\",\"bytes\":230875,\"tampered_demo\":false,\"block\":46266}",
+      "tx_hash": "0xf801a5e655babda99c12ebcbdecd3a7891ccdc9662d86d5e109a95aed8e39816",
+      "block_number": 46266,
+      "chain_mode": "local"
+    },
+    {
+      "id": 69,
+      "listing_id": "0xc2b9b52419958c1b881fe11812c67ab351695b42f1222d4f025e31465accfe33",
+      "ts": "2026-09-11T18:38:23.137Z",
+      "actor": "buyer",
+      "kind": "retrieved",
+      "detail": "{\"bytes\":230875,\"signer\":\"0x1B27C90FcD738E960D3D505682EC2732A08c7f99\",\"local_check_ok\":true,\"reason\":\"package matches commitment and advertised terms\"}",
+      "tx_hash": null,
+      "block_number": null,
+      "chain_mode": "local"
+    },
+    {
+      "id": 70,
+      "listing_id": "0xc2b9b52419958c1b881fe11812c67ab351695b42f1222d4f025e31465accfe33",
+      "ts": "2026-09-11T18:38:27.211Z",
+      "actor": "verifier",
+      "kind": "settled_valid",
+      "detail": "{\"reason\":\"delivered package hashes to the on-chain commitment, matches the advertised terms, and its replay frames are a physically possible trajectory that hashes to the run the verifier itself re-ran\",\"credited_to\":\"0x28dAA9F3F9468382fFeD53cc339418403337cDeD\",\"block\":46270}",
+      "tx_hash": "0x97a4bcea976d1898c2fe000a1bb7de3f3abb258b7cd1712253cb2bb072372ed1",
+      "block_number": 46270,
+      "chain_mode": "local"
+    },
+    {
+      "id": 71,
+      "listing_id": "0xc2b9b52419958c1b881fe11812c67ab351695b42f1222d4f025e31465accfe33",
+      "ts": "2026-09-11T18:38:31.248Z",
+      "actor": "seller",
+      "kind": "withdrawn",
+      "detail": "{\"amount_wei\":\"1000000000000000\",\"block\":46274}",
+      "tx_hash": "0x369858912996d520d940cd2c6b477e8bbb3cd76066b23471876c4dc28d4c3610",
+      "block_number": 46274,
+      "chain_mode": "local"
+    }
+  ]
+}

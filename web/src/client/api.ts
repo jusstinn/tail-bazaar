@@ -71,6 +71,10 @@ export type RunLike = {
   controller: { id: string; hash: string }; environment: Record<string, any>; outcome?: string;
   /** Fixed scene geometry that is not a posed body: the arm target's goal site. Absent elsewhere. */
   goal_m?: number[] | null; initial_state_check?: any;
+  /** The target the run belongs to, so class copy that differs per target (the G1's FELL) resolves. */
+  target_id?: string;
+  /** The G1's own fall predicate (thresholds), published by its simulator. Absent elsewhere. */
+  fall_predicate?: any;
 };
 export type Claim = { outcome: string; failure_class: string; severity_proxy: string; severity_value: number | null; severity_units: string; moment_t_s: number | null; severity_band: string };
 /** The AGGREGATE cost of the hunt that found this finding. Post-purchase only: it travels inside the

@@ -107,14 +107,17 @@ function bodyPosAt(frames: Frames, name: string, t: number): [number, number, nu
 }
 
 const n2 = (x: unknown): string => (typeof x === "number" && Number.isFinite(x) ? x.toFixed(2) : "—");
-const fallZ = (run: RunLike): number => {
-  const z = Number((run as unknown as { fall_predicate?: { fall_z_m?: unknown } }).fall_predicate?.fall_z_m);
-  return Number.isFinite(z) && z > 0 ? z : 0.462;
+/** The predicate's thresholds, read from the run: the `fall_predicate_fired` event carries them (and
+ *  travels in the private package), the full run document also publishes them in `fall_predicate`. */
+const threshold = (run: RunLike, key: "fall_z_m" | "fall_tilt_deg", fallback: number): number => {
+  const ev = (run.events ?? []).find((e: any) => e?.type === "fall_predicate_fired") as Record<string, unknown> | undefined;
+  const fromEvent = Number(ev?.[key]);
+  if (Number.isFinite(fromEvent) && fromEvent > 0) return fromEvent;
+  const fromDoc = Number((run.fall_predicate as Record<string, unknown> | undefined)?.[key]);
+  return Number.isFinite(fromDoc) && fromDoc > 0 ? fromDoc : fallback;
 };
-const fallTilt = (run: RunLike): number => {
-  const d = Number((run as unknown as { fall_predicate?: { fall_tilt_deg?: unknown } }).fall_predicate?.fall_tilt_deg);
-  return Number.isFinite(d) && d > 0 ? d : 60;
-};
+const fallZ = (run: RunLike): number => threshold(run, "fall_z_m", 0.462);
+const fallTilt = (run: RunLike): number => threshold(run, "fall_tilt_deg", 60);
 
 export const G1_RENDERER: SceneRenderer = {
   id: "g1-3d",
@@ -207,10 +210,12 @@ export const G1_RENDERER: SceneRenderer = {
     return { x: p[0], y: p[1], z: p[2] };
   },
 
-  /** Whole robot in frame plus the ghost lane: the G1 stands 1.3 m tall, so the camera sits lower and
-   *  closer than the humanoid's and looks at the hips rather than the chest. */
+  /** Whole robot in frame plus the ghost lane. The G1 stands 1.3 m tall, so the camera looks at the
+   *  hips rather than the chest; it sits further back than the humanoid's because a side shove can
+   *  carry the purchased robot metres across the lane the ghost keeps walking in, and the framing
+   *  follows the purchased subject (replay.ts), so the ghost must not loom when it ends up nearer. */
   camera(a) {
-    return { pos: [a.x - 1.15, a.y - 2.55, 1.2], look: [a.x + 0.15, a.y + 0.15, 0.62] };
+    return { pos: [a.x - 1.7, a.y - 3.6, 1.7], look: [a.x + 0.15, a.y + 0.1, 0.55] };
   },
 
   /** The fall is marked on the pelvis, the body the predicate reads. */

@@ -268,7 +268,7 @@ function outsideAxes(pkg: Pkg, env: EnvelopeDoc): string[] {
 }
 
 function renderReveal(host: HTMLElement, pkg: Pkg, baseline: RunLike, o: Order, env: EnvelopeDoc, view: TargetView): void {
-  const failureRun: RunLike = { scenario: pkg.scenario, scene: pkg.scene, metrics: pkg.metrics, events: pkg.events, ticks: pkg.ticks, frames: pkg.replay.frames, trajectory_hash: pkg.replay.trajectory_hash, controller: pkg.controller, environment: pkg.environment, outcome: pkg.claim?.outcome, goal_m: pkg.goal_m ?? null, initial_state_check: pkg.initial_state_check };
+  const failureRun: RunLike = { scenario: pkg.scenario, scene: pkg.scene, metrics: pkg.metrics, events: pkg.events, ticks: pkg.ticks, frames: pkg.replay.frames, trajectory_hash: pkg.replay.trajectory_hash, controller: pkg.controller, environment: pkg.environment, outcome: pkg.claim?.outcome, goal_m: pkg.goal_m ?? null, initial_state_check: pkg.initial_state_check, target_id: pkg.target_id };
   const p: FailurePresentation = presentFailure(failureRun, baseline);
   const hashMatch = o.delivery_check ? o.delivery_check.valid : null;
 
