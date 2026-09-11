@@ -141,7 +141,8 @@ export function replayLimitsFrom(run: { scene?: Record<string, unknown>; frames?
     speed_ceiling_mps: ceiling,
     position_bound_m: SIM_POSITION_BOUND_M,
     max_span_s: tMax + post + dtS,
-    derivation: `sqrt(2*(1+mu_max)*g*d_max) + sqrt(2*g*h_obstacle) with mu_max=${muMax} (published floor_friction axis), g=${GRAVITY_MPS2} m/s^2, d_max=${SIM_POSITION_BOUND_M} m (the simulator's DIVERGED bound) and h_obstacle=${hMax} m (the scene's tallest structure)`,
+    // Prose only, no envelope parameter identifiers: this string reaches the public delivery record.
+    derivation: `sqrt(2*(1+mu_max)*g*d_max) + sqrt(2*g*h_obstacle) with mu_max=${muMax} (largest surface friction the published envelope admits), g=${GRAVITY_MPS2} m/s^2, d_max=${SIM_POSITION_BOUND_M} m (the simulator's divergence bound) and h_obstacle=${hMax} m (the scene's tallest structure)`,
   };
 }
 
@@ -404,10 +405,12 @@ export async function verifierCheckDeliveryAndSettle(order: OrderRow, log: (m: s
     const ranController = verification.verifier_run?.controller ?? null;
     const c7 = check(checks, "delivered-controller-is-the-one-re-run", ranController !== null && pkg.controller?.id === ranController.id && pkg.controller?.hash === ranController.hash, ranController === null ? "the record does not name the controller the verifier re-ran" : `${String(pkg.controller?.hash).slice(0, 20)}... vs re-run ${ranController.hash.slice(0, 20)}...`);
     // The same physical-plausibility reading of the bytes actually served, so an absurd replay is
-    // refused on its own terms here too and not only by hash.
+    // refused on its own terms here too and not only by hash. The delivery record is PUBLIC, so a
+    // passing check states only the scene's own ceiling; a failing one may quote the delivered
+    // numbers, which are by construction not a trajectory of anything.
     const limits = verification.verifier_run?.replay_limits ?? replayLimitsFrom({});
     const plausible = checkReplayPlausibility(pkg.replay?.frames, limits);
-    const c8 = check(checks, "delivered-frames-physically-plausible", plausible.ok, plausible.detail);
+    const c8 = check(checks, "delivered-frames-physically-plausible", plausible.ok, plausible.ok ? `no recorded body exceeds the ${limits.speed_ceiling_mps.toFixed(3)} m/s this scene can produce (${limits.derivation})` : plausible.detail);
     contentOk = c0 && c1 && c2 && c3 && c4 && c5 && c6 && c7 && c8;
   } else {
     check(checks, "package-content", false, hashOk ? "not canonical JSON" : "skipped: commitment mismatch");

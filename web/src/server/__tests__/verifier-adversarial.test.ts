@@ -203,6 +203,10 @@ test("the plausibility ceiling is derived from the scene, not chosen", async () 
   assert.equal(limits.position_bound_m, 100);
   assert.equal(limits.dt_s, fixture.doc.frames.dt_s);
   assert.match(limits.derivation, /mu_max/);
+  // The derivation is quoted in the delivery record, which is served by the public orders endpoint,
+  // so it must name no envelope parameter (the same discipline operatingContext() follows).
+  for (const marker of ["sensor_delay_ms", "actuator_delay_ms", "floor_friction", "payload_kg", "salt_hex", "trajectory_hash"])
+    assert.ok(!limits.derivation.includes(marker), `the published derivation must not contain ${marker}`);
 
   // The honest recording sits far below the ceiling; the reviewer's frame sits far above it. Nothing
   // physical lies in between, which is why this is an impossibility line and not a tolerance.
