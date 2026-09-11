@@ -3,6 +3,8 @@ export type Status = {
   escrow_address: string | null; latest_block: number | null; roles: { verifier: string; seller: string; buyer: string };
   app_domain: string; buyer_budget_wei: string; demo_trigger_enabled: boolean; buyer_console_enabled: boolean; public_base_url: string;
   hosted_mode: boolean; private_routes_require_auth: boolean; operator_token_configured: boolean;
+  /** Orders this host publishes deliberately as demonstration fixtures (readable with no token). */
+  public_demo_orders?: string[]; public_demo_fixture_note?: string;
   provenance: { git_sha: string | null; git_dirty: boolean | null; envelope_ids?: string[]; envelope_id: string; envelope_config_hash: string; captured_at: string };
   targets: TargetInfo[];
 };
@@ -58,6 +60,8 @@ export type Order = {
   buyer_check: { ok: boolean; reason: string; delivered_hash: string; on_chain_commitment: string; checks: Check[] } | null;
   created_at: string; chain_mode?: string; listing?: Listing; on_chain?: Listing["on_chain"]; events?: Ev[]; revealed_in_buyer_console?: boolean;
   reveal_requires_auth?: boolean; explorer_base?: string | null;
+  /** This order is published as a demonstration fixture: its evidence is served without a token. */
+  public_demo_fixture?: boolean; public_demo_fixture_note?: string | null;
 };
 export type Frames = { dt_s: number; bodies: string[]; quat_order: string; data: number[][]; stride?: number; places?: number; source_dt_s?: number };
 /** Per-tick telemetry. The fields differ per target and each renderer reads only its own. */
@@ -65,6 +69,8 @@ export type Tick = Record<string, any>;
 export type RunLike = {
   scenario: Record<string, number>; scene: any; metrics: Record<string, any>; events: any[]; ticks: Tick[]; frames: Frames; trajectory_hash: string;
   controller: { id: string; hash: string }; environment: Record<string, any>; outcome?: string;
+  /** Fixed scene geometry that is not a posed body: the arm target's goal site. Absent elsewhere. */
+  goal_m?: number[] | null; initial_state_check?: any;
 };
 export type Claim = { outcome: string; failure_class: string; severity_proxy: string; severity_value: number | null; severity_units: string; moment_t_s: number | null; severity_band: string };
 /** The AGGREGATE cost of the hunt that found this finding. Post-purchase only: it travels inside the

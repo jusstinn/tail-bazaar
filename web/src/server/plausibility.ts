@@ -33,6 +33,13 @@ export type ReplayLimits = {
   max_span_s: number;
   /** How the ceiling was derived, carried into the record so it can be audited. */
   derivation: string;
+  /** Bodies the engine POSES rather than integrates, so their frame-to-frame displacement is not a
+   *  trajectory and a speed ceiling means nothing for them. The arm scene has exactly one: the mocap
+   *  weld target the environment drags the gripper to, which MuJoCo teleports and which the run
+   *  document itself publishes as carrying only `visual_marker` geometry. The list is read off the
+   *  VERIFIER'S OWN re-run, never off the delivered package, so a seller cannot add to it; those
+   *  bodies are still required to stay inside the world the simulator models. */
+  unchecked_speed_bodies?: string[];
 };
 
 export type PlausibilityResult = { ok: boolean; detail: string; max_speed_mps: number | null };
@@ -69,6 +76,7 @@ export function checkReplayPlausibility(frames: unknown, limits: ReplayLimits): 
     return { ok: false, detail: `frames declare dt_s=${f.dt_s}, but the verifier's own recording interval is ${limits.dt_s} s`, max_speed_mps: null };
   if (rows.length < 2) return { ok: false, detail: `a replay of a failure cannot consist of ${rows.length} frame(s)`, max_speed_mps: null };
   const width = 1 + FRAME_STRIDE * bodies.length;
+  const posed = new Set(limits.unchecked_speed_bodies ?? []);
   const violations: string[] = [];
   let maxSpeed = 0;
   let worst = "";
@@ -93,6 +101,7 @@ export function checkReplayPlausibility(frames: unknown, limits: ReplayLimits): 
       // A short final tick is real; a stretched one is not trusted, so never divide by more than the tick.
       const dt = step > 0 && step < limits.dt_s ? step : limits.dt_s;
       for (let b = 0; b < bodies.length; b++) {
+        if (posed.has(String(bodies[b]))) continue; // teleported by the engine: not a trajectory
         const o = 1 + FRAME_STRIDE * b;
         const speed = Math.hypot(r[o] - prev[o], r[o + 1] - prev[o + 1], r[o + 2] - prev[o + 2]) / dt;
         if (speed > maxSpeed) {
@@ -108,6 +117,7 @@ export function checkReplayPlausibility(frames: unknown, limits: ReplayLimits): 
     violations.push(`the recording spans ${span.toFixed(3)} s, longer than the ${limits.max_span_s.toFixed(3)} s a conclusive run can last under the simulator's own termination rules`);
   if (maxSpeed > limits.speed_ceiling_mps)
     violations.unshift(`${worst} moves at ${maxSpeed.toFixed(3)} m/s, above the ${limits.speed_ceiling_mps.toFixed(3)} m/s this scene can produce`);
-  const ceiling = `fastest recorded body ${maxSpeed.toFixed(3)} m/s, ceiling ${limits.speed_ceiling_mps.toFixed(3)} m/s = ${limits.derivation}`;
+  const excluded = posed.size ? `; ${[...posed].join(", ")} ${posed.size === 1 ? "is a marker the engine poses" : "are markers the engine poses"} rather than integrates, so only the world bound applies to ${posed.size === 1 ? "it" : "them"}` : "";
+  const ceiling = `fastest recorded simulated body ${maxSpeed.toFixed(3)} m/s, ceiling ${limits.speed_ceiling_mps.toFixed(3)} m/s = ${limits.derivation}${excluded}`;
   return { ok: violations.length === 0, detail: violations.length === 0 ? ceiling : `${violations.join("; ")} [${ceiling}]`, max_speed_mps: maxSpeed };
 }

@@ -1,7 +1,8 @@
 // The experience reads its failure vocabulary from the run document. These tests drive REAL RECORDED
-// RUNS — a cart collision, a cart load shed, and a humanoid fall from the second target — through the
-// same code, so each class is narrated from its own events, severity proxy and units instead of being
-// mislabelled as a collision, and a class nobody has registered still resolves.
+// RUNS — a cart collision, a cart load shed, a humanoid fall, and a dropped part from the arm target
+// whose simulator even names the event field differently — through the same code, so each class is
+// narrated from its own events, severity proxy and units instead of being mislabelled as a collision,
+// and a class nobody has registered still resolves.
 //
 // Every fixture is a committed, pipeline-generated run document under evidence/. Nothing here is
 // hand-written, and nothing depends on a demo run having been executed on this machine first.
@@ -206,6 +207,48 @@ test("the pre-purchase summary cannot be narrated: nothing about a scenario esca
   for (const k of ["sensor_delay_ms", "actuator_delay_ms", "floor_friction", "payload_kg", "load_friction", "salt_hex", "trajectory_hash"]) {
     assert.ok(!emitted.includes(k), `presentation leaks ${k}`);
   }
+});
+
+test("the arm's DROPPED finding is narrated from events the simulator names differently", () => {
+  // The arm simulator writes its event kind in `event`; the cart's and the humanoid's write `type`.
+  // Both are the run's own word for what happened, so both are read and neither is assumed.
+  const run = readRun(path.join(EVIDENCE, "arm", "runs", "finding-grip-025.json"));
+  assert.equal(run.events[0].type, undefined, "the fixture really does use the other field name");
+  const p = presentFailure(run, readRun(path.join(EVIDENCE, "arm", "runs", "baseline-seed3.json")));
+
+  assert.equal(p.class_id, "DROPPED");
+  assert.equal(p.known_class, true);
+  assert.equal(p.label, "Dropped");
+  assert.equal(p.moment_label, "the release");
+  // The release is when the part left the hand; the severity is measured when it hit something.
+  assert.equal(p.moment_t_s, 0.68);
+  assert.equal(p.severity_moment_t_s, 1.08);
+  assert.equal(p.severity_label, "impact");
+  assert.equal(p.headline_quantity?.key, "impact_speed_mps");
+  assert.equal(p.headline_quantity?.value, run.metrics.object_impact_speed_mps);
+  assert.equal(p.headline, "DROPPED · 3.151 m/s");
+  // Both moments are marked, which is what the scrubber draws.
+  assert.ok(p.markers.some((m) => m.kind === "moment" && m.t_s === 0.68));
+  assert.ok(p.markers.some((m) => m.kind === "secondary" && m.t_s === 1.08));
+  // The replay opens 0.6 s before the release, not at the parked end of the run.
+  assert.ok(Math.abs(defaultPlayhead(p.moment_t_s, 2.0) - 0.08) < 1e-9);
+  assert.equal(autoplayStop(p.moment_t_s, 2.0), 1.58);
+  // The event's own prose travels with it, and the field name it was keyed on does not.
+  assert.ok(p.attributes.some((a) => a.key === "detected_by"));
+  assert.ok(!p.attributes.some((a) => a.key === "event"), "the event-kind field is never shown as an attribute");
+});
+
+test("the arm's NOT_PLACED class reports no severity rather than inventing one", () => {
+  // Nothing was dropped and nothing hit anything, so there is no measured quantity and no moment: the
+  // environment judged placement at its own horizon. An invented stand-in would look like a severity.
+  const p = presentFailure({ outcome: "NOT_PLACED", metrics: { primary_failure_class: "NOT_PLACED" }, events: [] });
+  assert.equal(p.class_id, "NOT_PLACED");
+  assert.equal(p.label, "Not placed");
+  assert.equal(p.moment, null);
+  assert.equal(p.moment_t_s, null);
+  assert.equal(p.headline_quantity, null);
+  assert.equal(p.headline, "NOT PLACED");
+  assert.match(p.sentence, /success threshold/);
 });
 
 test("units and labels come from the field name, with no unit invented", () => {

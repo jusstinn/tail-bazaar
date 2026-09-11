@@ -11,6 +11,13 @@
 // demonstration mode exactly as before. Every other route serves public projections only
 // (publicListing / publicOrder in db.ts, the verifier's public summary), which is asserted by
 // __tests__/integration.local.test.ts.
+//
+// ONE DELIBERATE EXCEPTION, per order id: DEMO_PUBLIC_ORDERS names orders this host PUBLISHES as
+// demonstration fixtures, so a reader who opens the public URL cold can follow purchase -> reveal ->
+// replay without holding a key. Their packages are committed to this repository as evidence, so
+// nothing secret is opened; the API and the page both carry the DEMONSTRATION FIXTURE badge, and
+// every other order still returns 401. See publicDemoOrderIds below and
+// __tests__/demo-public-orders.test.ts, which pins both sides of that line.
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -21,7 +28,7 @@ import type { Hex } from "viem";
 import { AuthError, createChallenge, lookupSession, redeemChallenge } from "./auth.js";
 import { keccakHex } from "./canonical.js";
 import { publicClient, getListing, settledOrders, STATUS_NAMES, balanceOf } from "./chain.js";
-import { appDomain, buyerBudgetWei, buyerConsoleEnabled, chainId, chainLabel, chainMode, demoTriggerEnabled, escrowAddress, explorerBase, hostedMode, operatorToken, port, publicBaseUrl, roleAddresses, WEB_ROOT } from "./config.js";
+import { appDomain, buyerBudgetWei, buyerConsoleEnabled, chainId, chainLabel, chainMode, demoPublicOrderIds, demoPublicTamperFixtures, demoTriggerEnabled, escrowAddress, explorerBase, hostedMode, operatorToken, port, publicBaseUrl, roleAddresses, WEB_ROOT } from "./config.js";
 import { getDb, listEvents, publicListing, publicOrder, type ListingRow, type OrderRow } from "./db.js";
 import { DEFAULT_TARGET, envelopesDoc, isTargetId, TARGET_IDS, TARGETS, targetFor } from "./targets.js";
 import { provenance } from "./provenance.js";
@@ -40,11 +47,44 @@ function tokenEquals(a: string, b: string): boolean {
 
 export type Access = { ok: boolean; via: string; error?: string };
 
+/** The badge every public demonstration fixture carries, in the API and on the page. It is the whole
+ *  justification for the exception: these packages are committed to the repository as evidence, so
+ *  serving them without a token opens nothing that is not already published. */
+export const DEMO_FIXTURE_NOTE = "DEMONSTRATION FIXTURE, published in the repository, not a secret";
+
+/** Order ids this host publishes as demonstration fixtures. Explicit ids from DEMO_PUBLIC_ORDERS,
+ *  plus — only when DEMO_PUBLIC_TAMPER_FIXTURES=1 — the deliberately tampered order of each target
+ *  and the paired valid order of that same target, which together are the two halves of the
+ *  settlement story. Everything not in this set keeps the hosted-mode 401. */
+export function publicDemoOrderIds(): Set<string> {
+  const out = new Set(demoPublicOrderIds().map((s) => s.toLowerCase()));
+  if (demoPublicTamperFixtures()) {
+    try {
+      const rows = getDb().prepare("SELECT o.order_id, o.status, l.target_id, l.demo_tamper FROM orders o JOIN listings l ON l.listing_id = o.listing_id ORDER BY o.created_at ASC")
+        .all() as { order_id: string; status: string; target_id: string | null; demo_tamper: number }[];
+      for (const tampered of rows.filter((r) => r.demo_tamper === 1)) {
+        out.add(tampered.order_id.toLowerCase());
+        const paired = rows.find((r) => r.demo_tamper !== 1 && r.status === "SETTLED_VALID" && (r.target_id ?? "cart") === (tampered.target_id ?? "cart"));
+        if (paired) out.add(paired.order_id.toLowerCase());
+      }
+    } catch { /* no database yet: only the explicit ids are published */ }
+  }
+  return out;
+}
+
+export function isPublicDemoOrder(orderId: string | null | undefined): boolean {
+  return typeof orderId === "string" && publicDemoOrderIds().has(orderId.toLowerCase());
+}
+
 /** Gate for every route that can return private package bytes, scenario parameters, trajectories or
  *  salts. `orderId` null means "any live buyer session is enough" (the shared public baseline run);
  *  otherwise the session must be bound to that order. Operator-only routes pass operatorOnly. */
 export function privateAccess(c: Context, orderId: string | null, operatorOnly = false): Access {
   if (!hostedMode()) return { ok: true, via: "local-demonstration-mode" };
+  // PUBLIC DEMONSTRATION FIXTURE: this exact order is on this host's published list, so its evidence
+  // is served to anyone. It is the only hole in the gate, it is per order id, and it is never opened
+  // for an operator-only route.
+  if (!operatorOnly && isPublicDemoOrder(orderId)) return { ok: true, via: "public-demo-fixture" };
   const token = bearerToken(c);
   const op = operatorToken();
   if (!token) return { ok: false, via: "none", error: "hosted mode: this route returns private data and requires an Authorization: Bearer token (the buyer session returned by POST /api/retrieve, or the operator token)" };
@@ -72,6 +112,8 @@ export function buildApp() {
       demo_trigger_enabled: demoTriggerEnabled, buyer_console_enabled: buyerConsoleEnabled, public_base_url: publicBaseUrl,
       targets: TARGET_IDS.map((id) => ({ id, label: TARGETS[id].label, short_label: TARGETS[id].short_label, machine: TARGETS[id].machine, one_liner: TARGETS[id].one_liner, envelope_id: TARGETS[id].envelope_id, subject_label: TARGETS[id].subject_label, failure_classes: TARGETS[id].failure_classes.map((c) => ({ id: c.id, label: c.label })), replay_renderer: TARGETS[id].replay_renderer })),
       hosted_mode: hosted, private_routes_require_auth: hosted, operator_token_configured: hosted && operatorToken() !== "",
+      // Which orders, if any, this host deliberately publishes. Ids only: they are already public.
+      public_demo_orders: [...publicDemoOrderIds()], public_demo_fixture_note: DEMO_FIXTURE_NOTE,
       provenance: provenance(),
     });
   });
@@ -117,7 +159,10 @@ export function buildApp() {
     const revealed = !!db.prepare("SELECT 1 FROM retrievals WHERE order_id = ?").get(o.order_id);
     let sellerSettled: number | null = null;
     try { sellerSettled = await settledOrders(l.seller as Hex); } catch { /* unreachable chain */ }
-    return c.json({ ...publicOrder(o), listing: { ...publicListing(l), seller_settled_orders: sellerSettled }, on_chain: onChain, events: listEvents(o.listing_id), revealed_in_buyer_console: revealed && buyerConsoleEnabled, reveal_requires_auth: hostedMode(), chain_mode: l.chain_mode, explorer_base: l.chain_mode === "testnet" ? "https://sepolia.basescan.org" : null });
+    // PUBLIC DEMONSTRATION FIXTURE: this order's evidence is served without a token on this host, and
+    // the page says so rather than letting a reader assume the gate is broken.
+    const fixture = isPublicDemoOrder(o.order_id);
+    return c.json({ ...publicOrder(o), listing: { ...publicListing(l), seller_settled_orders: sellerSettled }, on_chain: onChain, events: listEvents(o.listing_id), revealed_in_buyer_console: revealed && buyerConsoleEnabled, reveal_requires_auth: hostedMode() && !fixture, public_demo_fixture: fixture, public_demo_fixture_note: fixture ? DEMO_FIXTURE_NOTE : null, chain_mode: l.chain_mode, explorer_base: l.chain_mode === "testnet" ? "https://sepolia.basescan.org" : null });
   });
 
   // Buyer console. Local demonstration mode: the browser IS the buyer's console, so it may view
@@ -132,19 +177,24 @@ export function buildApp() {
     const r = getDb().prepare("SELECT package_bytes, signer, retrieved_at FROM retrievals WHERE order_id = ?").get(orderId) as { package_bytes: Uint8Array; signer: string; retrieved_at: string } | undefined;
     if (!r) return c.json({ error: "this order has not been retrieved by the local buyer agent" }, 404);
     const bytes = new Uint8Array(r.package_bytes);
-    return new Response(bytes, { headers: { "content-type": "application/json", "x-package-keccak256": keccakHex(bytes), "x-retrieved-by": r.signer, "x-retrieved-at": r.retrieved_at, "x-access-via": access.via } });
+    const fixture = access.via === "public-demo-fixture" ? { "x-tb-demo-fixture": DEMO_FIXTURE_NOTE } : {};
+    return new Response(bytes, { headers: { "content-type": "application/json", "x-package-keccak256": keccakHex(bytes), "x-retrieved-by": r.signer, "x-retrieved-at": r.retrieved_at, "x-access-via": access.via, ...fixture } });
   });
 
   // The nominal baseline run is public by design (its scenario is the published nominal operating
   // point), but it is still a full recorded trajectory and it is only used by the reveal view, so it
-  // is gated with the rest of the private-data routes in hosted mode.
+  // is gated with the rest of the private-data routes in hosted mode. When this host publishes
+  // demonstration fixtures it is opened too, because it is the surviving run their replay draws
+  // behind the failure and a fixture whose ghost 401s is not a demonstration of anything.
   app.get("/api/runs/baseline", async (c) => {
     const access = privateAccess(c, null);
-    if (!access.ok) return c.json({ error: access.error, hosted_mode: true }, 401);
+    const viaFixture = !access.ok && publicDemoOrderIds().size > 0;
+    if (!access.ok && !viaFixture) return c.json({ error: access.error, hosted_mode: true }, 401);
     const want = c.req.query("target");
     if (want !== undefined && !isTargetId(want)) return c.json({ error: `unknown target ${want}`, known: TARGET_IDS }, 404);
     const { file } = await ensureBaseline(targetFor(want ?? DEFAULT_TARGET));
-    return new Response(fs.readFileSync(file), { headers: { "content-type": "application/json" } });
+    const fixture = viaFixture ? { "x-access-via": "public-demo-fixture", "x-tb-demo-fixture": DEMO_FIXTURE_NOTE } : { "x-access-via": access.via };
+    return new Response(fs.readFileSync(file), { headers: { "content-type": "application/json", ...fixture } });
   });
 
   // Published operating envelopes — ONE PER TARGET — and, for each, the range its author published.

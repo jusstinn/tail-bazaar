@@ -23,7 +23,9 @@ export type TargetView = {
   stats(pkg: Pkg, baseline: RunLike, p: FailurePresentation): Stat[];
 };
 
-const ev = (doc: { events?: any[] }, type: string): any | undefined => (doc.events ?? []).find((e) => e?.type === type);
+/** The run's own word for what happened. The cart and humanoid simulators name the field `type`, the
+ *  arm simulator names it `event`; both are read, neither is assumed. */
+const ev = (doc: { events?: any[] }, type: string): any | undefined => (doc.events ?? []).find((e) => e?.type === type || e?.event === type);
 /** "torso impact · torso impact speed" reads as a stutter; the quantity's own label already says it. */
 const severityTile = (p: FailurePresentation): Stat | null => {
   const q = p.headline_quantity;
@@ -144,7 +146,78 @@ const HUMANOID: TargetView = {
   },
 };
 
-const VIEWS: Record<string, TargetView> = { cart: CART, humanoid: HUMANOID };
+// -------------------------------------------------------------------------------------- the arm
+const ARM: TargetView = {
+  id: "arm",
+  renderer: rendererFor("arm-3d"),
+  baselineLabel: "Baseline · published conditions",
+  failureLabel: "Purchased scenario",
+  headline: "The arm was supposed to place the part.<br>Under these conditions it let go.",
+
+  narrate(pkg, baseline, p) {
+    const drop = ev(pkg, "DROPPED");
+    const land = ev(pkg, "LANDED");
+    const discarded = (pkg.events ?? []).filter((e: any) => (e?.type ?? e?.event) === "RELEASE_DISCARDED").length;
+    const mu = Number(pkg.scenario.grip_friction);
+    const mass = Number(pkg.scenario.object_mass_kg);
+    const noise = Number(pkg.scenario.action_noise_frac ?? 0);
+    const lat = Number(pkg.scenario.control_latency_ms ?? 0);
+    const glat = Number(pkg.scenario.gripper_latency_ms ?? 0);
+    const dx = Number(pkg.scenario.object_offset_x_m ?? 0);
+    const dy = Number(pkg.scenario.object_offset_y_m ?? 0);
+    const causes: string[] = [];
+    if (mu !== 1) causes.push(`grip friction <span class="mono">${num(mu, 3)}</span> instead of the shipped 1.00, written on the part <em>and</em> on both finger pads`);
+    if (mass !== 2) causes.push(`a <span class="mono">${num(mass, 2)} kg</span> payload instead of the shipped 2 kg`);
+    if (dx !== 0 || dy !== 0) causes.push(`the part moved <span class="mono">${num(Math.hypot(dx, dy) * 100, 1)} cm</span> from where the environment put it`);
+    if (noise > 0) causes.push(`action noise at <span class="mono">${num(noise * 100, 0)} %</span> of the command range`);
+    if (lat > 0) causes.push(`<span class="mono">${lat} ms</span> of control latency — ${Math.round(lat / 40)} tick${lat === 40 ? "" : "s"} between an action being computed and applied`);
+    if (glat > 0) causes.push(`a further <span class="mono">${glat} ms</span> on the gripper channel alone`);
+    const cause = causes.length ? `What changed: ${causes.join("; ")}.` : "Nothing outside the published conditions was changed.";
+    const release = drop
+      ? ` The predicate fired at <span class="mono">${num(drop.t_s, 3)} s</span>: both pads had been touching the part, it was <span class="mono">${num(drop.height_above_table_m, 3)} m</span> clear of the table and <span class="mono">${num(drop.object_goal_distance_m, 3)} m</span> from the goal, and then they were not — confirmed at <span class="mono">${num(drop.confirmed_at_t_s, 2)} s</span> once the grasp had not come back.${discarded ? ` ${discarded} earlier release${discarded === 1 ? " was" : "s were"} proposed and withdrawn by that same confirmation window.` : ""}`
+      : "";
+    const landing = land
+      ? ` The part reached ${land.on_the_floor ? "<strong>the floor</strong>" : "the table top"} <span class="mono">${num(land.t_s - (drop?.t_s ?? land.t_s), 2)} s</span> later at <span class="mono">${num(land.impact_speed_mps, 3)} m/s</span>.`
+      : "";
+    const closest = m(pkg, "min_object_goal_distance_m");
+    const near = typeof closest === "number"
+      ? ` It had already been within <span class="mono">${num(closest, 3)} m</span> of the goal — the environment's own success threshold is <span class="mono">${num((pkg.scene as any)?.distance_threshold_m ?? 0.05, 2)} m</span>.`
+      : "";
+    const base = ` The same policy at the published conditions placed its part and returned <span class="mono">${num(m(baseline, "episode_return"), 0)}</span> against <span class="mono">${num(m(pkg, "episode_return"), 0)}</span> here.`;
+    return `${cause}${release}${landing}${near}${base}`;
+  },
+
+  metrics(baseline, pkg) {
+    return [
+      ["outcome", m(baseline, "outcome"), m(pkg, "outcome")],
+      ["environment's success flag at its horizon", String(m(baseline, "env_success_at_horizon")), String(m(pkg, "env_success_at_horizon"))],
+      ["episode return", num(m(baseline, "episode_return"), 0), num(m(pkg, "episode_return"), 0)],
+      ["ever grasped", String(m(baseline, "ever_grasped")), String(m(pkg, "ever_grasped"))],
+      ["first grasp (s)", num(m(baseline, "first_grasp_t_s"), 2), num(m(pkg, "first_grasp_t_s"), 2)],
+      ["ticks with both pads on the part", m(baseline, "grasp_ticks"), m(pkg, "grasp_ticks")],
+      ["closest approach to the goal (m)", num(m(baseline, "min_object_goal_distance_m"), 4), num(m(pkg, "min_object_goal_distance_m"), 4)],
+      ["part lifted (m)", num(m(baseline, "object_lift_m"), 3), num(m(pkg, "object_lift_m"), 3)],
+      ["release (s)", "—", num(m(pkg, "drop_t_s"), 3)],
+      ["height above the table at release (m)", "—", num(m(pkg, "drop_height_above_table_m"), 3)],
+      ["what it landed on", "—", m(pkg, "landed_on_geom") ?? "—"],
+      ["impact speed (m/s)", "—", num(m(pkg, "object_impact_speed_mps"), 3)],
+      ["recovered after the drop", "—", String(m(pkg, "recovered_after_drop"))],
+      ["success-predicate cross-check mismatches", m(baseline, "success_predicate_mismatches"), m(pkg, "success_predicate_mismatches")],
+    ];
+  },
+
+  stats(pkg, baseline, p) {
+    const out: (Stat | null)[] = [
+      severityTile(p),
+      { label: "let go", value: m(pkg, "drop_height_above_table_m"), unit: "m", dec: 3, note: "height above the table when both pads lost the part" },
+      { label: "closest it got to the goal", value: m(pkg, "min_object_goal_distance_m"), unit: "m", dec: 3, note: `the environment succeeds within ${num((pkg.scene as any)?.distance_threshold_m ?? 0.05, 2)} m` },
+      { label: "baseline got within", value: m(baseline, "min_object_goal_distance_m"), unit: "m", dec: 3, note: "and placed it, at the published conditions" },
+    ];
+    return out.filter((x): x is Stat => x !== null);
+  },
+};
+
+const VIEWS: Record<string, TargetView> = { cart: CART, humanoid: HUMANOID, arm: ARM };
 
 /** The view for a target id. Anything unknown — including a listing registered before the
  *  marketplace became multi-target — is the cart, which was then the only target. */

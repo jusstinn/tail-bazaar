@@ -21,6 +21,8 @@
   --t-cart-soft: #EAE7E2;
   --t-humanoid: #8A6A46;
   --t-humanoid-soft: #F2EADF;
+  --t-arm: #4E5A52;
+  --t-arm-soft: #E6ECE7;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
   --band-y: clamp(64px, 8vw, 118px);
@@ -93,6 +95,9 @@ input[type=password], input[type=text] { flex: 1; min-width: 240px; padding: 12p
 .badge.bad { background: var(--alert-soft); color: var(--alert); }
 .badge.warn { background: var(--amber-soft); color: var(--amber); }
 .badge.info { background: var(--accent-soft); color: var(--accent); }
+/* A deliberately published demonstration order. Outlined rather than filled: it is a statement about
+   the host's configuration, not a verdict about the finding. */
+.badge.fixture { background: transparent; color: var(--ink-3); border: 1px dashed var(--line-2); letter-spacing: .03em; }
 .badge.testnet { background: var(--accent-soft); color: var(--accent); }
 .badge.local { background: #EEEDEB; color: var(--ink-2); }
 .chip { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 560; background: #EEEDEB; color: var(--ink-2); }
@@ -353,6 +358,7 @@ footer p { max-width: 78ch; margin: 0 0 8px; }
 .badge.target { background: #EEEDEB; color: var(--ink-2); }
 .badge.target-cart { background: var(--t-cart-soft); color: var(--t-cart); }
 .badge.target-humanoid { background: var(--t-humanoid-soft); color: var(--t-humanoid); }
+.badge.target-arm { background: var(--t-arm-soft); color: var(--t-arm); }
 
 .tcards { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 22px; margin-top: 34px; }
 .tcard { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 26px 26px 22px; }

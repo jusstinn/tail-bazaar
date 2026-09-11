@@ -16,6 +16,10 @@ export const COL = {
   wheel: 0x8a8680,     // mid grey
   spoke: 0xd2cec7,     // pale graphite, so a turning wheel reads as turning
   body: 0xc4b49e,      // humanoid: neutral warm stone
+  link: 0x6a655d,      // arm: graphite links (a box per MJCF geom, the mesh's own bounding box)
+  pad: 0x33302b,       // arm: the two gripper finger pads, darker so the hand reads against the links
+  table: 0xd6bf96,     // arm: the sand work surface the part starts on
+  part: 0xb4643c,      // arm: the carried part, in the same warm accent as the cart's obstacle
   floor: 0xf2f0ec,     // off-white
   grid: 0xd7d3cc,      // faint graphite
   line: 0x9a948c,      // thin scene annotations (clearance marker, healthy-height plate)

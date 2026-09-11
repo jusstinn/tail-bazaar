@@ -59,6 +59,23 @@ export function hostedMode(): boolean {
 export function operatorToken(): string {
   return (process.env.OPERATOR_TOKEN ?? "").trim();
 }
+
+/** PUBLIC DEMONSTRATION FIXTURES. A comma-separated list of order ids whose evidence this host
+ *  publishes deliberately, so a reader who opens the public URL cold sees purchase -> reveal ->
+ *  replay without holding a key. It is a NARROW, EXPLICIT exception to hosted mode: only these ids,
+ *  only their reveal (and the nominal baseline run their replay draws behind them), and every other
+ *  order keeps its 401. Their packages are in the repository as evidence, so nothing secret is being
+ *  opened — the UI says so on the page. Read at call time so it can be changed without a rebuild. */
+export function demoPublicOrderIds(): string[] {
+  return (process.env.DEMO_PUBLIC_ORDERS ?? "").split(",").map((s) => s.trim()).filter((s) => s !== "");
+}
+
+/** Convenience for a host that runs the demonstration pipeline itself and does not want to copy order
+ *  ids by hand: publish the deliberately-tampered order and the paired valid one of the same target,
+ *  which together are the two halves of the settlement story. */
+export function demoPublicTamperFixtures(): boolean {
+  return (process.env.DEMO_PUBLIC_TAMPER_FIXTURES ?? "").trim() === "1";
+}
 export const appDomain = env("APP_DOMAIN", "tail-bazaar.local");
 export const buyerBudgetWei = BigInt(env("BUYER_BUDGET_WEI", "2000000000000000"));
 export const listingPriceWei = BigInt(env("LISTING_PRICE_WEI", chainMode === "testnet" ? "200000000000000" : "1000000000000000"));

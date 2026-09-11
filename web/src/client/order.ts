@@ -11,6 +11,10 @@ import { autoplayStop, defaultPlayhead, presentFailure, type FailurePresentation
 let replay: Replay | null = null;
 export function disposeReplay(): void { if (replay) { replay.dispose(); replay = null; } }
 
+/** The badge a deliberately published order carries. The server sends the same string; this is the
+ *  fallback for a record served by an older build. */
+const DEMO_FIXTURE_NOTE = "DEMONSTRATION FIXTURE, published in the repository, not a secret";
+
 const STAGES: [string, string][] = [
   ["claim", "The sealed claim"], ["purchase", "The purchase"], ["reveal", "The reveal"], ["evidence", "The evidence"], ["settlement", "The settlement"],
 ];
@@ -68,6 +72,7 @@ export async function renderOrder(view: HTMLElement, orderId: string, st: Status
           ${badge(o.chain_mode === "testnet" ? "Base Sepolia" : "Local anvil", o.chain_mode === "testnet" ? "testnet" : "local")}
           ${badge(o.status.replace(/_/g, " ").toLowerCase(), statusTone(o.status))}
           ${o.on_chain ? badge("on chain: " + o.on_chain.status, statusTone(o.on_chain.status)) : ""}
+          ${o.public_demo_fixture ? badge(o.public_demo_fixture_note ?? DEMO_FIXTURE_NOTE, "fixture") : ""}
         </div>
       </div>
     </section>
@@ -263,7 +268,7 @@ function outsideAxes(pkg: Pkg, env: EnvelopeDoc): string[] {
 }
 
 function renderReveal(host: HTMLElement, pkg: Pkg, baseline: RunLike, o: Order, env: EnvelopeDoc, view: TargetView): void {
-  const failureRun: RunLike = { scenario: pkg.scenario, scene: pkg.scene, metrics: pkg.metrics, events: pkg.events, ticks: pkg.ticks, frames: pkg.replay.frames, trajectory_hash: pkg.replay.trajectory_hash, controller: pkg.controller, environment: pkg.environment, outcome: pkg.claim?.outcome };
+  const failureRun: RunLike = { scenario: pkg.scenario, scene: pkg.scene, metrics: pkg.metrics, events: pkg.events, ticks: pkg.ticks, frames: pkg.replay.frames, trajectory_hash: pkg.replay.trajectory_hash, controller: pkg.controller, environment: pkg.environment, outcome: pkg.claim?.outcome, goal_m: pkg.goal_m ?? null, initial_state_check: pkg.initial_state_check };
   const p: FailurePresentation = presentFailure(failureRun, baseline);
   const hashMatch = o.delivery_check ? o.delivery_check.valid : null;
 
@@ -274,8 +279,14 @@ function renderReveal(host: HTMLElement, pkg: Pkg, baseline: RunLike, o: Order, 
   const revealLede = honest
     ? `This is the run the buyer paid for, played back from the body transforms recorded when it was simulated. Nothing is re-simulated in your browser. <strong>${esc(p.sentence)}</strong>`
     : `These are the bytes the seller actually served. They do <strong>not</strong> hash to the commitment registered on chain, so the verifier refused them and the buyer was refunded — what follows is the rejected delivery, not certified evidence. It is played back from its own recorded transforms; nothing is re-simulated in your browser.`;
+  // A reader who opens the public URL cold gets this order's evidence without a token. Say so on the
+  // page, next to the evidence itself, so nobody mistakes a published fixture for a hole in the gate.
+  const fixtureNote = o.public_demo_fixture
+    ? `<p class="fineprint reveal"><strong>${esc(o.public_demo_fixture_note ?? DEMO_FIXTURE_NOTE)}.</strong> This host publishes a short list of order ids whose evidence is served to anyone, so the whole flow can be read without a key. These packages are committed to the repository as evidence; every order not on that list still requires the buyer session from a signed retrieval, or the operator token.</p>`
+    : "";
   host.innerHTML = `
     ${stageHead("reveal", 3, "The reveal", revealLede)}
+    ${fixtureNote}
     <div class="chips-row reveal">
       ${badge(p.label, "bad")}
       ${p.also.map((a) => badge("also " + a.label.toLowerCase(), "warn")).join("")}

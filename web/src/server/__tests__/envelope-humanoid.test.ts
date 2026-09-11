@@ -96,7 +96,8 @@ test("the registry resolves a run to its target by the envelope the run itself d
   assert.equal(TARGETS.humanoid.sim.module, "tailbazaar_sim.humanoid.cli");
   assert.equal(TARGETS.cart.sim.module, "tailbazaar_sim.cli");
   const doc = envelopesDoc();
-  assert.deepEqual(doc.targets.map((t) => t.target_id), ["cart", "humanoid"]);
+  // The registry may grow; these two stay where they are, in this order, with their own renderers.
+  assert.deepEqual(doc.targets.slice(0, 2).map((t) => t.target_id), ["cart", "humanoid"]);
   assert.equal(doc.targets[1].replay_renderer, "humanoid-3d");
 });
 

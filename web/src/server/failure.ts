@@ -17,7 +17,7 @@
 export type RunEvent = { type: string; t_s: number; [k: string]: unknown };
 
 /** Events that are steps on the way to a failure, not the failure itself. */
-export const CUE_EVENTS = new Set(["brake_onset", "stopped", "start", "cruise", "hold", "push_start", "push_end"]);
+export const CUE_EVENTS = new Set(["brake_onset", "stopped", "start", "cruise", "hold", "push_start", "push_end", "RELEASE_DISCARDED"]);
 
 const CUE_LABELS: Record<string, string> = {
   brake_onset: "brake onset",
@@ -27,6 +27,9 @@ const CUE_LABELS: Record<string, string> = {
   hold: "hold",
   push_start: "push starts",
   push_end: "push ends",
+  // The arm's drop predicate proposes a release and then withdraws it when the grasp comes back
+  // within three ticks. Marking the withdrawn proposals shows what the confirmation window rejected.
+  RELEASE_DISCARDED: "release proposal withdrawn",
 };
 
 /** Suffix → unit. Longest suffix wins, so `_mps2` beats `_mps` and `_mps` beats `_s`. */
@@ -73,6 +76,24 @@ const KNOWN_CLASSES: Record<string, { label: string; moment_event: string; momen
     severity_event: "ground_contact",
     severity_label: "torso impact",
     sentence: "The torso dropped out of the height band the environment calls healthy: the policy lost its balance instead of walking on.",
+  },
+  DROPPED: {
+    label: "Dropped",
+    moment_event: "DROPPED",
+    moment_label: "the release",
+    headline_key: "impact_speed_mps",
+    severity_event: "LANDED",
+    severity_label: "impact",
+    sentence: "The part left the gripper in mid-air, away from the goal: the arm let go of what it was carrying instead of placing it.",
+  },
+  NOT_PLACED: {
+    label: "Not placed",
+    // The environment judges placement at its own horizon, not at an instant, so this class has no
+    // moment event and the run records none: there is nothing to freeze the replay on.
+    moment_event: "NOT_PLACED",
+    moment_label: "the episode horizon",
+    headline_key: "object_goal_distance_m",
+    sentence: "The part was still not within the environment's own success threshold of the goal when the episode ran out, and it was never dropped on the way.",
   },
 };
 
@@ -140,11 +161,21 @@ export function quantityFrom(key: string, value: number): Quantity {
   return { key, label: labelForKey(key), value, unit, text };
 }
 
+/** WHICH FIELD NAMES THE EVENT is read from the document rather than assumed: the cart and the
+ *  humanoid simulators write `type`, the arm simulator writes `event`. Both are the run's own word for
+ *  what happened, so both are accepted and normalised to `type` for everything downstream. */
+function eventTypeOf(e: unknown): string | null {
+  const r = e as { type?: unknown; event?: unknown } | null;
+  const raw = typeof r?.type === "string" ? r.type : typeof r?.event === "string" ? r.event : null;
+  return raw && raw.trim() ? raw.trim() : null;
+}
+
 function eventsOf(run: unknown): RunEvent[] {
   const ev = (run as { events?: unknown })?.events;
   if (!Array.isArray(ev)) return [];
-  return ev.filter((e): e is RunEvent => !!e && typeof e === "object" && typeof (e as RunEvent).type === "string" && Number.isFinite(Number((e as RunEvent).t_s)))
-    .map((e) => ({ ...e, t_s: Number(e.t_s) }));
+  return ev
+    .filter((e) => !!e && typeof e === "object" && eventTypeOf(e) !== null && Number.isFinite(Number((e as RunEvent).t_s)))
+    .map((e) => ({ ...(e as RunEvent), type: eventTypeOf(e) as string, t_s: Number((e as RunEvent).t_s) }));
 }
 
 function outcomeOf(run: unknown): string {
@@ -195,7 +226,7 @@ export function presentFailure(run: unknown, baseline?: unknown): FailurePresent
   const severity_label = severity_moment ? known?.severity_label ?? labelForKey(severity_moment.type) : known ? known.moment_label : moment ? labelForKey(moment.type) : "the failure";
   const attributes: Attribute[] = [moment, severity_moment]
     .filter((e): e is RunEvent => !!e)
-    .flatMap((e) => Object.entries(e).filter(([k, v]) => k !== "type" && typeof v === "string").map(([k, v]) => ({ key: k, label: labelForKey(k), value: v as string })));
+    .flatMap((e) => Object.entries(e).filter(([k, v]) => k !== "type" && k !== "event" && typeof v === "string").map(([k, v]) => ({ key: k, label: labelForKey(k), value: v as string })));
   // The headline is the severity proxy the simulator itself uses for this class, taken from whichever
   // event records it; failing that, a speed-like field, which is the one a reader can feel.
   const headline_quantity = (known && (severity_quantities.find((q) => q.key === known.headline_key) ?? quantities.find((q) => q.key === known.headline_key)))

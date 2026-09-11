@@ -12,9 +12,10 @@
 import path from "node:path";
 import * as cart from "./envelope.js";
 import * as humanoid from "./envelope-humanoid.js";
+import * as arm from "./envelope-arm.js";
 import { GRAVITY_MPS2, SIM_POSITION_BOUND_M, timingFrom, type ReplayLimits } from "./plausibility.js";
 
-export type TargetId = "cart" | "humanoid";
+export type TargetId = "cart" | "humanoid" | "arm";
 export type Scenario = Record<string, number>;
 
 /** The artefact under test, as the simulator itself hashes it. The verifier binds a claim to this. */
@@ -67,7 +68,7 @@ export type TargetSpec = {
   failure_outcomes: string[];
   conclusive_outcomes: string[];
   severity: { proxy: string; units: string };
-  replay_renderer: "cart-3d" | "humanoid-3d";
+  replay_renderer: "cart-3d" | "humanoid-3d" | "arm-3d";
   nominal_scenario: Scenario;
   checkAdmissible: (scn: Record<string, unknown>) => string[];
   isDuplicate: (a: Scenario, b: Scenario) => boolean;
@@ -131,8 +132,31 @@ function humanoidEnvelopeDoc(): ReturnType<typeof cartEnvelopeDoc> {
   };
 }
 
+function armEnvelopeDoc(): ReturnType<typeof cartEnvelopeDoc> {
+  return {
+    target_id: "arm" as TargetId,
+    envelope_id: arm.ENVELOPE_ID,
+    yaml: "sim/envelope-arm.yaml (same axis shape as GUARD configs/guard_theta.yaml)",
+    axes: arm.ENVELOPE_AXES as unknown as (typeof cart.ENVELOPE_AXES)[number][],
+    nominal_scenario: arm.NOMINAL_SCENARIO as unknown as Record<string, number>,
+    control_tick_ms: arm.DT_CTRL_MS,
+    duplicate_rule: arm.DUPLICATE_RULE_PROSE,
+    controller_tuned_range: { label: "conditions the policy's publisher evaluated it under", verb: "published at", unstated: "the publisher states nothing about this axis", prose: arm.PUBLISHED_CONDITIONS_PROSE, source: arm.PUBLISHED_CONDITIONS_SOURCE, per_parameter: arm.PUBLISHED_CONDITIONS },
+    searched_envelope: { prose: arm.SEARCHED_ENVELOPE_PROSE },
+    product_question: arm.PRODUCT_QUESTION,
+    note: arm.OPERATING_CONTEXT_NOTE,
+    distribution: "No distribution D over these axes is stated or estimated. The search is a bounded deterministic grid; adversarially selected failures are not failure frequencies.",
+    severity: { proxy: "object_impact_speed_mps", units: "m/s", definition: arm.SEVERITY_BAND_DEFINITION },
+    failure_classes: [
+      { id: "DROPPED", label: "Dropped", severity_proxy: "object_impact_speed_mps", severity_units: "m/s", detected_by: `a mechanical predicate over MuJoCo's OWN contact list: the block was touching both gripper pads, was more than ${arm.AIRBORNE_MARGIN_M} m above where it rests on the table, then was not touching them and was not at the goal — confirmed over three further control ticks so a single dropped contact while the part is still pinched is never sold as a drop. This is the one predicate this project owns, because the environment scores placement, not custody.` },
+      { id: "NOT_PLACED", label: "Not placed", severity_proxy: "none", severity_units: "", detected_by: "Gymnasium-Robotics' own success flag: info[\"is_success\"] is false at the environment's own registered episode horizon, with no drop on the way. This project implements no placement detector. It has no severity proxy: nothing was dropped and nothing hit anything, so there is no measured quantity to report." },
+    ],
+    verdicts: { VALID: "re-simulated and bound to the delivered evidence", INVALID: "rejected (not reproducible, out of envelope, duplicate, or evidence not bound to the verified run)", INCONCLUSIVE: "numerical divergence, an environment the verifier cannot match, or metrics outside tolerance; never pays" },
+  };
+}
+
 // --------------------------------------------------------------------------------- hunt shapes
-const FAILURE_COUNT_KEYS = ["any_failure", "collision", "fell", "load_shed"];
+const FAILURE_COUNT_KEYS = ["any_failure", "collision", "fell", "load_shed", "dropped"];
 
 function normalizeHunt(doc: any, severityProxy: string, failureClasses: string[]): HuntSummary {
   const cost = doc?.search_cost ?? {};
@@ -168,6 +192,7 @@ function normalizeHunt(doc: any, severityProxy: string, failureClasses: string[]
 // ------------------------------------------------------------------------------------- targets
 const CART_ENVELOPE = cartEnvelopeDoc();
 const HUMANOID_ENVELOPE = humanoidEnvelopeDoc();
+const ARM_ENVELOPE = armEnvelopeDoc();
 
 const CART: TargetSpec = {
   id: "cart",
@@ -348,8 +373,115 @@ const HUMANOID: TargetSpec = {
   claimKind: "the balance policy falls over under admissible conditions inside the published envelope",
 };
 
-export const TARGETS: Record<TargetId, TargetSpec> = { cart: CART, humanoid: HUMANOID };
-export const TARGET_IDS: TargetId[] = ["cart", "humanoid"];
+const ARM: TargetSpec = {
+  id: "arm",
+  label: "Manipulator pick-and-place policy",
+  short_label: "Arm",
+  machine: "a Fetch arm picking a 5 cm block off a table under a pretrained policy",
+  one_liner: "A pretrained pick-and-place policy is supposed to put the part on the goal. A slippery part, a heavy one, noise or a late gripper can make it let go in mid-air — or never place it at all.",
+  subject_noun: "policy checkpoint",
+  subject_label: "Policy",
+  envelope_id: arm.ENVELOPE_ID,
+  envelope_yaml: "sim/envelope-arm.yaml",
+  envelope_doc: ARM_ENVELOPE,
+  sim: {
+    module: "tailbazaar_sim.arm.cli",
+    cli: "uv run python -m tailbazaar_sim.arm.cli --out DIR run|hunt|nominal|repeat|policy|selfcheck ...",
+    hunt_mode: "grid-grip",
+    hunt_modes: ["grid-grip", "grid-payload", "grid-systems", "grid-placement", "random"],
+    hunt_n: 60,
+    hunt_seed: 1,
+    huntFile: (outDir, mode, seed) => path.join(outDir, `hunt-${mode}${mode.startsWith("grid") ? "" : `-seed${seed}`}.json`),
+  },
+  fingerprint_fields: ["engine", "engine_version", "gymnasium_version", "gymnasium_robotics_version", "numpy_version", "python_version", "platform", "physics_timestep_s", "control_dt_s", "n_substeps", "threads", "policy_backend", "uv_lock_sha256"],
+  failure_classes: ARM_ENVELOPE.failure_classes,
+  failure_outcomes: ["DROPPED", "NOT_PLACED"],
+  conclusive_outcomes: ["SUCCESS", "DROPPED", "NOT_PLACED"],
+  severity: { proxy: "object_impact_speed_mps", units: "m/s" },
+  replay_renderer: "arm-3d",
+  nominal_scenario: arm.NOMINAL_SCENARIO as unknown as Scenario,
+  checkAdmissible: arm.checkAdmissible,
+  isDuplicate: arm.isDuplicate,
+  scenarioDistance: arm.scenarioDistance,
+  severityBand: arm.severityBand,
+  rangePosition: arm.rangePosition,
+  // The checkpoint is pinned by digest and every digest is checked at load time, so the actor-tensor
+  // sha256 over exactly the six tensors used for control is what a claim is bound to.
+  subjectOf: (run) => ({ id: String(run?.target?.policy_id ?? run?.target_id ?? ""), hash: String(run?.target?.actor_tensor_sha256 ?? "") }),
+  claimFromRun: (run) => {
+    const m = (run?.metrics ?? {}) as Record<string, unknown>;
+    const sev = run?.severity as { value?: unknown } | null | undefined;
+    // NOT_PLACED has no severity proxy on purpose: nothing was dropped and nothing hit anything, so
+    // the value stays null rather than becoming an invented stand-in.
+    const value = typeof sev?.value === "number" ? sev.value : typeof m.object_impact_speed_mps === "number" ? (m.object_impact_speed_mps as number) : null;
+    return {
+      outcome: String(run?.outcome ?? "UNKNOWN"),
+      failure_class: String(m.primary_failure_class ?? run?.outcome ?? "UNKNOWN"),
+      severity_proxy: "object_impact_speed_mps",
+      severity_value: value,
+      severity_units: "m/s",
+      moment_t_s: typeof m.drop_t_s === "number" ? (m.drop_t_s as number) : null,
+      severity_band: arm.severityBand(value).band,
+    };
+  },
+  changedConditions: (scn) =>
+    (arm.PARAM_ORDER as readonly string[])
+      .filter((k) => Number(scn[k]) !== Number((arm.NOMINAL_SCENARIO as Record<string, number>)[k]))
+      .map((k) => ({ parameter: k, nominal: (arm.NOMINAL_SCENARIO as Record<string, number>)[k], value: Number(scn[k]), unit: k === "init_seed" ? "1" : arm.ENVELOPE[k].unit })),
+  reproduceCommand: (scn) => `uv run python -m tailbazaar_sim.arm.cli --out OUT run --name finding --scenario '${JSON.stringify(scn)}'`,
+  /** Speed ceiling, the cart's construction with this scene's own numbers — and it is the cart's
+   *  construction because this scene has the cart's shape: nothing here is propelled except through
+   *  contact with a surface (the arm is dragged to a mocap target, the part is a free body). So the
+   *  largest acceleration any body can sustain is bounded by gravity plus the largest tangential force
+   *  a contact can transmit, mu_max * m * g, with mu_max the top of the PUBLISHED contact-friction
+   *  axis; a body accelerating at that over the longest straight line the simulator tolerates before
+   *  it calls the run DIVERGED reaches sqrt(2 * a_max * 100 m), and a fall from the only raised
+   *  surface in the scene adds sqrt(2 * g * h_table). An honest drop peaks near 3 m/s, twenty-four
+   *  times below; a teleport of one block width inside one 40 ms frame already implies 1.25 m/s and a
+   *  fabricated 100 m jump implies 2500 m/s. Nothing physical sits in between. */
+  replayLimitsFrom: (run) => {
+    const scene = (run?.scene ?? {}) as Record<string, unknown>;
+    const rules = (run?.termination_rules ?? {}) as Record<string, unknown>;
+    const hTable = Number.isFinite(Number(scene.table_top_z_m)) ? Number(scene.table_top_z_m) : arm.TABLE_TOP_Z_M;
+    const muMax = arm.ENVELOPE.grip_friction.max;
+    const aMax = (1 + muMax) * GRAVITY_MPS2;
+    const ceiling = Math.sqrt(2 * aMax * SIM_POSITION_BOUND_M) + Math.sqrt(2 * GRAVITY_MPS2 * hTable);
+    // This target's horizon and post-drop settle window are counted in CONTROL TICKS by the
+    // environment and the simulator, not in seconds, so the longest a conclusive recording can last is
+    // read off those two counts rather than off a t_max_s the arm never publishes.
+    const dt_s = Number(run?.frames?.dt_s) > 0 ? Number(run.frames.dt_s) : arm.DT_CTRL_MS / 1000;
+    const horizon = Number.isFinite(Number(rules.episode_horizon_ticks)) ? Number(rules.episode_horizon_ticks) : arm.EPISODE_HORIZON_TICKS;
+    const settle = Number.isFinite(Number(rules.settle_ticks_max)) ? Number(rules.settle_ticks_max) : arm.SETTLE_TICKS_MAX;
+    const guard = Number.isFinite(Number(rules.divergence_guard_mps)) ? Number(rules.divergence_guard_mps) : 50;
+    // The Fetch scene carries one body MuJoCo POSES rather than integrates: the mocap weld target the
+    // environment drags the gripper to. It is teleported, so its frame-to-frame displacement is not a
+    // trajectory and no speed ceiling means anything for it. It is identified from the run's OWN
+    // geometry — a body every one of whose published primitives is a visual marker, i.e. collides
+    // with nothing — and never from a hard-coded name.
+    const prims: any[] = Array.isArray(scene.render_bodies) ? (scene.render_bodies as any[]) : [];
+    const roles = new Map<string, Set<string>>();
+    for (const p of prims) {
+      if (!p?.body) continue;
+      if (!roles.has(p.body)) roles.set(p.body, new Set());
+      roles.get(p.body)!.add(String(p.role ?? "collision"));
+    }
+    const posed = [...roles].filter(([, r]) => !r.has("collision")).map(([b]) => b).sort();
+    return {
+      dt_s,
+      max_span_s: (horizon + settle + 1) * dt_s,
+      speed_ceiling_mps: ceiling,
+      position_bound_m: SIM_POSITION_BOUND_M,
+      unchecked_speed_bodies: posed,
+      // Prose only, no envelope parameter identifiers: this string reaches the public delivery record.
+      derivation: `sqrt(2*(1+mu_max)*g*d_max) + sqrt(2*g*h_table) with mu_max=${muMax} (the largest contact friction the published envelope admits, written on the part and on both gripper pads), g=${GRAVITY_MPS2} m/s^2, d_max=${SIM_POSITION_BOUND_M} m (the simulator's divergence bound) and h_table=${hTable} m (the only raised surface in this scene; the floor plane is at z = 0). The simulator independently ends a run as DIVERGED once the carried part exceeds ${guard} m/s, so no conclusive run can contain one faster than that either`,
+    };
+  },
+  normalizeHunt: (doc) => normalizeHunt(doc, "object_impact_speed_mps", ["DROPPED", "NOT_PLACED"]),
+  claimKind: "the pick-and-place policy drops the part, or fails to place it, under admissible conditions inside the published envelope",
+};
+
+export const TARGETS: Record<TargetId, TargetSpec> = { cart: CART, humanoid: HUMANOID, arm: ARM };
+export const TARGET_IDS: TargetId[] = ["cart", "humanoid", "arm"];
 export const DEFAULT_TARGET: TargetId = "cart";
 
 export function isTargetId(x: unknown): x is TargetId {

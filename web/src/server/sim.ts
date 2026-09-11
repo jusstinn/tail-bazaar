@@ -21,7 +21,7 @@ export type RunDoc = {
   scene: Record<string, unknown>; outcome: string; metrics: Record<string, number | string | null | boolean>;
   events: Record<string, unknown>[]; ticks: Record<string, unknown>[]; frames: { dt_s: number; bodies: string[]; quat_order: string; data: number[][] };
   trajectory_hash: string; mjcf_hash?: string; state_hash?: string; severity?: Record<string, unknown> | null;
-  failure_classes?: string[]; initial_state?: unknown; initial_state_check?: unknown; termination_rules?: unknown; wall_time_s: number;
+  failure_classes?: string[]; initial_state?: unknown; initial_state_check?: unknown; termination_rules?: unknown; goal_m?: number[]; wall_time_s: number;
 };
 
 async function cli(target: TargetSpec, outDir: string, args: string[], timeoutMs = 900_000): Promise<string> {

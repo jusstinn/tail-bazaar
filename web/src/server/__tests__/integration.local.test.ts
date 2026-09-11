@@ -10,12 +10,13 @@ import { keccakHex } from "../canonical.js";
 import { createChallenge, redeemChallenge } from "../auth.js";
 
 const app = buildApp();
-// Envelope-axis identifiers for BOTH targets, plus the private structures. None of these may appear
+// Envelope-axis identifiers for EVERY target, plus the private structures. None of these may appear
 // in any public projection. (GET /api/envelope publishes the axis names on purpose — that is the
 // point of publishing an envelope — so it is deliberately not in the list of routes checked below.)
 const PRIVATE_MARKERS = [
   "sensor_delay_ms", "actuator_delay_ms", "floor_friction", "payload_kg", "load_friction",
   "push_impulse_ns", "push_heading_deg", "push_time_s", "body_mass_scale", "actuator_noise_frac", "control_latency_ms", "init_seed",
+  "object_mass_kg", "grip_friction", "object_offset_x_m", "object_offset_y_m", "action_noise_frac", "gripper_latency_ms", "goal_m",
   "salt_hex", "\"frames\"", "\"ticks\"", "trajectory_hash", "reproduce",
 ];
 
@@ -35,7 +36,7 @@ test("public listing and order endpoints never expose private package fields", a
 test("pre-purchase summary carries only the allowed fields, for every target", async () => {
   const res = await app.request("/api/listings");
   const rows = (await res.json()) as any[];
-  assert.ok(rows.length >= 2);
+  assert.ok(rows.length >= 3);
   for (const row of rows) {
     const s = row.public_summary;
     // WHAT A BUYER SEES BEFORE PAYING: target, failure class, severity band, verification status and
@@ -54,24 +55,31 @@ test("pre-purchase summary carries only the allowed fields, for every target", a
   }
 });
 
-test("the marketplace carries both targets, and each listing declares which robot it is about", async () => {
+test("the marketplace carries all three targets, and each listing declares which robot it is about", async () => {
   const rows = (await (await app.request("/api/listings")).json()) as any[];
   const byTarget = new Set(rows.map((r) => r.public_summary.target.id));
-  assert.deepEqual([...byTarget].sort(), ["cart", "humanoid"], "both targets are on the market");
+  assert.deepEqual([...byTarget].sort(), ["arm", "cart", "humanoid"], "every target in the registry is on the market");
   for (const r of rows) assert.equal(r.target_id, r.public_summary.target.id, "the listing row and its sealed summary agree");
   const cart = rows.find((r) => r.public_summary.target.id === "cart")!;
   const humanoid = rows.find((r) => r.public_summary.target.id === "humanoid")!;
+  const arm = rows.find((r) => r.public_summary.target.id === "arm")!;
   assert.equal(cart.public_summary.envelope_id, "tb-envelope-1");
   assert.equal(humanoid.public_summary.envelope_id, "tb-humanoid-envelope-1");
   assert.equal(humanoid.public_summary.failure_class.id, "FELL");
   assert.match(humanoid.public_summary.failure_class.detected_by, /health predicate/i);
   assert.equal(humanoid.public_summary.target.replay_renderer, "humanoid-3d");
+  assert.equal(arm.public_summary.envelope_id, "tb-arm-envelope-1");
+  assert.ok(["DROPPED", "NOT_PLACED"].includes(arm.public_summary.failure_class.id));
+  assert.equal(arm.public_summary.target.replay_renderer, "arm-3d");
+  // The arm is the one target whose primary failure predicate this project owns, and the sealed
+  // summary says so in the same field the other two use to name the environment's own detector.
+  if (arm.public_summary.failure_class.id === "DROPPED") assert.match(arm.public_summary.failure_class.detected_by, /contact list/i);
 });
 
 test("the published envelope endpoint carries one envelope per target in GUARD's axis shape", async () => {
   const doc = (await (await app.request("/api/envelope")).json()) as any;
   assert.equal(doc.schema, "tb-envelopes-1");
-  assert.deepEqual(doc.targets.map((t: any) => t.target_id), ["cart", "humanoid"]);
+  assert.deepEqual(doc.targets.map((t: any) => t.target_id), ["cart", "humanoid", "arm"]);
   for (const env of doc.targets) {
     for (const a of env.axes) assert.deepEqual(Object.keys(a).sort(), ["group", "high", "low", "marginal", "name", "nominal", "quantization", "scale", "tuned_range", "units"]);
     assert.equal(env.axes.every((a: any) => a.marginal === null && a.scale === null), true, "no distribution D is stated");
@@ -79,42 +87,49 @@ test("the published envelope endpoint carries one envelope per target in GUARD's
     assert.deepEqual(Object.keys(env.verdicts).sort(), ["INCONCLUSIVE", "INVALID", "VALID"]);
     assert.ok(env.failure_classes.length >= 1);
   }
-  const cart = doc.targets[0], humanoid = doc.targets[1];
+  const cart = doc.targets[0], humanoid = doc.targets[1], arm = doc.targets[2];
   assert.equal(cart.envelope_id, "tb-envelope-1");
   assert.equal(cart.axes.length, 5);
   assert.match(cart.controller_tuned_range.prose, /sensor latency <= 40 ms/);
   assert.equal(humanoid.envelope_id, "tb-humanoid-envelope-1");
   assert.equal(humanoid.axes.length, 7);
   assert.match(humanoid.controller_tuned_range.prose, /unmodified Gymnasium Humanoid-v5/);
+  assert.equal(arm.envelope_id, "tb-arm-envelope-1");
+  assert.equal(arm.axes.length, 7);
+  assert.match(arm.controller_tuned_range.prose, /unmodified Gymnasium-Robotics FetchPickAndPlace-v4/);
+  assert.equal(arm.failure_classes.length, 2, "DROPPED and NOT_PLACED are both published");
   // ?target= returns exactly one of them
   const one = (await (await app.request("/api/envelope?target=humanoid")).json()) as any;
   assert.equal(one.envelope_id, "tb-humanoid-envelope-1");
+  assert.equal(((await (await app.request("/api/envelope?target=arm")).json()) as any).envelope_id, "tb-arm-envelope-1");
   assert.equal((await app.request("/api/envelope?target=nope")).status, 404);
 });
 
 test("search cost is published as a market-wide aggregate, with no scenario in it", async () => {
   const m = (await (await app.request("/api/market")).json()) as any;
   assert.ok(m.search_cost_total.simulations > 0, "the hunters actually ran simulations");
-  assert.ok(m.search_cost_total.hunts >= 2, "at least one hunt per target");
+  assert.ok(m.search_cost_total.hunts >= 3, "at least one hunt per target");
   const cart = m.targets.find((t: any) => t.target_id === "cart");
   const humanoid = m.targets.find((t: any) => t.target_id === "humanoid");
-  assert.ok(cart.search_cost.simulations > 0 && humanoid.search_cost.simulations > 0);
+  const arm = m.targets.find((t: any) => t.target_id === "arm");
+  assert.ok(cart.search_cost.simulations > 0 && humanoid.search_cost.simulations > 0 && arm.search_cost.simulations > 0);
   assert.ok(cart.failures_by_class.COLLISION > 0, "the cart sweep produced collisions");
   assert.ok(humanoid.failures_by_class.FELL > 0, "the humanoid sweep produced falls");
-  assert.ok(cart.listings > 0 && humanoid.listings > 0);
+  assert.ok(arm.failures_by_class.DROPPED > 0, "the arm sweep produced drops");
+  assert.ok(cart.listings > 0 && humanoid.listings > 0 && arm.listings > 0);
 });
 
 test("the failure ledger export carries the target id on every row", async () => {
   const { buildLedger } = await import("../ledger.js");
   const led = buildLedger();
-  assert.ok(led.findings.length >= 2);
+  assert.ok(led.findings.length >= 3);
   for (const row of led.findings) {
-    assert.ok(["cart", "humanoid"].includes(row.target_id), `row ${row.finding_id} names a known target`);
+    assert.ok(["cart", "humanoid", "arm"].includes(row.target_id), `row ${row.finding_id} names a known target`);
     assert.equal(typeof row.severity.proxy, "string");
     assert.ok(row.severity.value === null || typeof row.severity.value === "number");
   }
-  assert.deepEqual(Object.keys(led.findings_by_target).sort(), ["cart", "humanoid"]);
-  assert.ok(led.findings_by_target.cart > 0 && led.findings_by_target.humanoid > 0);
+  assert.deepEqual(Object.keys(led.findings_by_target).sort(), ["arm", "cart", "humanoid"]);
+  assert.ok(led.findings_by_target.cart > 0 && led.findings_by_target.humanoid > 0 && led.findings_by_target.arm > 0);
 });
 
 test("retrieval requires the bound buyer's signature over a fresh challenge", async () => {
@@ -185,6 +200,31 @@ test("hosted mode: the reveal route is closed to visitors and opened by a real r
     delete process.env.PUBLIC_BASE_URL;
   }
   assert.equal((await app.request(reveal)).status, 200, "unsetting PUBLIC_BASE_URL restores local demonstration mode");
+});
+
+// The public-demonstration-fixture exception, against a real order from a real pipeline run.
+// demo-public-orders.test.ts pins the rule in isolation; this checks it on the actual data.
+test("hosted mode: a published fixture order opens anonymously and its neighbours do not", async () => {
+  const all = orders();
+  const valid = all.find((o) => o.status === "SETTLED_VALID")!;
+  const other = all.find((o) => o.order_id !== valid.order_id)!;
+  process.env.PUBLIC_BASE_URL = "https://tail-bazaar.example";
+  process.env.DEMO_PUBLIC_ORDERS = valid.order_id;
+  try {
+    const opened = await app.request(`/api/orders/${valid.order_id}/reveal`);
+    assert.equal(opened.status, 200, "the published fixture is readable with no token");
+    assert.equal(opened.headers.get("x-access-via"), "public-demo-fixture");
+    assert.match(opened.headers.get("x-tb-demo-fixture") ?? "", /DEMONSTRATION FIXTURE/);
+    const listing = getDb().prepare("SELECT commitment FROM listings WHERE listing_id = ?").get(valid.listing_id) as { commitment: string };
+    assert.equal(keccakHex(new Uint8Array(await opened.arrayBuffer())), listing.commitment, "and it is the committed package, not a redaction");
+    assert.equal((await app.request("/api/runs/baseline")).status, 200, "so is the baseline its replay draws behind it");
+    const closed = await app.request(`/api/orders/${other.order_id}/reveal`);
+    assert.equal(closed.status, 401, "every other order keeps the hosted-mode 401");
+    assert.ok(!(await closed.text()).includes("salt_hex"));
+  } finally {
+    delete process.env.PUBLIC_BASE_URL;
+    delete process.env.DEMO_PUBLIC_ORDERS;
+  }
 });
 
 test("the replay renderer a package declares is the one its target publishes", async () => {

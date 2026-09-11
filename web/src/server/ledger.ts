@@ -66,6 +66,7 @@ type LedgerTableRow = {
 const SOURCE_LABEL: Record<string, string> = {
   grid: "bounded grid search", "grid-load": "bounded grid search (deck grip)", random: "seeded random search",
   "grid-push": "bounded grid search (push impulse x heading)", "grid-systems": "bounded grid search (latency x actuator noise)", "grid-terrain": "bounded grid search (friction x mass)",
+  "grid-grip": "bounded grid search (grip friction x initial state)", "grid-payload": "bounded grid search (payload mass x initial state)", "grid-placement": "bounded grid search (block offset x by y)",
 };
 
 /** The nominal suites are produced by the simulators, not by the web layer; report each with its
@@ -74,6 +75,7 @@ function nominalSuites(): { target_id: string; n_nominal_runs: number | null; al
   const candidates: Record<TargetId, string[]> = {
     cart: [path.join("evidence", "local", "nominal-suite.json"), path.join("evidence", "milestone", "nominal-suite.json")],
     humanoid: [path.join("evidence", "local", "humanoid", "nominal-suite.json"), path.join("evidence", "humanoid", "nominal-suite.json")],
+    arm: [path.join("evidence", "local", "arm", "nominal-suite.json"), path.join("evidence", "arm", "nominal-suite.json")],
   };
   return TARGET_IDS.map((id) => {
     for (const rel of candidates[id]) {
@@ -180,10 +182,10 @@ export function buildLedger() {
     placeholder_warnings: [
       "Adversarially selected failures are not failure frequencies: this ledger is a set of found failures, not an estimate of P(failure) under any distribution.",
       "No distribution D over the envelope axes is stated or estimated here; both envelope YAMLs leave GUARD's marginal/scale null on purpose.",
-      "Severity is an uncalibrated kinematic proxy per target (cart: impact speed; humanoid: torso impact speed). No biomechanical tier, damage estimate or monetary value is assigned.",
+      "Severity is an uncalibrated kinematic proxy per target (cart: impact speed; humanoid: torso impact speed; arm: the carried part's impact speed, and NOT_PLACED deliberately has none at all). No biomechanical tier, damage estimate or monetary value is assigned.",
       "limit_state_margin_m is the cart's minimum recorded range to the obstacle; the simulator records no signed penetration depth, so it is not negative on contact, and the humanoid target records no quantity of that shape at all.",
-      "The physics is a simplified cart and a Gymnasium MuJoCo mannequin in illustrative envelopes, and needs calibration against physical robots before any underwriting use.",
-      "The humanoid target's policy checkpoint declares no licence; see evidence/humanoid/README.md.",
+      "The physics is a simplified cart, a Gymnasium MuJoCo mannequin and a mocap-welded Fetch arm in illustrative envelopes, and needs calibration against physical robots before any underwriting use.",
+      "The humanoid target's policy checkpoint declares no licence; see evidence/humanoid/README.md. Neither does the arm target's, nor any FetchPickAndPlace checkpoint found on the hub; see evidence/arm/README.md.",
       "INCONCLUSIVE never pays; INVALID rows are recorded findings that failed verification, not deliverable evidence.",
     ],
     findings: out,

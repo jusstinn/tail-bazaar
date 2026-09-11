@@ -12,9 +12,10 @@
 // in the scene with an expanding ring, held for a beat when the playhead crosses it, and played at a
 // fraction of speed around it so the moment is legible rather than a single dropped frame.
 //
-// TARGETS. Everything that differs between a warehouse cart and a humanoid — the geometry, the floor,
-// the camera, the HUD, where the ring sits — lives in a SceneRenderer (replay-cart.ts,
-// replay-humanoid.ts). This file knows only about frames, time and the failure presentation.
+// TARGETS. Everything that differs between a warehouse cart, a humanoid and a manipulator — the
+// geometry, the floor, the camera, the HUD, where the ring sits — lives in a SceneRenderer
+// (replay-cart.ts, replay-humanoid.ts, replay-arm.ts). This file knows only about frames, time and
+// the failure presentation.
 import * as THREE from "three";
 import type { Frames, RunLike } from "./api.js";
 import { COL } from "./palette.js";
@@ -333,11 +334,13 @@ export function createReplay(host: HTMLElement, opts: ReplayOptions): Replay {
 /** The renderer a run's target declares. Unknown ids fall back to the cart, which is the renderer
  *  every record written before the marketplace became multi-target implies. */
 export function rendererFor(id: string | undefined | null): SceneRenderer {
-  return id === "humanoid-3d" ? HUMANOID : CART;
+  return id === "humanoid-3d" ? HUMANOID : id === "arm-3d" ? ARM : CART;
 }
 
 import { CART_RENDERER as CART } from "./replay-cart.js";
 import { HUMANOID_RENDERER as HUMANOID } from "./replay-humanoid.js";
+import { ARM_RENDERER as ARM } from "./replay-arm.js";
 export { CART_RENDERER } from "./replay-cart.js";
 export { HUMANOID_RENDERER } from "./replay-humanoid.js";
+export { ARM_RENDERER } from "./replay-arm.js";
 export const GHOST_LANE_OFFSET_M = CART.ghostLaneOffset;

@@ -73,6 +73,9 @@ export function buildPrivatePackage(target: TargetSpec, run: RunDoc, seller: str
     hunter,
     initial_state: run.initial_state ?? null,
     initial_state_check: run.initial_state_check ?? null,
+    // Fixed scene geometry a replay needs that is NOT a posed body, and therefore not in `frames`:
+    // the arm target's goal is a MuJoCo site, published once per episode. Null for targets with none.
+    goal_m: (run as { goal_m?: unknown }).goal_m ?? null,
     ticks: run.ticks,
     replay: { frames: run.frames, trajectory_hash: run.trajectory_hash, mjcf_hash: run.mjcf_hash ?? null, renderer: target.replay_renderer },
     reproduce: {

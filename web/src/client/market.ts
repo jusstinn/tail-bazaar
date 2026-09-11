@@ -2,10 +2,11 @@
 // mechanism, then the findings. Everything dense (roles, raw pipeline log, limitations) sits behind a
 // labelled disclosure.
 //
-// MULTI-TARGET. A visitor has to be able to tell, inside one screen, that there are two robots here
-// and what "failure" means for each of them — so the robots come before the mechanism, each with its
-// own machine, its own failure class and who decides that class. The findings list is then grouped
-// and filterable by robot.
+// MULTI-TARGET. A visitor has to be able to tell, inside one screen, how many robots are here and
+// what "failure" means for each of them — so the robots come before the mechanism, each with its own
+// machine, its own failure classes and who decides each class. The findings list is then grouped and
+// filterable by robot. Nothing here counts the targets by hand: the copy is built from whatever the
+// registry publishes at /api/market.
 import { envelopeFor, getJSON, postJSON, type DemoRun, type EnvelopesDoc, type Listing, type MarketDoc, type Order, type Status } from "./api.js";
 import { addrCell, esc, eth, short, txCell } from "./format.js";
 import { armPage, badge, band, counter, disclosure, rangeBars, statusTone } from "./ui.js";
@@ -18,6 +19,11 @@ const STEPS: [string, string][] = [
 ];
 
 const targetOf = (l: Listing): string => l.public_summary.target?.id ?? l.target_id ?? "cart";
+
+const COUNT_WORD = ["no", "one", "two", "three", "four", "five", "six"];
+const countWord = (n: number): string => COUNT_WORD[n] ?? String(n);
+/** "a, b and c" — the robots on sale are read out, never hard-coded to a number of them. */
+const oxford = (parts: string[]): string => (parts.length <= 1 ? parts[0] ?? "" : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`);
 
 function findingCard(l: Listing, order: Order | undefined): string {
   const s = l.public_summary;
@@ -85,7 +91,7 @@ export async function renderMarket(view: HTMLElement, st: Status): Promise<void>
       <div class="wrap">
         <div class="eyebrow reveal">Reproducible failure scenarios for robot controllers</div>
         <h1 class="display reveal">Someone finds the conditions<br>where a robot controller fails.<br>You buy the recipe sealed.</h1>
-        <p class="lede reveal">Two robots are on sale here: a <strong>warehouse cart</strong> that is supposed to stop short of an obstacle, and a <strong>humanoid balance policy</strong> that is supposed to keep walking. A hunter agent searches each one's published range of operating conditions for the ones where it fails. A verifier re-runs every claim with that robot's own simulator and seals the evidence with a hash on a public blockchain. The buyer pays into escrow <em>before</em> being allowed to look — and is refunded automatically if the delivered bytes do not match the seal.</p>
+        <p class="lede reveal">${esc(countWord(shown.length).replace(/^./, (x) => x.toUpperCase()))} robots are on sale here: ${oxford(shown.map((t) => `a <strong>${esc(t.label.toLowerCase())}</strong>`))}. A hunter agent searches each one's published range of operating conditions for the ones where it fails. A verifier re-runs every claim with that robot's own simulator and seals the evidence with a hash on a public blockchain. The buyer pays into escrow <em>before</em> being allowed to look — and is refunded automatically if the delivered bytes do not match the seal.</p>
         <div class="cta-row reveal">
           ${firstOrder ? `<a class="btn" href="#/orders/${esc(firstOrder.order_id)}">See a settled finding</a>` : ""}
           <a class="btn ghost" href="#/how-it-works">How settlement works</a>
@@ -101,8 +107,8 @@ export async function renderMarket(view: HTMLElement, st: Status): Promise<void>
 
     ${band({
       id: "robots", eyebrow: "What is on the market", inner: `
-      <h2 class="section-title reveal">Two robots. Two different meanings of "it failed".</h2>
-      <p class="prose reveal">Neither failure class is invented here. The cart's collision is the simulator's own contact flag; the humanoid's fall is Gymnasium's own health predicate, read straight off the environment. This project implements no failure detector of its own for either one.</p>
+      <h2 class="section-title reveal">${esc(countWord(shown.length).replace(/^./, (x) => x.toUpperCase()))} robots. ${esc(countWord(shown.length))} different meanings of "it failed".</h2>
+      <p class="prose reveal">Almost none of these failure classes is invented here. The cart's collision is the simulator's own contact flag; the humanoid's fall is Gymnasium's own health predicate; the arm's <em>not placed</em> is Gymnasium-Robotics' own success flag at its own episode horizon — all read straight off the environment. The one exception is stated rather than hidden: the arm's <em>dropped</em> is this project's own predicate, because the environment scores placement and not custody. It is mechanical, it reads MuJoCo's own contact list, and the card below says exactly what it is so a reader can disagree with it on the evidence.</p>
       <div class="tcards">${shown.map((t) => targetCard(t, envs)).join("")}</div>
       <p class="fineprint reveal">${esc(market.note)}</p>`,
     })}
@@ -150,7 +156,7 @@ export async function renderMarket(view: HTMLElement, st: Status): Promise<void>
     ${band({
       id: "pipeline", eyebrow: "Run it yourself", inner: `
       <h2 class="section-title reveal">The whole workflow, end to end, on this machine.</h2>
-      <p class="prose reveal">The seller, verifier and buyer agents run server-side against <strong>${esc(st.chain_label)}</strong>: a bounded hunt over each robot's envelope with that robot's own simulator, verification by re-simulation, listings registered on chain for both, a buyer that shops target by target under a budget, and settlement. One delivery is deliberately tampered so the refund path is visible too.</p>
+      <p class="prose reveal">The seller, verifier and buyer agents run server-side against <strong>${esc(st.chain_label)}</strong>: a bounded hunt over each robot's envelope with that robot's own simulator, verification by re-simulation, listings registered on chain for every target, a buyer that shops target by target under a budget, and settlement. One delivery is deliberately tampered so the refund path is visible too.</p>
       <div class="row reveal">
         <button id="run-demo" class="btn" ${st.demo_trigger_enabled ? "" : "disabled"}>Run the pipeline</button>
         <span id="demo-state" class="muted">${demo.run ? `last run ${esc(short(demo.run.run_id, 10, 6))} — ${esc(demo.run.status)}` : "no run yet"}</span>
@@ -161,7 +167,7 @@ export async function renderMarket(view: HTMLElement, st: Status): Promise<void>
     ${band({
       eyebrow: "Read this before you believe any of it", tone: "quiet", inner: `
       <div class="two-col">
-        <p class="prose reveal">Adversarially selected failures do not estimate real-world failure frequency. The physics is a simplified cart and a 42 kg Gymnasium mannequin in illustrative envelopes, severity is an uncalibrated kinematic proxy, and simulation needs calibration against physical robots before it can support an underwriting decision. The humanoid's policy checkpoint declares no licence. Nothing here is audited, Sybil-resistant or production-ready.</p>
+        <p class="prose reveal">Adversarially selected failures do not estimate real-world failure frequency. The physics is a simplified cart, a 42 kg Gymnasium mannequin and a mocap-welded Fetch arm carrying a 5 cm cube, all in illustrative envelopes; severity is an uncalibrated kinematic proxy, and simulation needs calibration against physical robots before it can support an underwriting decision. Both pretrained policy checkpoints — the humanoid's and the arm's — declare no licence, and neither does any alternative that was checked. Nothing here is audited, Sybil-resistant or production-ready.</p>
         <div>
           ${disclosure("Show who holds which key", `<p class="prose">In this demonstration all three role keys are test-only keys held by the server: verifier ${addrCell(st.roles.verifier, st.chain_mode)}, seller ${addrCell(st.roles.seller, st.chain_mode)}, buyer ${addrCell(st.roles.buyer, st.chain_mode)}. A deployed version keeps only the verifier key server-side; buyers and sellers sign with their own wallets, and automated spending is bounded by per-key budgets, an allowlist of contracts and selectors, and rate limits.</p><p class="prose">Mode: ${esc(st.mode)}</p>`)}
           ${disclosure("Show provenance", `<dl class="facts"><dt>Escrow</dt><dd>${st.escrow_address ? addrCell(st.escrow_address, st.chain_mode) : "not configured"}</dd><dt>Chain</dt><dd>${esc(st.chain_label)}</dd><dt>Envelopes</dt><dd class="mono">${esc((st.provenance.envelope_ids ?? [st.provenance.envelope_id]).join(", "))} · ${esc(short(st.provenance.envelope_config_hash, 14, 6))}</dd><dt>Build</dt><dd class="mono">${esc(st.provenance.git_sha ? short(st.provenance.git_sha, 10, 0) : "unknown")}${st.provenance.git_dirty ? " (dirty)" : ""}</dd><dt>Captured</dt><dd class="mono">${esc(st.provenance.captured_at)}</dd></dl>`)}
