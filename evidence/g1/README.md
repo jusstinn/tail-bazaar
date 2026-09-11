@@ -92,4 +92,7 @@ other target; on another machine the verifier abstains (INCONCLUSIVE) rather tha
 `PORT=3188 npm run demo -- --target g1` against the local anvil, with a copy of the demonstration
 database: the seller's grid-push hunt, two listings verified VALID by re-run in the verifier's own
 environment, funded, delivered, retrieved by signed challenge and settled on chain; receipts and
-public summaries are in `../local-g1/`, the order page render in `../ui/g1-fall.png`.
+public summaries are in `../local-g1/`, the order page render in `../ui/g1-fall.png` (the replay at
+4.44 s, all 27 link meshes loaded, the fall ring on the pelvis, the ghost one lane over; because the
+side shove carried the purchased robot about 3 m across the lane the ghost keeps walking in, and the
+framing follows the purchased subject, the ghost stands nearer the camera than in a frontal case).
