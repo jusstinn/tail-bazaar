@@ -36,7 +36,9 @@ test("the published tuned range still matches the controller's own docstring", (
   assert.match(doc, /actuator latency <= 20 ms/);
   assert.match(doc, /floor friction >= 0\.6/);
   assert.match(doc, /20 kg payload/);
-  assert.deepEqual(CONTROLLER_TUNED_RANGE, { sensor_delay_ms: { max: 40 }, actuator_delay_ms: { max: 20 }, floor_friction: { min: 0.6 }, payload_kg: { exactly: 20.0 } });
+  assert.deepEqual(CONTROLLER_TUNED_RANGE, { sensor_delay_ms: { max: 40 }, actuator_delay_ms: { max: 20 }, floor_friction: { min: 0.6 }, payload_kg: { exactly: 20.0 }, load_friction: { not_stated: true } });
+  // the controller states nothing about deck grip, so that axis is never "outside the tuned range"
+  assert.doesNotMatch(doc, /load_friction|deck grip/);
   // and the searched envelope really is wider than the tuned range on the two axes the demo sells
   assert.ok(ENVELOPE.sensor_delay_ms.max > 40 && ENVELOPE.floor_friction.min < 0.6);
 });
@@ -44,13 +46,19 @@ test("the published tuned range still matches the controller's own docstring", (
 test("a sold scenario is positioned against both ranges, per parameter", () => {
   const sold = { ...NOMINAL_SCENARIO, sensor_delay_ms: 200, floor_friction: 0.3 };
   const pos = Object.fromEntries(rangePosition(sold).map((p) => [p.parameter, p.in_tuned_range]));
-  assert.deepEqual(pos, { sensor_delay_ms: false, actuator_delay_ms: true, floor_friction: false, payload_kg: true });
-  assert.deepEqual(Object.fromEntries(rangePosition(NOMINAL_SCENARIO).map((p) => [p.parameter, p.in_tuned_range])), { sensor_delay_ms: true, actuator_delay_ms: true, floor_friction: true, payload_kg: true });
+  assert.deepEqual(pos, { sensor_delay_ms: false, actuator_delay_ms: true, floor_friction: false, payload_kg: true, load_friction: true });
+  assert.deepEqual(Object.fromEntries(rangePosition(NOMINAL_SCENARIO).map((p) => [p.parameter, p.in_tuned_range])), { sensor_delay_ms: true, actuator_delay_ms: true, floor_friction: true, payload_kg: true, load_friction: true });
 });
 
 test("sim/envelope.yaml publishes the same axes in GUARD's shape", () => {
   const yaml = fs.readFileSync(path.join(REPO_ROOT, "sim", "envelope.yaml"), "utf8");
-  const blocks = yaml.split(/\n\s*- name: /).slice(1);
+  // Parse only the axis section: it starts at the first "- name:" entry and ends at the next top-level
+  // key (the YAML also lists failure classes under their own key, and those entries use "- name:" too).
+  const axisStart = yaml.search(/\n\s*- name: /);
+  const rest = yaml.slice(axisStart);
+  const axisEnd = rest.search(/\n[A-Za-z_]+:\s*(#.*)?$/m);
+  const axisSection = axisEnd === -1 ? rest : rest.slice(0, axisEnd);
+  const blocks = axisSection.split(/\n\s*- name: /).slice(1);
   assert.equal(blocks.length, PARAM_ORDER.length, "one block per envelope axis");
   const field = (block: string, key: string): string | null => block.match(new RegExp(`^\\s*${key}:\\s*(.+?)\\s*$`, "m"))?.[1] ?? null;
   for (const block of blocks) {

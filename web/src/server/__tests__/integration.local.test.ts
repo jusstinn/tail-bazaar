@@ -43,9 +43,9 @@ test("pre-purchase summary carries only the allowed fields", async () => {
 test("the published envelope endpoint carries both ranges in GUARD's axis shape", async () => {
   const env = (await (await app.request("/api/envelope")).json()) as any;
   assert.equal(env.envelope_id, "tb-envelope-1");
-  assert.equal(env.axes.length, 4);
+  assert.equal(env.axes.length, 5);
   for (const a of env.axes) assert.deepEqual(Object.keys(a).sort(), ["group", "high", "low", "marginal", "name", "nominal", "quantization", "scale", "tuned_range", "units"]);
-  assert.deepEqual(env.axes.map((a: any) => a.group).sort(), ["physical", "physical", "systems", "systems"]);
+  assert.deepEqual(env.axes.map((a: any) => a.group).sort(), ["physical", "physical", "physical", "systems", "systems"]);
   assert.equal(env.axes.every((a: any) => a.marginal === null && a.scale === null), true, "no distribution D is stated");
   assert.deepEqual(Object.keys(env.verdicts).sort(), ["INCONCLUSIVE", "INVALID", "VALID"]);
 });

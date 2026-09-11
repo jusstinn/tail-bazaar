@@ -5,30 +5,38 @@
 export const ENVELOPE_ID = "tb-envelope-1";
 export const DT_CTRL_MS = 20;
 export const DUPLICATE_DISTANCE = 0.05;
-export const PARAM_ORDER = ["sensor_delay_ms", "actuator_delay_ms", "floor_friction", "payload_kg"] as const;
-export type Scenario = { sensor_delay_ms: number; actuator_delay_ms: number; floor_friction: number; payload_kg: number };
+export const PARAM_ORDER = ["sensor_delay_ms", "actuator_delay_ms", "floor_friction", "payload_kg", "load_friction"] as const;
+// `load_friction` (deck grip) is OPTIONAL in an input scenario, exactly as in the Python authority:
+// a four-key scenario written against envelope revision tb-envelope-1 is read at the nominal deck grip.
+export const OPTIONAL_PARAMS: ReadonlySet<string> = new Set(["load_friction"]);
+export type Scenario = { sensor_delay_ms: number; actuator_delay_ms: number; floor_friction: number; payload_kg: number; load_friction?: number };
 
 export const ENVELOPE: Record<(typeof PARAM_ORDER)[number], { min: number; max: number; step?: number; places?: number; type: "int" | "float"; unit: string }> = {
   sensor_delay_ms: { min: 0, max: 300, step: DT_CTRL_MS, type: "int", unit: "ms" },
   actuator_delay_ms: { min: 0, max: 100, step: DT_CTRL_MS, type: "int", unit: "ms" },
   floor_friction: { min: 0.2, max: 1.0, places: 3, type: "float", unit: "1" },
   payload_kg: { min: 5.0, max: 60.0, places: 1, type: "float", unit: "kg" },
+  load_friction: { min: 0.1, max: 1.0, places: 3, type: "float", unit: "1" },
 };
 
-export const NOMINAL_SCENARIO: Scenario = { sensor_delay_ms: 20, actuator_delay_ms: 20, floor_friction: 0.8, payload_kg: 20.0 };
+export const NOMINAL_SCENARIO: Required<Scenario> = { sensor_delay_ms: 20, actuator_delay_ms: 20, floor_friction: 0.8, payload_kg: 20.0, load_friction: 0.6 };
 
 // ---------------------------------------------------------------- operating context (P3 framing)
 // The controller's TUNED RANGE, transcribed from the "Design assumptions" paragraph of the docstring
 // in sim/tailbazaar_sim/controller.py. That file is the authority and is never edited (its SHA-256 is
 // the controller version id in every evidence document), so this is a mirror, checked by a test.
-export const CONTROLLER_TUNED_RANGE: Record<(typeof PARAM_ORDER)[number], { min?: number; max?: number; exactly?: number }> = {
+export const CONTROLLER_TUNED_RANGE: Record<(typeof PARAM_ORDER)[number], { min?: number; max?: number; exactly?: number; not_stated?: true }> = {
   sensor_delay_ms: { max: 40 },
   actuator_delay_ms: { max: 20 },
   floor_friction: { min: 0.6 },
   payload_kg: { exactly: 20.0 },
+  // controller.py documents no assumption about how the load is secured; the deck grip a planned stop
+  // demands (A_TRIGGER/g = 0.306) and a saturated brake demands (A_FULL/g = 0.612) follow from its constants.
+  load_friction: { not_stated: true },
 };
 export const TUNED_RANGE_PROSE = "sensor latency <= 40 ms, actuator latency <= 20 ms, floor friction >= 0.6, payload 20 kg";
-export const SEARCHED_ENVELOPE_PROSE = "sensor latency 0-300 ms, actuator latency 0-100 ms, floor friction 0.2-1.0, payload 5-60 kg";
+export const SEARCHED_ENVELOPE_PROSE = "sensor latency 0-300 ms, actuator latency 0-100 ms, floor friction 0.2-1.0, payload 5-60 kg, deck grip (load friction) 0.1-1.0";
+export const TUNED_RANGE_PROSE_FULL = TUNED_RANGE_PROSE + "; deck grip (load_friction) not stated by the controller";
 export const TUNED_RANGE_SOURCE = "sim/tailbazaar_sim/controller.py, docstring section 'Design assumptions'";
 export const PRODUCT_QUESTION =
   "Can this controller be deployed in a wider operating range than it was tuned for, and where exactly does it stop working?";
@@ -41,9 +49,9 @@ export function rangePosition(scn: Scenario): { parameter: string; value: number
   return PARAM_ORDER.map((k) => {
     const t = CONTROLLER_TUNED_RANGE[k];
     const spec = ENVELOPE[k];
-    const v = Number(scn[k]);
-    const inTuned = t.exactly !== undefined ? v === t.exactly : (t.min === undefined || v >= t.min) && (t.max === undefined || v <= t.max);
-    const tuned = t.exactly !== undefined ? `= ${t.exactly}` : t.min !== undefined ? `>= ${t.min}` : `<= ${t.max}`;
+    const v = Number(scn[k] ?? NOMINAL_SCENARIO[k]);
+    const inTuned = t.not_stated ? true : t.exactly !== undefined ? v === t.exactly : (t.min === undefined || v >= t.min) && (t.max === undefined || v <= t.max);
+    const tuned = t.not_stated ? "not stated" : t.exactly !== undefined ? `= ${t.exactly}` : t.min !== undefined ? `>= ${t.min}` : `<= ${t.max}`;
     return { parameter: k, value: v, unit: spec.unit, tuned_range: tuned, in_tuned_range: inTuned, searched_envelope: `${spec.min} - ${spec.max}` };
   });
 }
@@ -57,6 +65,7 @@ export const ENVELOPE_AXES = [
   { name: "actuator_delay_ms", low: 0, high: 100, nominal: 20, marginal: null, scale: null, units: "ms", group: "systems", quantization: "quantized to the 20 ms control tick", tuned_range: "<= 20" },
   { name: "floor_friction", low: 0.2, high: 1.0, nominal: 0.8, marginal: null, scale: null, units: "coefficient", group: "physical", quantization: "3 decimal places", tuned_range: ">= 0.6" },
   { name: "payload_kg", low: 5.0, high: 60.0, nominal: 20.0, marginal: null, scale: null, units: "kg", group: "physical", quantization: "1 decimal place", tuned_range: "= 20" },
+  { name: "load_friction", low: 0.1, high: 1.0, nominal: 0.6, marginal: null, scale: null, units: "coefficient", group: "physical", quantization: "3 decimal places", tuned_range: "not stated" },
 ] as const;
 
 /** Public document served by GET /api/envelope: constants only, identical for every listing. */
@@ -91,6 +100,10 @@ export function checkAdmissible(scn: Record<string, unknown>): string[] {
   const problems: string[] = [];
   for (const k of PARAM_ORDER) {
     const spec = ENVELOPE[k];
+    if (!(k in scn)) {
+      if (!OPTIONAL_PARAMS.has(k)) problems.push(`missing ${k}`);
+      continue;
+    }
     const v = scn[k];
     if (typeof v !== "number" || !Number.isFinite(v)) {
       problems.push(`${k} must be a number`);
@@ -111,7 +124,9 @@ export function scenarioDistance(a: Scenario, b: Scenario): number {
   let d = 0;
   for (const k of PARAM_ORDER) {
     const spec = ENVELOPE[k];
-    d = Math.max(d, Math.abs(Number(a[k]) - Number(b[k])) / (spec.max - spec.min));
+    const av = Number(a[k] ?? NOMINAL_SCENARIO[k]);
+    const bv = Number(b[k] ?? NOMINAL_SCENARIO[k]);
+    d = Math.max(d, Math.abs(av - bv) / (spec.max - spec.min));
   }
   return d;
 }
