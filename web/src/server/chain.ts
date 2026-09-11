@@ -23,8 +23,13 @@ if (chain.id !== chainId) throw new Error(`configured chain id ${chainId} does n
 const transport = rpcUrls.length > 1 ? fallback(rpcUrls.map((u) => http(u, { timeout: 30_000 }))) : http(rpcUrls[0], { timeout: 30_000 });
 export const publicClient = createPublicClient({ chain, transport });
 
+// Writes never use the fallback transport and never auto-retry: a broadcast that times out on one
+// backend may already be in its mempool, and re-sending the same signed transaction elsewhere is
+// rejected as an underpriced replacement (observed on Base Sepolia: the pipeline aborted mid-run).
+// Reads keep the fallback; a failed send surfaces once and the caller decides.
+const writeTransport = http(rpcUrls[0], { timeout: 60_000, retryCount: 0 });
 export function walletFor(account: Account) {
-  return createWalletClient({ account, chain, transport });
+  return createWalletClient({ account, chain, transport: writeTransport });
 }
 
 export const STATUS_NAMES = ["None", "Listed", "Funded", "Delivered", "SettledValid", "SettledInvalid", "Refunded"] as const;
