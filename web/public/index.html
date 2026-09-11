@@ -4,15 +4,24 @@
 <meta charset="utf-8">
 <title>Tail Bazaar</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="A marketplace for reproducible robot failure scenarios: a hunter finds the conditions where a controller fails, a verifier re-runs the claim, and an escrow decides who gets paid.">
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-<header>
-  <a class="brand" href="#/" style="color:#fff">TAIL BAZAAR <small>failure intelligence for warehouse robots</small></a>
-  <div id="chainbar"></div>
+<header id="topbar">
+  <div class="wrap bar">
+    <a class="brand" href="#/">Tail Bazaar</a>
+    <nav id="nav"></nav>
+    <div id="chainbar"></div>
+  </div>
 </header>
-<main><div id="view">Loading…</div></main>
-<footer>Simulation: MuJoCo (Apache-2.0). Viewer: Three.js (MIT). The replay draws recorded simulation transforms; it runs no physics. Local demonstration mode: all agents run server-side with test-only keys. Not production software; no audit; no safety certification.</footer>
+<main><div id="view"><div class="band hero"><div class="wrap"><p class="lede">Loading…</p></div></div></div></main>
+<footer>
+  <div class="wrap">
+    <p>The replay draws transforms recorded by the simulator; it runs no physics in your browser. Simulation: MuJoCo (Apache-2.0). Viewer: Three.js (MIT).</p>
+    <p>A research prototype. Not audited, not Sybil-resistant, not a safety certification, and not production software. Adversarially selected failures say nothing about how often anything fails in the field.</p>
+  </div>
+</footer>
 <script src="/app.js"></script>
 </body>
 </html>
