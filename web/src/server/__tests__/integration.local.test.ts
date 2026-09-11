@@ -17,8 +17,12 @@ const PRIVATE_MARKERS = [
   "sensor_delay_ms", "actuator_delay_ms", "floor_friction", "payload_kg", "load_friction",
   "push_impulse_ns", "push_heading_deg", "push_time_s", "body_mass_scale", "actuator_noise_frac", "control_latency_ms", "init_seed",
   "object_mass_kg", "grip_friction", "object_offset_x_m", "object_offset_y_m", "action_noise_frac", "gripper_latency_ms", "goal_m",
+  "cmd_vx_mps",
   "salt_hex", "\"frames\"", "\"ticks\"", "trajectory_hash", "reproduce",
 ];
+/** Every target the registry publishes, in registry order, and sorted for set comparisons. */
+const ALL_TARGETS = ["cart", "humanoid", "arm", "g1"];
+const ALL_SORTED = [...ALL_TARGETS].sort();
 
 function orders(): OrderRow[] {
   return getDb().prepare("SELECT * FROM orders ORDER BY created_at ASC").all() as unknown as OrderRow[];
@@ -55,10 +59,16 @@ test("pre-purchase summary carries only the allowed fields, for every target", a
   }
 });
 
-test("the marketplace carries all three targets, and each listing declares which robot it is about", async () => {
+test("the marketplace carries every target, and each listing declares which robot it is about", async () => {
   const rows = (await (await app.request("/api/listings")).json()) as any[];
   const byTarget = new Set(rows.map((r) => r.public_summary.target.id));
-  assert.deepEqual([...byTarget].sort(), ["arm", "cart", "humanoid"], "every target in the registry is on the market");
+  assert.deepEqual([...byTarget].sort(), ALL_SORTED, "every target in the registry is on the market");
+  const g1 = rows.find((r) => r.public_summary.target.id === "g1")!;
+  assert.equal(g1.public_summary.envelope_id, "tb-g1-envelope-1");
+  assert.equal(g1.public_summary.failure_class.id, "FELL");
+  // The G1's fall is the one FELL this project decides itself, and the sealed summary says so.
+  assert.match(g1.public_summary.failure_class.detected_by, /THIS PROJECT'S predicate/);
+  assert.equal(g1.public_summary.target.replay_renderer, "g1-3d");
   for (const r of rows) assert.equal(r.target_id, r.public_summary.target.id, "the listing row and its sealed summary agree");
   const cart = rows.find((r) => r.public_summary.target.id === "cart")!;
   const humanoid = rows.find((r) => r.public_summary.target.id === "humanoid")!;
@@ -79,11 +89,12 @@ test("the marketplace carries all three targets, and each listing declares which
 test("the published envelope endpoint carries one envelope per target in GUARD's axis shape", async () => {
   const doc = (await (await app.request("/api/envelope")).json()) as any;
   assert.equal(doc.schema, "tb-envelopes-1");
-  assert.deepEqual(doc.targets.map((t: any) => t.target_id), ["cart", "humanoid", "arm"]);
+  assert.deepEqual(doc.targets.map((t: any) => t.target_id), ALL_TARGETS);
   for (const env of doc.targets) {
     for (const a of env.axes) assert.deepEqual(Object.keys(a).sort(), ["group", "high", "low", "marginal", "name", "nominal", "quantization", "scale", "tuned_range", "units"]);
     assert.equal(env.axes.every((a: any) => a.marginal === null && a.scale === null), true, "no distribution D is stated");
-    assert.ok(env.axes.every((a: any) => ["physical", "systems", "visual"].includes(a.group)));
+    // GUARD's three groups plus `command` (the G1's forward-velocity command: what the policy is asked to do).
+    assert.ok(env.axes.every((a: any) => ["physical", "systems", "visual", "command"].includes(a.group)));
     assert.deepEqual(Object.keys(env.verdicts).sort(), ["INCONCLUSIVE", "INVALID", "VALID"]);
     assert.ok(env.failure_classes.length >= 1);
   }
@@ -98,6 +109,11 @@ test("the published envelope endpoint carries one envelope per target in GUARD's
   assert.equal(arm.axes.length, 7);
   assert.match(arm.controller_tuned_range.prose, /unmodified Gymnasium-Robotics FetchPickAndPlace-v4/);
   assert.equal(arm.failure_classes.length, 2, "DROPPED and NOT_PLACED are both published");
+  const g1 = doc.targets[3];
+  assert.equal(g1.envelope_id, "tb-g1-envelope-1");
+  assert.equal(g1.axes.length, 8);
+  assert.match(g1.controller_tuned_range.prose, /Unitree's own MuJoCo deployment configuration/);
+  assert.match(g1.failure_classes[0].detected_by, /THIS PROJECT'S predicate/);
   // ?target= returns exactly one of them
   const one = (await (await app.request("/api/envelope?target=humanoid")).json()) as any;
   assert.equal(one.envelope_id, "tb-humanoid-envelope-1");
@@ -108,15 +124,17 @@ test("the published envelope endpoint carries one envelope per target in GUARD's
 test("search cost is published as a market-wide aggregate, with no scenario in it", async () => {
   const m = (await (await app.request("/api/market")).json()) as any;
   assert.ok(m.search_cost_total.simulations > 0, "the hunters actually ran simulations");
-  assert.ok(m.search_cost_total.hunts >= 3, "at least one hunt per target");
+  assert.ok(m.search_cost_total.hunts >= ALL_TARGETS.length, "at least one hunt per target");
   const cart = m.targets.find((t: any) => t.target_id === "cart");
   const humanoid = m.targets.find((t: any) => t.target_id === "humanoid");
   const arm = m.targets.find((t: any) => t.target_id === "arm");
-  assert.ok(cart.search_cost.simulations > 0 && humanoid.search_cost.simulations > 0 && arm.search_cost.simulations > 0);
+  const g1 = m.targets.find((t: any) => t.target_id === "g1");
+  assert.ok(cart.search_cost.simulations > 0 && humanoid.search_cost.simulations > 0 && arm.search_cost.simulations > 0 && g1.search_cost.simulations > 0);
   assert.ok(cart.failures_by_class.COLLISION > 0, "the cart sweep produced collisions");
   assert.ok(humanoid.failures_by_class.FELL > 0, "the humanoid sweep produced falls");
   assert.ok(arm.failures_by_class.DROPPED > 0, "the arm sweep produced drops");
-  assert.ok(cart.listings > 0 && humanoid.listings > 0 && arm.listings > 0);
+  assert.ok(g1.failures_by_class.FELL > 0, "the G1 sweep produced falls");
+  assert.ok(cart.listings > 0 && humanoid.listings > 0 && arm.listings > 0 && g1.listings > 0);
 });
 
 test("the failure ledger export carries the target id on every row", async () => {
@@ -124,12 +142,12 @@ test("the failure ledger export carries the target id on every row", async () =>
   const led = buildLedger();
   assert.ok(led.findings.length >= 3);
   for (const row of led.findings) {
-    assert.ok(["cart", "humanoid", "arm"].includes(row.target_id), `row ${row.finding_id} names a known target`);
+    assert.ok(ALL_TARGETS.includes(row.target_id), `row ${row.finding_id} names a known target`);
     assert.equal(typeof row.severity.proxy, "string");
     assert.ok(row.severity.value === null || typeof row.severity.value === "number");
   }
-  assert.deepEqual(Object.keys(led.findings_by_target).sort(), ["arm", "cart", "humanoid"]);
-  assert.ok(led.findings_by_target.cart > 0 && led.findings_by_target.humanoid > 0 && led.findings_by_target.arm > 0);
+  assert.deepEqual(Object.keys(led.findings_by_target).sort(), ALL_SORTED);
+  assert.ok(led.findings_by_target.cart > 0 && led.findings_by_target.humanoid > 0 && led.findings_by_target.arm > 0 && led.findings_by_target.g1 > 0);
 });
 
 test("retrieval requires the bound buyer's signature over a fresh challenge", async () => {

@@ -7,6 +7,7 @@ import { chainMode, databasePath, port, REPO_ROOT } from "./config.js";
 import { startServer } from "./index.js";
 import { writeLedger } from "./ledger.js";
 import { runDemoPipeline } from "./pipeline.js";
+import { TARGET_IDS, isTargetId, type TargetId } from "./targets.js";
 
 async function main() {
   const [cmd, ...rest] = process.argv.slice(2);
@@ -18,12 +19,21 @@ async function main() {
     console.log("NOTE: every row contains the scenario parameters buyers pay for. This file is operator/Loop-facing; no HTTP route serves it.");
     return;
   }
-  if (cmd !== "demo") { console.error("usage: cli.js demo [--evidence DIR] [--serve] | serve | ledger [FILE]"); process.exit(2); }
+  if (cmd !== "demo") { console.error("usage: cli.js demo [--evidence DIR] [--serve] [--target ID[,ID...]] | serve | ledger [FILE]"); process.exit(2); }
   let evidence: string | null = null;
   let keep = false;
+  // --target restricts one pipeline run to the named registry targets; omitted, the run covers every
+  // target in the registry exactly as before.
+  let targets: TargetId[] | undefined;
   for (let i = 0; i < rest.length; i++) {
     if (rest[i] === "--evidence") evidence = rest[++i];
     else if (rest[i] === "--serve") keep = true;
+    else if (rest[i] === "--target") {
+      const ids = String(rest[++i] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+      const bad = ids.filter((id) => !isTargetId(id));
+      if (!ids.length || bad.length) { console.error(`--target: unknown target(s) ${JSON.stringify(bad.length ? bad : ids)}; known: ${TARGET_IDS.join(", ")}`); process.exit(2); }
+      targets = ids as TargetId[];
+    }
     else if (rest[i] === "--reset") {
       if (chainMode !== "local") { console.error("--reset is only allowed in local chain mode"); process.exit(2); }
       for (const suffix of ["", "-wal", "-shm", "-journal"]) fs.rmSync(databasePath + suffix, { force: true });
@@ -33,7 +43,7 @@ async function main() {
   if (evidence) fs.mkdirSync(evidence, { recursive: true });
   const server = startServer(port);
   try {
-    const res = await runDemoPipeline({ evidenceDir: evidence, baseUrl: `http://127.0.0.1:${port}` });
+    const res = await runDemoPipeline({ evidenceDir: evidence, baseUrl: `http://127.0.0.1:${port}`, targets });
     console.log(`pipeline ${res.run_id} done; orders: ${res.orders.join(", ")}`);
     if (!keep) { server.close(); process.exit(0); }
   } catch (e: any) {

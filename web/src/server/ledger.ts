@@ -76,6 +76,7 @@ function nominalSuites(): { target_id: string; n_nominal_runs: number | null; al
     cart: [path.join("evidence", "local", "nominal-suite.json"), path.join("evidence", "milestone", "nominal-suite.json")],
     humanoid: [path.join("evidence", "local", "humanoid", "nominal-suite.json"), path.join("evidence", "humanoid", "nominal-suite.json")],
     arm: [path.join("evidence", "local", "arm", "nominal-suite.json"), path.join("evidence", "arm", "nominal-suite.json")],
+    g1: [path.join("evidence", "local", "g1", "nominal-suite.json"), path.join("evidence", "g1", "nominal-suite.json")],
   };
   return TARGET_IDS.map((id) => {
     for (const rel of candidates[id]) {

@@ -95,13 +95,15 @@ test("published conditions are per axis, with null where the publisher states no
 });
 
 test("the registry carries the arm as the third target and resolves runs to it by their own envelope", () => {
-  assert.deepEqual(TARGET_IDS, ["cart", "humanoid", "arm"]);
+  // The arm stays third; the registry may grow after it (the G1 is fourth).
+  assert.deepEqual(TARGET_IDS.slice(0, 3), ["cart", "humanoid", "arm"]);
+  assert.deepEqual(TARGET_IDS, ["cart", "humanoid", "arm", "g1"]);
   assert.equal(targetOfRun({ envelope_id: "tb-arm-envelope-1" }).id, "arm");
   assert.equal(targetOfRun({ target_id: "arm" }).id, "arm");
   assert.equal(ARM.sim.module, "tailbazaar_sim.arm.cli");
   assert.deepEqual(ARM.failure_outcomes, ["DROPPED", "NOT_PLACED"]);
   const doc = envelopesDoc();
-  assert.deepEqual(doc.targets.map((t) => t.target_id), ["cart", "humanoid", "arm"]);
+  assert.deepEqual(doc.targets.map((t) => t.target_id).slice(0, 3), ["cart", "humanoid", "arm"]);
   assert.equal(doc.targets[2].replay_renderer, "arm-3d");
   assert.equal(doc.targets[2].axes.length, 7);
   // NOT_PLACED is Gymnasium-Robotics' own verdict; DROPPED is the one predicate this project owns and

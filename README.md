@@ -33,6 +33,7 @@ signed challenge, and the verifier releases or refunds the payment.
 | `cart` (`tb-envelope-1`) | a braking warehouse cart carrying a payload | `COLLISION` — it reaches the obstacle instead of stopping short; `LOAD_SHED` — the payload breaks loose under braking | the simulator's own contact flag / slip criterion | impact speed (m/s) |
 | `humanoid` (`tb-humanoid-envelope-1`) | a 42.116 kg Gymnasium MuJoCo humanoid under a pretrained SAC balance policy | `FELL` — the torso leaves the height band the environment calls healthy | **Gymnasium's own health predicate**; this project implements no fall detector | torso impact speed (m/s) |
 | `arm` (`tb-arm-envelope-1`) | a Gymnasium-Robotics MuJoCo Fetch arm picking a 5 cm block off a table under a pretrained SAC+HER policy | `DROPPED` — the part leaves the gripper in mid-air, away from the goal; `NOT_PLACED` — it is still not at the goal when the episode ends | `NOT_PLACED` is **Gymnasium-Robotics' own success flag**; `DROPPED` is **this project's own mechanical predicate over MuJoCo's contact list**, because the environment scores placement and not custody | the part's impact speed (m/s); `NOT_PLACED` deliberately has **none** |
+| `g1` (`tb-g1-envelope-1`) | Unitree's own 32 kg 12-dof MuJoCo model of the G1 humanoid walking under Unitree's own pretrained policy (`unitree_rl_gym`, BSD-3-Clause) | `FELL` — the pelvis drops below 0.462 m or tilts past 60° | **this project's own predicate, stated in every run document**, because Unitree's runner has no fall flag | pelvis impact speed (m/s) |
 
 Everything target-specific lives in one registry, `web/src/server/targets.ts`: id, label, envelope
 YAML, simulator entry point and CLI shape, failure classes, severity proxy and units, the
@@ -341,7 +342,61 @@ block.
 Full provenance, the nominal suite, every hunt, the drop-predicate hardening and the repeatability
 checks: [`evidence/arm/README.md`](evidence/arm/README.md).
 
-### The fourth target that was explored and deliberately not listed — a VLA
+### Target 4 — the Unitree G1 walking policy (`tb-g1-envelope-1`)
+
+> **Unitree ships this walking policy with one MuJoCo deployment configuration and no envelope. How
+> far can the operating range be widened — a shove, a slippery floor, a heavier body, noisy or
+> delayed actuation, a faster or slower command — before the G1 falls over?**
+
+The artefact under test is **Unitree's own pretrained G1 walking policy**, `deploy/pre_train/g1/motion.pt`
+from [`unitreerobotics/unitree_rl_gym`](https://github.com/unitreerobotics/unitree_rl_gym/tree/276801e46c5d433564f24658bac64f254b7d2d4b)
+at commit `276801e4`, **BSD-3-Clause** (the licence text is vendored beside the files). It is a
+TorchScript module — an LSTM(47 → 64) memory feeding a 64 → 32 → 12 ELU actor — run under Unitree's
+own 12-dof MuJoCo model of the G1 (`g1_12dof.xml`, 32.1 kg, the arms, torso and head folded into
+one rigid pelvis body) with Unitree's own deployment configuration (`deploy_mujoco/configs/g1.yaml`:
+0.002 s physics, 50 Hz control, PD gains, default joint angles, observation/action scales, a 0.5 m/s
+forward command). `sim/tailbazaar_sim/g1/simulate.py` is a line-by-line port of the publisher's
+`deploy_mujoco.py` control loop; the policy file's sha256 `cf668f75…1759d` is checked at load time
+and **is what a listing is bound to**. Nothing trains or edits anything. Torch runs on one CPU thread
+under `inference_mode`, and the LSTM's hidden/cell buffers are reset with the exporter's own
+`reset_memory()` at the start of every run — that reset is what makes two identical scenarios
+byte-identical (`evidence/g1/repeatability-*.json`: two in-process runs plus one fresh subprocess,
+same trajectory hash, same state hash, same metrics).
+
+| Axis | Group | Publisher deploys at | Searched envelope | Nominal | Units |
+|---|---|---|---|---|---|
+| `push_impulse_ns` | physical | = 0 | 0 – 60 | 0 | N·s (constant world-frame force held 0.1 s on the pelvis) |
+| `push_heading_deg` | physical | not stated | 0 – 360 | 0 | deg (circular) |
+| `push_time_s` | physical | not stated | 1.0 – 8.0 | 3.0 | s (quantized to the 20 ms control tick) |
+| `floor_friction` | physical | = 1.0 | 0.4 – 1.4 | 1.0 | coefficient (MuJoCo's default; the XML declares none) |
+| `body_mass_scale` | physical | = 1.0 | 0.8 – 1.25 | 1.0 | coefficient (mass **and** matching inertia) |
+| `actuator_noise_frac` | systems | = 0 | 0 – 0.3 | 0 | fraction of the 0.25 rad action scale, on the joint target |
+| `control_latency_ms` | systems | = 0 | 0 – 100 | 0 | ms (quantized to the 20 ms control tick) |
+| `cmd_vx_mps` | command | = 0.5 | 0 – 1.0 | 0.5 | m/s, the forward velocity command |
+
+**The failure class is ours, and it says so.** Unlike the Gymnasium humanoid, Unitree's runner has no
+health flag: it steps until the clock runs out. So `FELL` is a predicate this project wrote and
+states in every run document (`fall_predicate`): the pelvis height drops below **0.462 m** (0.6 × the
+measured nominal standing height, 0.77 m) **or** the pelvis tilts past **60°** from vertical (the
+projected gravity the policy itself observes), whichever first, checked every 20 ms; the run records
+which condition fired and when. Severity is `pelvis_impact_speed_mps`, the pelvis's world-frame speed
+at the first floor contact of a geom that is not a foot, after the predicate fired; bands are anchored
+to `sqrt(2·g·0.462 m) = 3.01 m/s`, a free fall from the line itself. Kinematics, not damage.
+
+Measured (`evidence/g1/README.md`): at the deployment configuration the G1 walks the full 15 s
+episode, 6.92 m at 0.46 m/s against a 0.5 m/s command, and every benign case (one tick of latency,
+a grippier floor, a lighter body, a 4 N·s shove, 0.3 and 0.8 m/s commands) survives too. The push
+grid (88 runs) survives every shove up to 24 N·s from all eight headings; **28 N·s from the side is
+the mildest fall** (4.32 s, pelvis 0.459 m and tilt 65.9° both crossed, right hand hits the floor at
+4.40 s with the pelvis at 2.74 m/s). The systems grid (42 runs) survives up to 60 ms of latency at
+every noise level and **falls at 80 ms — four control ticks — even with no noise**; the friction ×
+mass grid (36 runs) survives entirely. Set beside target 2, whose policy one 15 ms tick fells: this
+one tolerates four ticks and a shove three and a half times harder. The order page draws the robot
+from its own link meshes (the 27 STLs its MJCF names, decimated for the page by vertex clustering
+from 25.2 MB to 6.3 MB — `web/public/meshes/g1/README.txt` lists every file's before and after; the
+simulator only ever loads the verbatim copies).
+
+### A target that was explored and deliberately not listed — a VLA
 
 A vision-language-action policy was the obvious fourth target, and it was actually run rather than
 speculated about: **openpi `pi0`** (commit `215abfb2`, checkpoint

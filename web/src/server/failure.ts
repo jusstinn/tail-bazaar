@@ -97,6 +97,30 @@ const KNOWN_CLASSES: Record<string, { label: string; moment_event: string; momen
   },
 };
 
+/** A class id can mean a different mechanism on a different target. The G1's FELL is decided by THIS
+ *  PROJECT'S predicate (Unitree's runner has none) and measured on the pelvis, so its copy, its moment
+ *  event and its severity field differ from the Gymnasium humanoid's FELL. Looked up by the run's own
+ *  `target_id` first; a target without an override falls back to the table above. */
+const KNOWN_CLASSES_BY_TARGET: Record<string, Record<string, (typeof KNOWN_CLASSES)[string]>> = {
+  g1: {
+    FELL: {
+      label: "Fell",
+      moment_event: "fall_predicate_fired",
+      moment_label: "the fall",
+      headline_key: "pelvis_impact_speed_mps",
+      severity_event: "ground_contact",
+      severity_label: "pelvis impact",
+      sentence: "The pelvis dropped below the fall-height line or tilted past 60 degrees — this project's own predicate, since Unitree's runner has no fall flag: the policy lost its balance instead of walking on.",
+    },
+  },
+};
+
+function knownClass(classId: string, run: unknown): (typeof KNOWN_CLASSES)[string] | undefined {
+  const target = (run as { target_id?: unknown } | null)?.target_id;
+  const override = typeof target === "string" ? KNOWN_CLASSES_BY_TARGET[target]?.[classId] : undefined;
+  return override ?? KNOWN_CLASSES[classId];
+}
+
 export type Quantity = { key: string; label: string; value: number; unit: string; text: string };
 export type Attribute = { key: string; label: string; value: string };
 export type Marker = { id: string; t_s: number; label: string; kind: "moment" | "secondary" | "cue" };
@@ -195,8 +219,7 @@ function classesOf(run: unknown, primary: string): string[] {
 }
 
 /** The event that carries a class's failure moment, when the run recorded one. */
-function momentFor(classId: string, events: RunEvent[]): RunEvent | null {
-  const known = KNOWN_CLASSES[classId];
+function momentFor(known: (typeof KNOWN_CLASSES)[string] | undefined, events: RunEvent[]): RunEvent | null {
   if (known) { const e = events.find((x) => x.type === known.moment_event); if (e) return e; }
   const terminal = events.filter((e) => !CUE_EVENTS.has(e.type));
   return terminal.length ? terminal[terminal.length - 1] : null;
@@ -209,13 +232,13 @@ function momentFor(classId: string, events: RunEvent[]): RunEvent | null {
  */
 export function presentFailure(run: unknown, baseline?: unknown): FailurePresentation {
   const classId = outcomeOf(run);
-  const known = KNOWN_CLASSES[classId];
+  const known = knownClass(classId, run);
   const events = eventsOf(run);
   const classes = classesOf(run, classId);
 
   // The moment: the class's own event type when the run carries it, otherwise the last event that is
   // not a cue on the way there, otherwise nothing.
-  const moment = momentFor(classId, events);
+  const moment = momentFor(known, events);
 
   const numericOf = (e: RunEvent | null): Quantity[] =>
     e ? Object.entries(e).filter(([k, v]) => k !== "t_s" && typeof v === "number" && Number.isFinite(v)).map(([k, v]) => quantityFrom(k, v as number)) : [];

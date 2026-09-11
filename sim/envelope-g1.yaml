@@ -1,0 +1,189 @@
+# Tail Bazaar target #4 — the operating envelope (theta) the G1 hunter searches, published in the
+# same axis shape GUARD uses in configs/guard_theta.yaml and the same shape as this project's other
+# envelopes. Machine-readable copy of sim/tailbazaar_sim/g1/envelope.py; the Python file stays
+# authoritative and `tailbazaar-g1 selfcheck` keeps the two together.
+#
+# This file is ADDITIVE. It does not replace, extend or renumber any other envelope. A run document
+# says which target it belongs to in its own top-level `target_id` field.
+#
+# EVERYTHING HERE IS AN ILLUSTRATIVE ASSUMPTION for a demonstration. None of these bounds is measured
+# on a physical robot. The "robot" is Unitree's own 12-dof MuJoCo model of the G1 (32.1 kg, the arms,
+# torso and head folded into one rigid pelvis body) and the "controller" is Unitree's own pretrained
+# walking policy; the bounds are chosen to bracket the publisher's deployment configuration widely
+# enough that "where does this stop working?" has an answer inside them.
+#
+# NO DISTRIBUTION D IS STATED. `marginal` and `scale` are present for schema compatibility and null.
+# Adversarially selected failures are not failure frequencies.
+#
+# Axis groups (GUARD's vocabulary plus one):
+#   physical  — forces on the body, the ground it stands on, and the mass it carries
+#   systems   — latency and noise in the actuation path
+#   command   — what the policy is asked to do (the forward velocity command)
+#   visual    — not modelled; there is no perception stack. The policy reads proprioception directly.
+#
+# `published_conditions` records the conditions the target's PUBLISHER deploys the policy under: the
+# MuJoCo deployment configuration in deploy/deploy_mujoco/configs/g1.yaml, which is the ONLY operating
+# point Unitree publishes. Where the publisher says nothing, the value is "not stated".
+
+envelope_id: tb-g1-envelope-1
+envelope_revision: tb-g1-envelope-1.0
+target_id: unitree-g1-walk-v1
+scene_id: unitree-g1-12dof-scene
+scene_revision: 1
+control_tick_ms: 20          # deploy_mujoco: simulation_dt 0.002 s x control_decimation 10 (50 Hz)
+physics_timestep_ms: 2
+episode_length_s: 15.0       # 750 control ticks; the publisher's runner has no episode, this project chose the humanoid target's 15 s
+push_duration_s: 0.1         # 5 control ticks; fixed and documented, NOT an axis
+duplicate_rule: >-
+  same failure-class set AND normalized L-infinity distance < 0.05 over the eight continuous axes
+  (push_heading_deg the short way round the circle; push_heading_deg and push_time_s skipped when
+  either side has no push, because an impulse of magnitude zero has no direction or timing and the
+  two runs are byte-identical)
+distribution_D: null         # not stated, not estimated
+
+target:
+  kind: pretrained_policy
+  what: Unitree's own pretrained G1 walking policy (TorchScript, LSTM + MLP); nothing here trains
+  repo: unitreerobotics/unitree_rl_gym
+  repo_commit: 276801e46c5d433564f24658bac64f254b7d2d4b
+  policy_file: deploy/pre_train/g1/motion.pt
+  policy_sha256: cf668f75b90d1abf73d2b87612a6e76bccc61ff7e083b63582d3f6aaa3c1759d
+  model: resources/robots/g1_description/g1_12dof.xml (+ scene.xml, 27 STL meshes)
+  licence: BSD-3-Clause (HangZhou YuShu TECHNOLOGY CO.,LTD., "Unitree Robotics"); vendored verbatim with the licence text
+  publisher_claim: "none stated; the deployment configuration is the only published operating point"
+
+continuous:
+  # --- physical ---------------------------------------------------------------
+  # An external shove applied to the pelvis's centre of mass as a constant world-frame force held for
+  # push_duration_s. 60 N*s is 1.9 m/s of velocity change on the 32.1 kg body.
+  - name: push_impulse_ns
+    low: 0.0
+    high: 60.0
+    nominal: 0.0
+    marginal: null
+    scale: null
+    units: N*s
+    group: physical
+    places: 2
+    published_conditions: "= 0 (the publisher deploys an unpushed robot)"
+  # Direction of that force in the world horizontal plane; 0 deg = +x, the commanded walking direction.
+  - name: push_heading_deg
+    low: 0.0
+    high: 360.0
+    nominal: 0.0
+    marginal: null
+    scale: null
+    units: deg
+    group: physical
+    places: 1
+    circular: true
+    published_conditions: "not stated"
+  # When the push starts. Must be an exact multiple of the 20 ms control tick (1.0 s = tick 50, 8.0 s = tick 400).
+  - name: push_time_s
+    low: 1.0
+    high: 8.0
+    nominal: 3.0
+    marginal: null
+    scale: null
+    units: s
+    group: physical
+    places: 3
+    step: 0.02
+    published_conditions: "not stated"
+  # Coulomb sliding coefficient written into geom_friction[0] of EVERY geom (MuJoCo takes the max of a
+  # pair). Nothing in the vendored XML declares a friction, so every geom compiles with the default 1.0.
+  - name: floor_friction
+    low: 0.4
+    high: 1.4
+    nominal: 1.0
+    marginal: null
+    scale: null
+    units: coefficient
+    group: physical
+    places: 3
+    published_conditions: "= 1.0 (MuJoCo's default, the value the vendored model compiles with)"
+  # Multiplier on every body mass AND the matching diagonal inertia.
+  - name: body_mass_scale
+    low: 0.8
+    high: 1.25
+    nominal: 1.0
+    marginal: null
+    scale: null
+    units: "1"
+    group: physical
+    places: 3
+    published_conditions: "= 1.0 (stock masses)"
+
+  # --- systems ----------------------------------------------------------------
+  # Std of zero-mean Gaussian noise added to each applied joint POSITION TARGET, as a fraction of the
+  # policy's 0.25 rad action scale, drawn once per control tick from a scenario-seeded generator.
+  - name: actuator_noise_frac
+    low: 0.0
+    high: 0.3
+    nominal: 0.0
+    marginal: null
+    scale: null
+    units: "1"
+    group: systems
+    places: 3
+    published_conditions: "= 0 (noiseless actuation)"
+  # The joint target computed at tick k is applied from tick k + control_latency_ms/20; until the first
+  # target arrives the PD loop holds the publisher's default joint angles (zero-order hold).
+  - name: control_latency_ms
+    low: 0
+    high: 100
+    nominal: 0
+    marginal: null
+    scale: null
+    units: ms
+    group: systems
+    step: 20
+    published_conditions: "= 0 (the runner applies the target in the same tick it is computed)"
+
+  # --- command ----------------------------------------------------------------
+  # The forward velocity command given to the policy (cmd_init[0] in the deployment configuration).
+  - name: cmd_vx_mps
+    low: 0.0
+    high: 1.0
+    nominal: 0.5
+    marginal: null
+    scale: null
+    units: m/s
+    group: command
+    places: 2
+    published_conditions: "= 0.5 (cmd_init in deploy_mujoco/configs/g1.yaml)"
+
+# No discrete stratification axis: the publisher's runner starts every run from the model's own qpos0
+# and so does this target.
+discrete: []
+
+# Failure class. Decided by THIS PROJECT'S predicate, stated because the publisher has none: Unitree's
+# runner steps until the clock runs out and never declares a fall.
+failure_classes:
+  - name: FELL
+    detected_by: >-
+      tailbazaar_sim.g1.simulate (THIS PROJECT): FELL when the pelvis height data.qpos[2] drops below
+      0.462 m (0.6 x the measured nominal standing height of 0.77 m) OR the pelvis tilts more than
+      60 deg from vertical (arccos(-g_z) of the projected gravity the policy itself observes),
+      whichever first, checked at the end of every 20 ms control tick. The run document records
+      which condition fired and when.
+    severity_proxy: pelvis_impact_speed_mps
+    severity_proxy_secondary: peak_pelvis_accel_mps2
+
+severity:
+  pelvis_impact_speed_mps: >-
+    magnitude of the pelvis body's world-frame linear velocity (mujoco.mj_objectVelocity) at the first
+    contact between the floor and a geom that does not belong to a foot body, looked for only AFTER the
+    predicate has fired
+  peak_pelvis_accel_mps2: largest control-tick finite difference of that velocity after the predicate fired
+  fall_time_s: the time the predicate fired
+  survival_time_s: how long the policy lasted, capped at the 15 s episode
+
+outcomes:
+  conclusive: [SURVIVED, FELL]
+  inconclusive: [DIVERGED, INVALID_INITIAL_STATE, REJECTED_OUT_OF_ENVELOPE]
+
+verdicts:
+  VALID: re-simulated by the verifier and bound to the delivered evidence; pays the seller
+  INVALID: rejected — not reproducible, out of envelope, duplicate, or evidence not bound to the verified run
+  INCONCLUSIVE: numerical divergence, an invalid initial state, or out-of-envelope parameters; never pays

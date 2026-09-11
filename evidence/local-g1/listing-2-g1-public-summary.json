@@ -1,0 +1,55 @@
+{
+  "schema": "tb-summary-2",
+  "format": "tb-cjson-1",
+  "target": {
+    "id": "g1",
+    "label": "Unitree G1 walking policy",
+    "machine": "a 32 kg Unitree G1 humanoid walking under Unitree's own pretrained policy",
+    "subject_label": "Policy",
+    "replay_renderer": "g1-3d"
+  },
+  "failure_class": {
+    "id": "FELL",
+    "label": "Fell",
+    "detected_by": "THIS PROJECT'S predicate, stated because Unitree's runner has no fall flag of its own: FELL when the pelvis drops below 0.462 m (0.6 x the measured nominal standing height of 0.77 m) or tilts more than 60 degrees from vertical, whichever first, checked every 20 ms control tick; the run document records which condition fired and when."
+  },
+  "controller": {
+    "id": "unitree-rl-gym-g1-motion-pt",
+    "hash": "sha256:cf668f75b90d1abf73d2b87612a6e76bccc61ff7e083b63582d3f6aaa3c1759d"
+  },
+  "envelope_id": "tb-g1-envelope-1",
+  "admissible": true,
+  "claim_kind": "the walking policy falls over under admissible conditions inside the published envelope",
+  "verification": {
+    "status": "VERIFIED",
+    "verdict": "VALID",
+    "method": "exact-trajectory-hash",
+    "verifier_version": "tb-verifier-2",
+    "verifier": "0xe592C7DA96Cc42344952C452377eBCc7Cc0982AE",
+    "environment_fingerprint": "0x8383c9f5ca1688e7b435a6dbf3839eb9cc4f6131e1cf8832547b00956a8f67a2",
+    "evidence_binding": "the seller's environment fingerprint equalled the verifier's own, and the policy checkpoint id+hash and the trajectory hash RECOMPUTED from the delivered replay frames were compared against the verifier's own re-run with this target's own simulator; declared hashes are not trusted, the frames were checked to be a physically possible trajectory of this scene, and a replay the verifier cannot bind exactly is INCONCLUSIVE rather than certified",
+    "verified_at": "2026-09-11T18:37:54.664Z"
+  },
+  "operating_context": {
+    "controller_tuned_range": "Unitree's own MuJoCo deployment configuration: no external push, MuJoCo's default floor friction 1.0, stock body masses, no actuator noise, no control latency, a forward velocity command of 0.5 m/s",
+    "controller_tuned_range_label": "the publisher's own deployment configuration",
+    "searched_envelope": "push impulse 0-60 N·s from any heading, push time 1-8 s, floor friction 0.4-1.4, body mass ×0.8-1.25, actuator noise 0-30 %, control latency 0-100 ms, forward command 0-1 m/s",
+    "question": "Unitree ships this walking policy with one MuJoCo deployment configuration and no envelope. How far can the operating range be widened — a shove, a slippery floor, a heavier body, noisy or delayed actuation, a faster or slower command — before the G1 falls over?",
+    "note": "The searched envelope is deliberately wider than the one configuration the policy is published with, so a finding outside it is not a defect report: Unitree's runner claims nothing about pushes, latency, noise, friction, mass or other commands. Unlike the Gymnasium humanoid, this environment has no health flag, so the fall predicate is this project's own and is stated in every run document. These bounds are illustrative assumptions for a demonstration; the 'robot' is Unitree's 32 kg 12-dof MuJoCo model of the G1, not a physical machine.",
+    "reference": "GET /api/envelope (published axes for every target, same shape as GUARD configs/guard_theta.yaml)"
+  },
+  "severity": {
+    "proxy": "pelvis_impact_speed_mps",
+    "band": "low",
+    "definition": "pelvis impact speed banded against the 3.01 m/s a free fall from the 0.462 m fall-height threshold reaches: low below half of it, medium up to it, high above it (a measured kinematic proxy, never a damage, injury or cost estimate)"
+  },
+  "seller": "0x28dAA9F3F9468382fFeD53cc339418403337cDeD",
+  "seller_settled_orders_at_listing": 9,
+  "price_wei": "1000000000000000",
+  "chain": {
+    "mode": "local",
+    "chain_id": 31337,
+    "escrow": "0xC2D82022B3F2E06AB0E25B899B553dF729f3241e"
+  },
+  "hidden": "exact scenario parameters, trajectory, replay frames, the hunt that found it and the reproduction command are in the private package only"
+}
