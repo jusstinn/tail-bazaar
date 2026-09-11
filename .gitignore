@@ -25,6 +25,10 @@ web/data/
 evidence/private/
 evidence/runs/
 sim/out/
+sim/out-*/
+
+# third-party clones used only as a SOURCE for vendored files (see sim/tailbazaar_sim/g1/PROVENANCE.md)
+sim/third_party/
 
 # foundry
 contracts/out/
