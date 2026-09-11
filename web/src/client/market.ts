@@ -7,10 +7,16 @@
 // machine, its own failure classes and who decides each class. The findings list is then grouped and
 // filterable by robot. Nothing here counts the targets by hand: the copy is built from whatever the
 // registry publishes at /api/market.
-import { envelopeFor, getJSON, postJSON, type DemoRun, type EnvelopesDoc, type Listing, type MarketDoc, type Order, type Status } from "./api.js";
+import { envelopeFor, getJSON, getToken, postJSON, setToken, type DemoRun, type EnvelopesDoc, type Flow, type Listing, type MarketDoc, type Order, type Status } from "./api.js";
 import { addrCell, esc, eth, short, txCell } from "./format.js";
 import { armPage, badge, band, counter, disclosure, rangeBars, statusTone } from "./ui.js";
 import { heroMarkup, mountHero } from "./hero.js";
+import { livePanelMarkup, mountLive, plainError } from "./live.js";
+
+/** Whether this browser may drive the market (buy, list). Local demonstration mode: always. Hosted
+ *  mode: only with the operator token stored, because a flow spends the operator's test ETH. */
+type Drive = { ok: boolean; note: string };
+const driveFor = (st: Status): Drive => (st.hosted_mode && !getToken() ? { ok: false, note: "hosted instance: paste the operator token below to drive the market from this page" } : { ok: true, note: "" });
 
 const STEPS: [string, string][] = [
   ["Search", "A hunter agent sweeps one robot's published operating range, simulating the same controller or policy under conditions it was never tuned for, and keeps the mildest conditions that break it."],
@@ -24,14 +30,15 @@ const targetOf = (l: Listing): string => l.public_summary.target?.id ?? l.target
 const COUNT_WORD = ["no", "one", "two", "three", "four", "five", "six"];
 const countWord = (n: number): string => COUNT_WORD[n] ?? String(n);
 
-function findingCard(l: Listing, order: Order | undefined): string {
+function findingCard(l: Listing, order: Order | undefined, drive: Drive): string {
   const s = l.public_summary;
   const verdict = s.verification.verdict ?? s.verification.status;
+  const unsold = !order && l.status === "LISTED";
   const settled = order?.status === "SETTLED_VALID" ? "The delivered bytes matched the seal. The seller was paid and the buyer keeps the evidence."
     : order?.status === "SETTLED_INVALID" ? "The delivered bytes did not match the seal. The buyer was refunded and the seller was paid nothing."
-    : order ? "Purchased; settlement in progress." : "Not yet purchased.";
+    : order ? "Purchased; settlement in progress." : unsold ? "Sealed and for sale. Buying it runs the escrow, delivery, retrieval and settlement live, one transaction at a time." : "Not yet purchased.";
   const t = targetOf(l);
-  return `<a class="finding reveal" data-target="${esc(t)}" href="#/orders/${esc(order?.order_id ?? "")}" ${order ? "" : 'aria-disabled="true"'}>
+  const inner = `
     <div class="finding-top">
       <span class="badge target target-${esc(t)}">${esc(s.target?.label ?? "Warehouse cart")}</span>
       <span class="chip chip-${esc(s.severity.band)}">${esc(s.severity.band)} severity</span>
@@ -47,9 +54,26 @@ function findingCard(l: Listing, order: Order | undefined): string {
       <div><span class="k">Seller</span><span class="v">${addrCell(l.seller, l.chain_mode)}</span></div>
       <div><span class="k">Settled orders</span><span class="v mono">${l.seller_settled_orders ?? "—"}</span></div>
       <div><span class="k">On chain</span><span class="v">${l.on_chain ? badge(l.on_chain.status, statusTone(l.on_chain.status)) : badge("unreachable", "bad")}</span></div>
-    </div>
+    </div>`;
+  if (unsold) {
+    return `<div class="finding unsold reveal" data-target="${esc(t)}">${inner}
+      <div class="finding-buy"><button class="btn small" data-buy="${esc(l.listing_id)}" ${drive.ok ? "" : "disabled"}>Buy for ${esc(eth(l.price_wei))}</button>${drive.ok ? "" : `<span class="muted">${esc(drive.note)}</span>`}</div>
+    </div>`;
+  }
+  return `<a class="finding reveal" data-target="${esc(t)}" href="#/orders/${esc(order?.order_id ?? "")}" ${order ? "" : 'aria-disabled="true"'}>${inner}
     <span class="finding-go">${order ? "Open the finding" : "No order yet"} <i>→</i></span>
   </a>`;
+}
+
+/** HOSTED MODE: the operator token that unlocks the Buy and List buttons. Same storage as the order
+ *  page's unlock box (api.ts getToken/setToken); it stays in this browser and goes to this app only. */
+function tokenBox(st: Status): string {
+  if (!st.hosted_mode) return "";
+  if (getToken()) return `<p class="fineprint reveal">An operator token is stored in this browser, so the Buy and List buttons are live. <a href="#" id="op-tok-clear" class="link-go">Forget it <i>→</i></a></p>`;
+  return `<div class="op-token reveal">
+    <div class="row"><input id="op-tok" type="password" placeholder="paste the operator token to buy or list from this page" autocomplete="off"><button id="op-tok-go" class="btn small">Save</button></div>
+    <p class="fineprint">This instance is hosted at a public URL. Buying or listing from the page writes to the chain and spends the operator's test ETH, so it needs the operator token. The token stays in this browser and is sent to this app only.</p>
+  </div>`;
 }
 
 /** One robot, explained in the space a visitor actually reads: what it is, what "failure" means for
@@ -70,14 +94,20 @@ function targetCard(t: MarketDoc["targets"][number], envs: EnvelopesDoc): string
   </div>`;
 }
 
-export async function renderMarket(view: HTMLElement, st: Status): Promise<void> {
-  const [listings, orders, demo, envs, market] = await Promise.all([
+export async function renderMarket(view: HTMLElement, st: Status, opts: { showFlow?: Flow | null } = {}): Promise<void> {
+  const [listings, orders, demo, envs, market, flows] = await Promise.all([
     getJSON<Listing[]>("/api/listings"),
     getJSON<Order[]>("/api/orders"),
     getJSON<{ enabled: boolean; run: DemoRun; log_redacted?: boolean }>("/api/demo/status"),
     getJSON<EnvelopesDoc>("/api/envelope"),
     getJSON<MarketDoc>("/api/market"),
+    getJSON<{ flow: Flow | null }>("/api/flows/current").catch(() => ({ flow: null as Flow | null })),
   ]);
+  const drive = driveFor(st);
+  // A listing flow still running on the server (say, after a reload) is mounted where it was; a
+  // just-finished one the caller hands in stays on screen above the listing it produced.
+  const liveFlow = flows.flow && flows.flow.status === "running" ? flows.flow : null;
+  const shownFlow = opts.showFlow ?? null;
   const settledTotal = Math.max(0, ...listings.map((l) => l.seller_settled_orders ?? 0));
   const priceEth = listings.length ? Number(BigInt(listings[0].price_wei)) / 1e18 : 0;
   const firstOrder = orders.find((o) => o.status === "SETTLED_VALID") ?? orders[0];
@@ -143,19 +173,22 @@ export async function renderMarket(view: HTMLElement, st: Status): Promise<void>
       id: "findings", eyebrow: "Findings for sale", tone: "quiet", inner: `
       <h2 class="section-title reveal">What a buyer can see before paying.</h2>
       <p class="prose reveal">The robot, the failure class, the version hash of the controller or policy checkpoint, the envelope, the verifier's verdict and method, a coarse severity band and the seller's settled-order history. The exact conditions, the trajectory, the replay frames and the hunt that found it stay in the private package.</p>
-      ${listings.length === 0 ? `<p class="prose muted reveal">No listings yet — run the demonstration pipeline below.</p>` : `
+      <p class="prose reveal">Every unsold finding has a <strong>Buy</strong> button, and every robot a <strong>List a new finding</strong> button: each runs the real agents against the chain while you watch, one transaction at a time.</p>
+      ${tokenBox(st)}
+      ${liveFlow && liveFlow.kind === "buy" ? `<p class="prose reveal">A purchase is running right now — <a class="link-go" href="#/orders/${esc(liveFlow.listing_id ?? "")}">watch it on the finding's page <i>→</i></a></p>` : ""}
+      ${listings.length === 0 ? `<p class="prose muted reveal">No listings yet — list a finding for a robot below, or run the whole demonstration pipeline further down.</p>` : `
       <div class="filters reveal" role="group" aria-label="filter by robot">
         <button data-filter="all" class="on">All <span class="fcount">${esc(listings.length)}</span></button>
         ${shown.map((t) => `<button data-filter="${esc(t.target_id)}">${esc(t.short_label)} <span class="fcount">${esc(counts.get(t.target_id) ?? 0)}</span></button>`).join("")}
-      </div>
+      </div>`}
       ${shown.map((t) => {
         const mine = listings.filter((l) => targetOf(l) === t.target_id);
-        if (!mine.length) return "";
         return `<div class="tgroup" data-target="${esc(t.target_id)}">
-          <h3 class="tgroup-head reveal"><span class="badge target target-${esc(t.target_id)}">${esc(t.label)}</span> <span class="muted">${esc(t.machine)}</span></h3>
-          <div class="findings">${mine.map((l) => findingCard(l, orders.find((o) => o.listing_id === l.listing_id))).join("")}</div>
+          <h3 class="tgroup-head reveal"><span class="badge target target-${esc(t.target_id)}">${esc(t.label)}</span> <span class="muted">${esc(t.machine)}</span><button class="btn ghost small" data-list="${esc(t.target_id)}" ${drive.ok && !liveFlow ? "" : "disabled"} title="${esc(drive.ok ? "" : drive.note)}">List a new finding</button></h3>
+          <div class="live-host" data-live-for="${esc(t.target_id)}">${shownFlow && shownFlow.target_id === t.target_id ? livePanelMarkup(shownFlow, st) : ""}</div>
+          ${mine.length ? `<div class="findings">${mine.map((l) => findingCard(l, orders.find((o) => o.listing_id === l.listing_id), drive)).join("")}</div>` : `<p class="tgroup-empty reveal">No findings listed for this robot yet.</p>`}
         </div>`;
-      }).join("")}`}`,
+      }).join("")}`,
     })}
 
     ${band({
@@ -184,6 +217,11 @@ export async function renderMarket(view: HTMLElement, st: Status): Promise<void>
   mountHero(view);
   wireEnvelopePanes(view);
   wireFilters(view);
+  wireDrive(view, st);
+  if (liveFlow && liveFlow.kind === "list") {
+    const host = view.querySelector<HTMLElement>(`.live-host[data-live-for="${liveFlow.target_id}"]`);
+    if (host) mountLive(host, liveFlow, st, (f) => { renderMarket(view, st, { showFlow: f }).catch(() => {}); });
+  }
 
   const btn = document.getElementById("run-demo") as HTMLButtonElement | null;
   btn?.addEventListener("click", async () => {
@@ -192,6 +230,39 @@ export async function renderMarket(view: HTMLElement, st: Status): Promise<void>
     startPolling();
   });
   if (demo.run && demo.run.status === "running") startPolling();
+}
+
+/** The Buy and List buttons, and the hosted-mode token box. A buy moves to the finding's page, which
+ *  mounts the live panel; a listing stays here and mounts it above that robot's findings. */
+function wireDrive(view: HTMLElement, st: Status): void {
+  view.querySelectorAll<HTMLButtonElement>("button[data-buy]").forEach((b) => b.addEventListener("click", async () => {
+    b.disabled = true;
+    try {
+      const r = await postJSON<{ flow_id: string; order_id: string }>(`/api/listings/${b.dataset.buy}/buy`, {});
+      location.hash = `#/orders/${r.order_id}`;
+    } catch (e) {
+      b.disabled = false;
+      b.parentElement!.querySelector(".alert")?.remove();
+      b.insertAdjacentHTML("afterend", `<span class="muted alert">${esc(plainError(e))}</span>`);
+    }
+  }));
+  view.querySelectorAll<HTMLButtonElement>("button[data-list]").forEach((b) => b.addEventListener("click", async () => {
+    const t = b.dataset.list!;
+    const host = view.querySelector<HTMLElement>(`.live-host[data-live-for="${t}"]`)!;
+    view.querySelectorAll<HTMLButtonElement>("button[data-list]").forEach((x) => { x.disabled = true; });
+    try {
+      const r = await postJSON<{ flow_id: string; flow: Flow }>(`/api/targets/${t}/list`, {});
+      mountLive(host, r.flow, st, (f) => { renderMarket(view, st, { showFlow: f }).catch(() => {}); });
+    } catch (e) {
+      view.querySelectorAll<HTMLButtonElement>("button[data-list]").forEach((x) => { x.disabled = false; });
+      host.innerHTML = `<p class="live-note bad">${esc(plainError(e))}</p>`;
+    }
+  }));
+  const tok = document.getElementById("op-tok") as HTMLInputElement | null;
+  const save = (): void => { setToken(tok!.value.trim()); location.reload(); };
+  document.getElementById("op-tok-go")?.addEventListener("click", save);
+  tok?.addEventListener("keydown", (e) => { if ((e as KeyboardEvent).key === "Enter") save(); });
+  document.getElementById("op-tok-clear")?.addEventListener("click", (e) => { e.preventDefault(); setToken(""); location.reload(); });
 }
 
 function wireEnvelopePanes(root: ParentNode): void {

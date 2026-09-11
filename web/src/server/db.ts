@@ -105,6 +105,17 @@ export function getDb(): DatabaseSync {
       status TEXT NOT NULL,
       log TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS flows (
+      flow_id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL,
+      target_id TEXT NOT NULL,
+      listing_id TEXT,
+      status TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      finished_at TEXT,
+      error TEXT,
+      steps TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS pending_txs (
       hash TEXT PRIMARY KEY,
       function_name TEXT NOT NULL,

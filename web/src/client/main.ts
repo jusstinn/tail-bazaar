@@ -6,6 +6,7 @@ import { esc, short } from "./format.js";
 import { renderMarket, stopPolling } from "./market.js";
 import { disposeReplay, renderOrder } from "./order.js";
 import { renderRules } from "./rules.js";
+import { stopLive } from "./live.js";
 import { armPage, badge } from "./ui.js";
 
 const view = document.getElementById("view")!;
@@ -38,6 +39,7 @@ async function route(): Promise<void> {
   disposeHero();
   disposeReplay();
   stopPolling();
+  stopLive();
   window.scrollTo({ top: 0, behavior: "auto" });
   const st = await loadStatus();
   const order = hash.match(/^#\/orders\/(0x[0-9a-fA-F]{64})$/);

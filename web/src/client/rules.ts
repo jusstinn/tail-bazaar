@@ -46,6 +46,7 @@ export async function renderRules(view: HTMLElement, _st: Status): Promise<void>
         <div class="eyebrow reveal">How it is decided</div>
         <h1 class="display reveal">What the verifier checks,<br>and who ends up with the money.</h1>
         <p class="lede reveal">A buyer pays for evidence it is not allowed to inspect first. That only works if somebody independent re-does the work and if the rules for releasing the payment are fixed before anyone pays. Both are written down here.</p>
+        <p class="prose reveal">To watch it happen rather than read about it, the <a class="link-go" href="#/">marketplace</a> has a <strong>Buy</strong> button on every unsold finding and a <strong>List a new finding</strong> button for each robot: each runs the steps below live, one transaction at a time.</p>
       </div>
     </section>
 

@@ -459,3 +459,39 @@ footer p { max-width: 78ch; margin: 0 0 8px; }
   .study-stage { height: 330px; }
   .study-annotation { display: none; }
 }
+
+/* ---------------------------------------------------------------- live flows (buy / list from the page) */
+.live { border: 1px solid var(--line-2); border-radius: 14px; background: var(--card); padding: 24px 28px; margin-top: 26px; }
+.live.done { border-color: #B6DCC4; }
+.live.failed { border-color: #F0C8C2; }
+.live-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 15px; }
+.live-id { font-size: 11.5px; color: var(--ink-3); }
+.live-elapsed { margin-left: auto; font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.live-pulse { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); flex: none; animation: live-pulse 1.4s ease-in-out infinite; }
+.live.done .live-pulse { background: var(--ok); animation: none; }
+.live.failed .live-pulse { background: var(--alert); animation: none; }
+@keyframes live-pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .live-pulse { animation: none; } }
+.live-steps { list-style: none; margin: 18px 0 0; padding: 0; }
+.live-step { display: grid; grid-template-columns: 26px 1fr; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); align-items: baseline; }
+.live-mark { font: 600 13px/1 var(--mono); color: var(--ink-3); }
+.live-step.done .live-mark { color: var(--ok); }
+.live-step.failed .live-mark { color: var(--alert); }
+.live-step.running .live-mark { color: var(--accent); }
+.live-t { margin: 0; font-size: 15px; color: var(--ink-3); }
+.live-step.running .live-t { color: var(--ink); font-weight: 500; }
+.live-step.done .live-t, .live-step.failed .live-t { color: var(--ink-2); }
+.live-meta { margin-top: 4px; font-size: 12.5px; color: var(--ink-3); }
+.live-meta a { color: var(--accent); }
+.live-note { margin: 16px 0 0; font-size: 13.5px; color: var(--ink-3); }
+.live-note.ok { color: var(--ok); }
+.live-note.bad { color: var(--alert); }
+.finding.unsold { cursor: default; }
+.finding.unsold:hover { transform: none; }
+.finding-buy { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.finding-buy .muted { font-size: 12.5px; }
+.tgroup-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.tgroup-head .btn { margin-left: auto; }
+.tgroup-empty { color: var(--ink-3); margin-top: 18px; }
+.op-token { margin-top: 22px; }
+.op-token .fineprint { margin-top: 8px; }
