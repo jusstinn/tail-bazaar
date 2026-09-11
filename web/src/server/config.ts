@@ -46,7 +46,8 @@ export const publicBaseUrl = env("PUBLIC_BASE_URL", `http://127.0.0.1:${port}`);
 export const appDomain = env("APP_DOMAIN", "tail-bazaar.local");
 export const buyerBudgetWei = BigInt(env("BUYER_BUDGET_WEI", "2000000000000000"));
 export const listingPriceWei = BigInt(env("LISTING_PRICE_WEI", chainMode === "testnet" ? "200000000000000" : "1000000000000000"));
-export const databasePath = path.resolve(WEB_ROOT, env("DATABASE_PATH", "./data/tail-bazaar.sqlite"));
+// One database per chain mode so local-anvil and Base Sepolia listings, ledgers and orders never mix.
+export const databasePath = path.resolve(WEB_ROOT, env("DATABASE_PATH", "./data/tail-bazaar-{mode}.sqlite").replace("{mode}", chainMode));
 export const dataDir = path.dirname(databasePath);
 export const demoTriggerEnabled = env("DEMO_TRIGGER_ENABLED", "1") !== "0";
 export const buyerConsoleEnabled = env("DEMO_BUYER_CONSOLE", "1") !== "0";

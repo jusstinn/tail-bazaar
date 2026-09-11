@@ -53,8 +53,8 @@ export function buildApp() {
   });
 
   app.get("/api/orders", (c) => {
-    const rows = getDb().prepare("SELECT * FROM orders ORDER BY created_at DESC").all() as unknown as OrderRow[];
-    return c.json(rows.map(publicOrder));
+    const rows = getDb().prepare("SELECT o.*, l.chain_mode FROM orders o JOIN listings l ON l.listing_id = o.listing_id ORDER BY o.created_at DESC").all() as unknown as (OrderRow & { chain_mode: string })[];
+    return c.json(rows.map((r) => ({ ...publicOrder(r), chain_mode: r.chain_mode })));
   });
 
   app.get("/api/orders/:id", async (c) => {
@@ -68,7 +68,9 @@ export function buildApp() {
       onChain = { status: STATUS_NAMES[oc.status], buyer: oc.buyer, commitment: oc.commitment, terms_hash: oc.termsHash, delivery_hash: oc.deliveryHash, delivery_deadline: Number(oc.deliveryDeadline), settlement_deadline: Number(oc.settlementDeadline) };
     } catch { /* unreachable chain */ }
     const revealed = !!db.prepare("SELECT 1 FROM retrievals WHERE order_id = ?").get(o.order_id);
-    return c.json({ ...publicOrder(o), listing: publicListing(l), on_chain: onChain, events: listEvents(o.listing_id), revealed_in_buyer_console: revealed && buyerConsoleEnabled, chain_mode: chainMode, explorer_base: explorerBase });
+    let sellerSettled: number | null = null;
+    try { sellerSettled = await settledOrders(l.seller as Hex); } catch { /* unreachable chain */ }
+    return c.json({ ...publicOrder(o), listing: { ...publicListing(l), seller_settled_orders: sellerSettled }, on_chain: onChain, events: listEvents(o.listing_id), revealed_in_buyer_console: revealed && buyerConsoleEnabled, chain_mode: l.chain_mode, explorer_base: l.chain_mode === "testnet" ? "https://sepolia.basescan.org" : null });
   });
 
   // Buyer console (LOCAL DEMONSTRATION MODE): the browser acts as the buyer's own console, so it may

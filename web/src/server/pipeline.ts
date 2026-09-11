@@ -17,7 +17,13 @@ let running: { run_id: string; started_at: string; log: PipelineLog; status: "ru
 let lastFinishedAt = 0;
 
 export function pipelineStatus() {
-  return running ? { run_id: running.run_id, status: running.status, started_at: running.started_at, log: running.log, error: running.error ?? null } : null;
+  if (running) return { run_id: running.run_id, status: running.status, started_at: running.started_at, log: running.log, error: running.error ?? null };
+  // No run in this process: report the most recent persisted run (e.g. one made by `npm run demo`).
+  const row = getDb().prepare("SELECT run_id, started_at, status, log FROM pipeline_runs ORDER BY started_at DESC LIMIT 1").get() as { run_id: string; started_at: string; status: string; log: string } | undefined;
+  if (!row) return null;
+  const log = JSON.parse(row.log) as PipelineLog;
+  const failed = log.find((l) => l.msg.startsWith("pipeline FAILED"));
+  return { run_id: row.run_id, status: row.status === "running" ? "failed" : row.status, started_at: row.started_at, log, error: failed ? failed.msg : null };
 }
 
 export const PUBLIC_OUT = path.join(dataDir, "sim", "public");

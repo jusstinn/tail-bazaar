@@ -66,7 +66,8 @@ export async function redeemChallenge(orderId: string, nonce: string, signature:
   // On-chain ownership check: the escrow's bound buyer must be the signer and the order must be funded.
   const onChain = await getListing(orderId as Hex);
   if (onChain.buyer.toLowerCase() !== signer.toLowerCase()) throw new AuthError(403, "signer is not the buyer bound to this order on chain");
-  if (onChain.status !== 2 && onChain.status !== 3) throw new AuthError(403, `order is not funded or delivered on chain (status ${onChain.status})`);
+  // Funded (2), Delivered (3) or SettledValid (4): a buyer who paid for a valid package may re-download it.
+  if (onChain.status !== 2 && onChain.status !== 3 && onChain.status !== 4) throw new AuthError(403, `order is not funded, delivered or validly settled on chain (status ${onChain.status})`);
   const order = db.prepare("SELECT * FROM orders WHERE order_id = ?").get(orderId) as unknown as OrderRow | undefined;
   if (!order) throw new AuthError(404, "unknown order");
   if (!order.delivered_bytes) throw new AuthError(409, "the seller has not made the package available yet");

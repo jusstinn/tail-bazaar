@@ -3,9 +3,12 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export PATH="$HOME/.foundry/bin:$PATH"
+_CM="${CHAIN_MODE:-}"; _PORT="${PORT:-}"
 if [ -f "$ROOT/.env" ]; then
   set -a; . "$ROOT/.env"; set +a
 fi
+[ -n "$_CM" ] && export CHAIN_MODE="$_CM"      # a value given on the command line wins over .env
+[ -n "$_PORT" ] && export PORT="$_PORT"
 : "${LOCAL_RPC_URL:=http://127.0.0.1:8545}"
 : "${LOCAL_CHAIN_ID:=31337}"
 : "${BASE_SEPOLIA_RPC_URL:=https://sepolia.base.org}"

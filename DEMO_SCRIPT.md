@@ -1,0 +1,17 @@
+# Tail Bazaar — 3-minute demo script
+
+Before recording: `scripts/anvil-start.sh && scripts/local-deploy.sh && (cd web && npm run demo -- --reset --evidence ../evidence/local) && scripts/server-start.sh`.
+If Base Sepolia is funded, run `scripts/testnet-deploy.sh` instead and set `CHAIN_MODE=testnet` so the header shows the testnet badge and explorer links.
+Open http://127.0.0.1:3100. Keep the browser at 1400 px wide.
+
+**0:00 – 0:25 — Problem.** "Warehouse-robot developers can't inspect a failure scenario before they pay for it, or the seller has given it away. Tail Bazaar is a market for reproducible failures: hunter agents find conditions inside the robot's published envelope where its controller crashes; a verifier re-simulates; buyers pay into escrow and get the exact scenario and replay." Point at the disclaimer line under the title: adversarially selected failures are not failure rates; simulation needs calibration against physical robots.
+
+**0:25 – 0:55 — Marketplace.** Listings table: controller id and hash, envelope, admissibility, VERIFIED with method `exact-trajectory-hash`, severity band LOW (impact-speed proxy), seller settled-order count read live from the contract, price, on-chain status with the registration transaction (labeled LOCAL ANVIL or linking to Basescan). "Nothing here lets a buyer reconstruct the scenario."
+
+**0:55 – 1:25 — The agents ran for real.** Scroll to "Local demonstration pipeline" and show the log: 144 MuJoCo simulations, 43 collisions, the verifier's check list (admissible, not-duplicate, reproduces-collision, environment fingerprint match, trajectory-hash-identical, package-commitment), registerListing tx, buyer policy JSON, fund tx, markDelivered tx, signed challenge, retrieval over HTTP, settle, withdraw. (Optionally click "Run pipeline" and let it run in the background — it takes about 50 s.)
+
+**1:25 – 2:15 — Valid purchase.** Open order 1. Timeline: register → fund → markDelivered → retrieved with a signed challenge → settle(valid) → withdraw, each with its transaction and block. Verifier delivery check: keccak256(delivered) equals the on-chain commitment; buyer's own check agrees. Scroll to the replay: baseline (nominal) on the left stops 0.38 m short; failure on the right hits the obstacle at 0.415 m/s. Press "first contact", scrub back to "brake onset", read the HUD: the controller saw 0.89 m of range while the true range was 0.53 m because the range measurement was 200 ms stale, and with floor friction 0.3 the wheels could not deliver the requested deceleration. Metrics table: brake onset 3.28 s vs 3.52 s, clearance 0.378 m vs 0.003 m. Expand "Scenario, hashes and reproduction" to show the exact parameters, trajectory hash, salt and the reproduction command.
+
+**2:15 – 2:45 — Invalid delivery and refund.** Open order 2 (labeled "demo: tampered delivery"). The seller asserted the registered hash but served altered bytes: the verifier check shows COMMITMENT MISMATCH with both hashes; the buyer's own check failed first and emitted requestRecheck on chain; settle(invalid) credited the buyer; the buyer withdrew the refund. The revealed section is flagged "package hash ≠ on-chain commitment / TAMPERED (demo)".
+
+**2:45 – 3:00 — Chain and honesty.** Show the escrow address in the header (Basescan contract page when on testnet; the state machine, deadlines and pull-payments are in the README). Close on the limitation: simplified cart physics in an illustrative envelope; verifier-adjudicated; no audit, no safety certification.
