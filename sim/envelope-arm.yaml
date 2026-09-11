@@ -1,0 +1,243 @@
+# Tail Bazaar target #3 — the operating envelope (theta) the arm hunter searches, published in the
+# same axis shape GUARD uses in configs/guard_theta.yaml, and in the same shape as this project's
+# cart envelope (sim/envelope.yaml) and humanoid envelope (sim/envelope-humanoid.yaml).
+# Machine-readable copy of sim/tailbazaar_sim/arm/envelope.py; the Python file stays authoritative
+# and `tailbazaar-arm selfcheck` fails if the two drift apart.
+#
+# This file is ADDITIVE. It does not replace, extend or renumber sim/envelope.yaml or
+# sim/envelope-humanoid.yaml: the cart target (envelope_id tb-envelope-1) and the humanoid target
+# (tb-humanoid-envelope-1) are unchanged and keep working exactly as they did. A run document says
+# which target it belongs to in its own top-level `target_id` field.
+#
+# EVERYTHING HERE IS AN ILLUSTRATIVE ASSUMPTION for a demonstration. None of these bounds is measured
+# on a physical robot. The "robot" is Gymnasium-Robotics' MuJoCo Fetch mannequin driven by a
+# mocap-welded end-effector, the "part" is a 5 cm cube, and the "controller" is somebody else's
+# published reinforcement-learning checkpoint; the bounds are chosen to bracket the nominal operating
+# point widely enough that "where does this stop working?" has an answer inside them, and each one
+# carries the reasoning that picked it.
+#
+# NO DISTRIBUTION D IS STATED. As with the cart and the humanoid: GUARD's `marginal` and `scale`
+# describe the deployment distribution its estimator prices against. Tail Bazaar does not estimate a
+# probability; it runs bounded deterministic searches and sells individual reproducible failures. The
+# two fields are present for schema compatibility and left null. Adversarially selected failures are
+# not failure frequencies.
+#
+# Axis groups (GUARD's vocabulary):
+#   physical  — the part being carried and where it starts
+#   systems   — latency and noise in the actuation path, the axis real deployments have
+#   visual    — not modelled; there is no perception stack. The policy reads the environment's
+#               state observation vector (gripper pose, block pose, relative pose, velocities)
+#               directly, so a finding here is never a perception failure.
+#
+# `published_conditions` is not a GUARD field. It plays the role the cart envelope's `tuned_range`
+# plays: it records the conditions the target's PUBLISHER evaluated the policy under, so a reader can
+# see immediately whether a finding sits inside the conditions the artefact was published for or
+# outside them. The searched envelope is deliberately wider. Where the publisher says nothing, the
+# value is "not stated" rather than an invented bound.
+
+envelope_id: tb-arm-envelope-1
+envelope_revision: tb-arm-envelope-1.0
+target_id: arm-pick-place-sac-v1
+scene_id: gymnasium-robotics-fetch-pick-and-place-v4
+scene_revision: 1
+control_tick_ms: 40         # Gymnasium-Robotics Fetch: MuJoCo timestep 0.002 s with n_substeps 20
+physics_timestep_ms: 2
+episode_horizon_ticks: 50   # the environment's OWN registered max_episode_steps, not a choice here
+episode_length_s: 2.0
+airborne_margin_m: 0.03     # part of the drop predicate; fixed and documented, NOT an axis
+duplicate_distance: 0.05
+duplicate_rule: >-
+  same failure-class set AND same init_seed AND normalized L-infinity distance < 0.05 over the seven
+  continuous axes. Unlike the humanoid's push axes there are no conditional axes here: every axis of
+  this envelope changes the dynamics on its own at every point of the envelope, so none of them can
+  ever describe nothing.
+distribution_D: null        # not stated, not estimated
+
+product_question: >-
+  This policy is published as placing the block in about ten control steps, every episode. How far can
+  the operating range be widened - a heavier part, a slipperier one, a part that is not quite where it
+  was expected, noisy or delayed actuation - before it drops what it is carrying?
+
+target:
+  kind: pretrained_policy
+  what: a pick-and-place policy somebody else trained and published; nothing here trains
+  repo_id: IntelliGrow/FetchPickAndPlace-v4
+  repo_revision: 04bb1bf735f6a2957d8b77d185afe46ba112357a
+  archive: sac-FetchPickAndPlace-v4.zip
+  archive_sha256: 2b1b30dd5e778a1f04868891eaa447ad7387f79d1f4db3514e01b9b189be1481
+  weights_member: policy.pth
+  weights_sha256: 792506461c719beb3926cb4230b258bdcf47ed8efbbc3eca8b31539e4fd710ea
+  algo: >-
+    SAC + Hindsight Experience Replay (stable-baselines3 2.7.0), MultiInputPolicy over the
+    environment's Dict observation; MLP 31 -> 256 -> 256 -> 4, relu, tanh-squashed
+  publisher_claim: mean_reward -9.70 +/- 4.17 over 10 deterministic episodes of FetchPickAndPlace-v4
+  licence: >-
+    NOT DECLARED by the model repository — no license field in its card metadata, no license tag and
+    no LICENSE file. Neither does any other FetchPickAndPlace checkpoint found on the hub: six were
+    checked one by one and all six declare nothing. The weights are downloaded at run time, never
+    vendored, never modified, never redistributed by this project; only their sha256 digests are
+    published. See evidence/arm/README.md.
+
+scene:
+  source: gymnasium_robotics/envs/assets/fetch/pick_and_place.xml, unmodified
+  licence: MIT (Farama Foundation) — the SCENE is properly licensed even though the policy is not
+  block: 5 cm cube, stock mass 2.0 kg, resting on a table whose top is at z = 0.4 m
+  goal: sampled by the environment itself, in the air about half the time
+  success: the environment's own info["is_success"], block within its own 0.05 m threshold of the goal
+
+continuous:
+  # --- physical ---------------------------------------------------------------
+  # Mass of the block, with its inertia scaled by the same ratio so the mass DISTRIBUTION is unchanged
+  # and only the scale moves. READ THIS AXIS AS PAYLOAD MASS, NOT AS A MATERIAL: a 5 cm cube at the
+  # stock 2.0 kg is already a density of 16 000 kg/m^3, denser than lead, so the shipped block is not
+  # a realistic object either. 0.2 kg is a light plastic part of that size; 20 kg is a payload ten
+  # times what the policy ever saw, deliberately past the interesting region so the bound does not
+  # hide it. The measured boundary is at roughly 5x the published mass.
+  - name: object_mass_kg
+    low: 0.2
+    high: 20.0
+    nominal: 2.0
+    marginal: null
+    scale: null
+    units: kg
+    group: physical
+    places: 3
+    published_conditions: "= 2.0 (the publisher evaluated the shipped block)"
+  # Coulomb sliding coefficient written into geom_friction[0] of the block AND of BOTH finger pads.
+  # MuJoCo combines a contact pair's friction with the maximum of the two geoms, so lowering only the
+  # block would change nothing while the pads still carry 1.0 — the same trap the humanoid envelope
+  # documents for its floor. The stock model ships 1.0 on all three, so writing one value on all three
+  # reproduces the stock scene exactly at the nominal point. 0.02 is an oily or iced part; 1.5 is a
+  # tackier pad than the stock rubber. This is the axis the drop findings live on.
+  - name: grip_friction
+    low: 0.02
+    high: 1.5
+    nominal: 1.0
+    marginal: null
+    scale: null
+    units: coefficient
+    group: physical
+    places: 3
+    published_conditions: "= 1.0 (the publisher evaluated the shipped friction)"
+  # Offset added to the block's x/y position AFTER the environment has sampled its own initial state,
+  # so the part is where the policy did not expect while the goal — which the environment samples
+  # relative to the gripper, not the block — does not move with it. +-0.05 m is a third of the
+  # environment's own obj_range of 0.15 m and one full block width, and keeps the block comfortably
+  # inside the table footprint at every published seed.
+  - name: object_offset_x_m
+    low: -0.05
+    high: 0.05
+    nominal: 0.0
+    marginal: null
+    scale: null
+    units: m
+    group: physical
+    places: 4
+    published_conditions: "= 0 (the block where the environment put it)"
+  - name: object_offset_y_m
+    low: -0.05
+    high: 0.05
+    nominal: 0.0
+    marginal: null
+    scale: null
+    units: m
+    group: physical
+    places: 4
+    published_conditions: "= 0 (the block where the environment put it)"
+  # --- systems ----------------------------------------------------------------
+  # Standard deviation of zero-mean Gaussian noise added to each commanded action as a fraction of the
+  # action half-range (the action box is [-1, 1], so the half-range is 1.0), drawn once per control
+  # tick from a generator seeded from the scenario's canonical commitment and clipped back into the
+  # box. Applied where an actuator would add it: AFTER the transport delay, so the two systems axes
+  # compose cleanly and the noise sequence for a given scenario does not depend on the latency.
+  # 0.5 is half the full command range, which is far more jitter than any servo has.
+  - name: action_noise_frac
+    low: 0.0
+    high: 0.5
+    nominal: 0.0
+    marginal: null
+    scale: null
+    units: "1"
+    group: systems
+    places: 3
+    published_conditions: "= 0"
+  # The action computed at tick k is applied from tick k + control_latency_ms/40; before the first
+  # action arrives the actuators hold a zero action. Must be an exact multiple of the 40 ms control
+  # tick so a scenario names one unambiguous tick and two different numbers can never mean the same
+  # run. 160 ms is four ticks.
+  - name: control_latency_ms
+    low: 0
+    high: 160
+    nominal: 0
+    marginal: null
+    scale: null
+    units: ms
+    group: systems
+    step: 40
+    published_conditions: "= 0"
+  # EXTRA delay on the GRIPPER channel only, on top of control_latency_ms. A real gripper's open/close
+  # command goes through a different path from the arm's servo loop and can lag it; this axis asks
+  # whether the hand closing late, or letting go late, is enough on its own to lose the part.
+  - name: gripper_latency_ms
+    low: 0
+    high: 160
+    nominal: 0
+    marginal: null
+    scale: null
+    units: ms
+    group: systems
+    step: 40
+    published_conditions: "= 0"
+
+discrete:
+  # A stratification, not a coordinate: reset(seed=s) makes the environment sample a different block
+  # position AND a different goal, so each seed is a different pick-and-place problem and two runs
+  # from different seeds are never duplicates of each other. A finding names the seed it was found on,
+  # and its distance to nominal is measured within its own stratum.
+  - name: init_seed
+    values: [0, 1, 2, 3, 4, 5, 6, 7]
+    nominal: 0
+    units: "1"
+    group: physical
+    published_conditions: "not stated — the publisher evaluated 10 unspecified deterministic episodes"
+
+outcomes:
+  conclusive:
+    SUCCESS: the environment's own info["is_success"] is true at its own horizon, with no drop on the way
+    DROPPED: >-
+      the block was in contact with BOTH gripper finger pads at tick k-1, and its centre was more than
+      airborne_margin_m above its resting height, and at tick k MuJoCo reports fewer than both pads in
+      contact, and the environment's own info["is_success"] is false. In plain English: it was being
+      held, it was off the table, it is not being held any more, and it is not at the goal. This is the
+      one predicate this project owns, because the environment scores placement, not custody.
+    NOT_PLACED: >-
+      the environment's own info["is_success"] is false at its own horizon, with no drop on the way.
+      Entirely the environment's verdict; this project implements no placement detector.
+  inconclusive:
+    DIVERGED: non-finite state, or a block speed above the 50 m/s plausibility bound (a solver blow-up)
+    INVALID_INITIAL_STATE: the block did not start at rest on the table, unheld and away from the goal
+    REJECTED_OUT_OF_ENVELOPE: the scenario was not admissible; nothing was simulated
+  precedence: [DIVERGED, INVALID_INITIAL_STATE, DROPPED, NOT_PLACED, SUCCESS]
+  note: >-
+    a run that dropped the block and then recovered and placed it anyway is still a DROP — the question
+    is literally whether the arm drops things — but the run document carries recovered_after_drop: true
+    and the environment's own success flag beside it.
+
+severity:
+  DROPPED:
+    proxy: object_impact_speed_mps
+    definition: >-
+      the block's world-frame linear speed (its free joint's linear dof velocity, exact for a free
+      body) at the last control tick at which it was still unsupported, i.e. immediately before its
+      first contact with the table or the floor after the drop
+    sampling_note: >-
+      speed is sampled at the 40 ms control tick, so a free fall gains about 0.39 m/s between samples;
+      the reported value is the last sample before contact, never an extrapolation
+    secondary_proxy: drop_height_m
+    units: m/s
+    not_a_damage_estimate: true
+  NOT_PLACED:
+    proxy: null
+    why_null: >-
+      nothing was dropped and nothing hit anything, so there is no measured quantity to report. An
+      invented stand-in would look like a severity and would not be one.
