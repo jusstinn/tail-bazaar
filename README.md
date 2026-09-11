@@ -1,5 +1,17 @@
 # Tail Bazaar — a marketplace for reproducible robot failure scenarios
 
+> **The four answers the brief asks for (the rest of this file is the evidence).**
+>
+> **Vertical.** Robot-controller testing. Sellers are *hunter* agents that search a robot's published operating envelope for the exact conditions under which its controller fails; buyers are the people who ship or insure that controller. The good is a reproducible failure scenario the buyer cannot inspect before paying, because inspecting it *is* having it. Three robots are on sale: a warehouse cart, a pretrained humanoid balance policy, a pretrained manipulator pick-and-place policy, each with its own definition of "it failed" (details under each target below).
+>
+> **Trust assumptions.** One verifier, trusted for the verdict and constrained by the contract: only it can register a listing or settle, it can never take funds, it settles once, and every check it ran is published after settlement. The simulator is the ground truth, pinned by an environment fingerprint; a re-run that does not match is INCONCLUSIVE, never VALID. Sellers and buyers are untrusted: sealed commitments, re-simulation, a physical-plausibility bound on delivered frames, and wallet-signed single-use retrieval challenges. Full section: [Trust assumptions](#trust-assumptions).
+>
+> **Biggest design decision.** Listings are registered on chain only by the verifier, after it has re-simulated the scenario itself and computed the commitment: a listing's existence *is* the verifier's statement that the failure reproduces. Money moves only when the delivered bytes hash to that commitment. Full section: [Biggest design decision](#biggest-design-decision).
+>
+> **One important limitation.** Adversarially selected failures are not failure frequencies: the hunters are built to find failures, so nothing here says how often anything fails in the field, and the simulations are uncalibrated research models. The contract is unaudited. Full section: [Limitations, stated plainly](#limitations-stated-plainly).
+>
+> **Live:** https://tail.170-9-57-94.sslip.io · **Contract:** `FailureEscrow` at [`0xfadf11662C46c0214B0A40938a26FB8f0CD785A3`](https://sepolia.basescan.org/address/0xfadf11662C46c0214B0A40938a26FB8f0CD785A3) on Base Sepolia (chain id 84532), source verified · **Video script:** `DEMO_SCRIPT.md`.
+
 > **Read this first.** Adversarially selected failures do not estimate real-world failure frequency.
 > Simulation requires calibration against physical robots before supporting underwriting decisions.
 > Tail Bazaar sells *failure discovery and replay*; it does not sell an insurance premium, a safety
