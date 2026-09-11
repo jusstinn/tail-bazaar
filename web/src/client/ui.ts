@@ -51,9 +51,15 @@ export function metric(label: string, value: number, unit: string, decimals = 2,
 // ------------------------------------------------------------------ operating-range bars
 const pct = (v: number, lo: number, hi: number): number => (hi === lo ? 0 : ((v - lo) / (hi - lo)) * 100);
 
-export type TunedSpec = { min?: number; max?: number; exactly?: number };
+export type TunedSpec = { min?: number; max?: number; exactly?: number; not_stated?: boolean };
+
+/** An axis the controller's author said nothing about has no tuned range to be inside or outside of;
+ *  the bar shows the searched envelope only and says so, rather than implying the whole range. */
+export const tunedStated = (t: TunedSpec): boolean =>
+  !t.not_stated && (t.min !== undefined || t.max !== undefined || t.exactly !== undefined);
 
 export function inTuned(v: number, t: TunedSpec): boolean {
+  if (!tunedStated(t)) return true;
   return t.exactly !== undefined ? v === t.exactly : (t.min === undefined || v >= t.min) && (t.max === undefined || v <= t.max);
 }
 
@@ -62,6 +68,7 @@ export function inTuned(v: number, t: TunedSpec): boolean {
  *  finding sits. */
 export function rangeBar(axis: Axis, tuned: TunedSpec, finding?: number | null): string {
   const lo = axis.low, hi = axis.high;
+  const stated = tunedStated(tuned);
   const tLo = tuned.exactly !== undefined ? tuned.exactly : tuned.min !== undefined ? tuned.min : lo;
   const tHi = tuned.exactly !== undefined ? tuned.exactly : tuned.max !== undefined ? tuned.max : hi;
   let left = pct(tLo, lo, hi), width = pct(tHi, lo, hi) - left;
@@ -72,17 +79,21 @@ export function rangeBar(axis: Axis, tuned: TunedSpec, finding?: number | null):
   return `<div class="rb reveal">
     <div class="rb-head"><span class="mono rb-name">${esc(axis.name)}</span><span class="rb-group">${esc(axis.group)}</span></div>
     <div class="rb-track">
-      <div class="rb-tuned" style="left:${left.toFixed(2)}%;width:${width.toFixed(2)}%"></div>
+      ${stated ? `<div class="rb-tuned" style="left:${left.toFixed(2)}%;width:${width.toFixed(2)}%"></div>` : ""}
       <div class="rb-nominal" style="left:${pct(axis.nominal, lo, hi).toFixed(2)}%" title="nominal ${esc(axis.nominal)}"></div>
       ${hasFinding ? `<div class="rb-find ${ok ? "ok" : "out"}" style="left:${pct(finding as number, lo, hi).toFixed(2)}%"><span>${esc(finding)}</span></div>` : ""}
     </div>
     <div class="rb-scale"><span>${esc(lo)}</span><span class="rb-unit">${esc(unit)}</span><span>${esc(hi)}</span></div>
-    <div class="rb-note">searched ${esc(lo)}–${esc(hi)} · tuned for ${esc(axis.tuned_range)}${hasFinding ? ` · this finding <strong class="${ok ? "" : "alert"}">${esc(finding)}</strong>` : ""}</div>
+    <div class="rb-note">searched ${esc(lo)}–${esc(hi)} · ${stated ? `tuned for ${esc(axis.tuned_range)}` : "no tuned range stated for this axis"}${hasFinding ? ` · this finding <strong class="${ok ? "" : "alert"}">${esc(finding)}</strong>` : ""}</div>
   </div>`;
 }
 
 export function rangeBars(env: EnvelopeDoc, scenario?: Record<string, number> | null): string {
-  return `<div class="rb-grid">${env.axes.map((a) => rangeBar(a, env.controller_tuned_range.per_parameter[a.name] ?? {}, scenario ? Number(scenario[a.name]) : null)).join("")}</div>
+  const at = (name: string): number | null => {
+    const v = scenario ? Number(scenario[name]) : NaN;
+    return Number.isFinite(v) ? v : null;
+  };
+  return `<div class="rb-grid">${env.axes.map((a) => rangeBar(a, env.controller_tuned_range.per_parameter[a.name] ?? {}, at(a.name))).join("")}</div>
   <div class="rb-legend"><span><i class="sw sw-tuned"></i>range the controller was tuned for</span><span><i class="sw sw-track"></i>envelope the hunter searched</span><span><i class="sw sw-nominal"></i>nominal operating point</span>${scenario ? `<span><i class="sw sw-find"></i>where this finding sits</span>` : ""}</div>`;
 }
 
@@ -136,7 +147,8 @@ export function armCounters(root: ParentNode = document): void {
     };
     requestAnimationFrame(step);
   };
-  if (!("IntersectionObserver" in window)) { nodes.forEach(settle); return; }
+  // reduced motion: no count-up, and no waiting for a scroll that may never come — show the number
+  if (reducedMotion() || !("IntersectionObserver" in window)) { nodes.forEach(settle); return; }
   const obs = new IntersectionObserver((entries) => {
     for (const e of entries) if (e.isIntersecting) { settle(e.target as HTMLElement); obs.unobserve(e.target); }
   }, { threshold: 0.3 });

@@ -14,7 +14,47 @@ publishes a coarse public summary, and registers a salted commitment to the priv
 on chain. A *buyer* agent funds an escrow without seeing the scenario, retrieves the package with a
 signed challenge, and the verifier releases or refunds the payment.
 
-![order page](evidence/ui/order-valid-impact.png)
+![the moment of contact, with the nominal baseline drawn as a ghost](evidence/ui/order-valid-impact.png)
+
+## The experience
+
+Three places to be: the **marketplace**, one **finding**, and **how it works** — what the verifier
+actually checks and what each verdict does to the money. Every page opens with one plain-language
+sentence. Hashes, canonical JSON, envelope tables, provenance and raw metrics stay complete and
+reachable but sit behind labelled disclosures ("Show the verifier's checks", "Show provenance"), so
+they are never the first thing a visitor reads. A finding is told in five stages down the page — the
+sealed claim, the purchase, the reveal, the evidence, the settlement — with a sticky rail to move
+between them, and the on-chain history reads as one sentence per transaction with real explorer
+links rather than a log dump.
+
+**Seeing the failure.** The replay opens **0.6 s before the failure moment** and plays through it
+once on load, instead of resting at the parked end of the run. Both viewports share **one camera
+anchor**, so baseline and failure are literally the same framing and both carts stay in frame (the
+replay handle exposes `visibility()`, and the headless captures assert it). By default the nominal
+baseline is drawn inside the failure viewport as a translucent **ghost** — one lane over, its
+position *along* the track exact — together with the line where it came to rest, so "stops in time"
+and "does not" are visible in one frame; side by side stays as a toggle. The moment itself gets an
+expanding contact ring on the body its event names, a short hold and slow motion through it, a
+persistent `CONTACT · 0.415 m/s` callout anchored to that instant on the scrubber, and ticks for
+brake onset, the failure, and where the baseline stopped. `prefers-reduced-motion` disables every
+entrance reveal, counter and hover lift, and opens the replay **paused on the failure frame** instead
+of autoplaying. The renderer still consumes only the saved simulation transforms; it runs no physics.
+
+**The failure class is data, not code** (`web/src/server/failure.ts`). A run document names its own
+class in `outcome`, and the page derives the readable name, the failure moment, the number that
+summarises it and its unit, the scrubber marks and the scene annotation from that run's own events
+and metrics. `COLLISION` and `LOAD_SHED` are each narrated from their own recorded event and their
+own severity proxy; a run that fails both ways keeps both moments and both badges; a class with no
+entry in the copy registry still gets a readable name and its own moment, with no UI change.
+
+**Both ranges are graphical**: one bar per axis showing the envelope the hunter searched, the range
+the controller was tuned for inside it, the nominal operating point, and — post-purchase only — where
+this finding sits. The pre-purchase view never renders the finding marker, because that marker is
+derived from the exact parameters.
+
+Captures: `evidence/ui/marketplace.png`, `order-valid.png`, `order-valid-impact.png`,
+`order-valid-side-by-side.png`, `order-invalid-refund.png`, `how-it-works.png`,
+`hosted-reveal-locked.png`, and the same pages in testnet mode (`testnet-*.png`).
 
 ## The question this market answers
 
@@ -31,8 +71,11 @@ deliberately **wider** than that range:
 | `actuator_delay_ms` | systems | ≤ 20 | 0 – 100 | 20 | ms (quantized to the 20 ms control tick) |
 | `floor_friction` | physical | ≥ 0.6 | 0.2 – 1.0 | 0.8 | coefficient |
 | `payload_kg` | physical | = 20 | 5 – 60 | 20 | kg |
+| `load_friction` | physical | not stated | 0.1 – 1.0 | 0.6 | coefficient (deck grip; added with the `LOAD_SHED` class) |
 
-So a finding outside the tuned range is **not** a claim that the controller is broken where it was
+`load_friction` is the one axis for which the controller's docstring states no tuned range, so a
+finding cannot be inside or outside it; the UI's range bar for that axis draws the searched envelope
+only and says so. So a finding outside the tuned range is **not** a claim that the controller is broken where it was
 designed to work. It is a measured boundary of how far the operating range can be widened before it
 stops working. The demo's sold failure sits at `sensor_delay_ms = 200` and `floor_friction = 0.3`,
 outside the tuned range on both axes and inside the searched envelope on every axis, and the UI says
@@ -66,7 +109,10 @@ sim/envelope.yaml   the searched envelope and the controller's tuned range, in G
 contracts/          FailureEscrow.sol (Solidity 0.8.28, Foundry) + 22 tests
 web/src/server/     Hono API, node:sqlite storage, seller/verifier/buyer agents, signed-challenge
                     delivery + hosted-mode gate, provenance, failure-ledger export, pipeline
-web/src/client/     Three.js replay of recorded transforms (no second physics), listings, order timeline
+web/src/server/failure.ts
+                    failure-class vocabulary read from the run document (COLLISION, LOAD_SHED, …)
+web/src/client/     marketplace / finding / how-it-works pages, the five-stage finding narrative,
+                    Three.js replay of recorded transforms (no second physics), operating-range bars
 scripts/            anvil, local deploy, cast flow, testnet deploy, ABI export
 deploy/             start.sh, systemd unit, Caddy snippet for an Ubuntu VM
 evidence/           milestone runs, local demo artifacts + ledger.json, UI captures, testnet receipts
@@ -129,9 +175,10 @@ scripts/export-abi.sh                  # contracts/out -> web/abi/FailureEscrow.
 scripts/anvil-start.sh                 # anvil on :8545, funds the three test addresses (local ether)
 scripts/local-deploy.sh                # writes ESCROW_ADDRESS_LOCAL into .env
 scripts/local-flow.sh                  # whole state machine with cast (valid + invalid), before any web code
-(cd web && npm ci && npm run build && npm test)                       # 23 unit tests (canonical JSON, envelope,
-                                       # hosted-mode auth, verifier evidence binding; the last group re-runs the
-                                       # simulator, so uv must be on PATH — no chain and no keys needed)
+(cd web && npm ci && npm run build && npm test)                       # 45 unit tests (canonical JSON, envelope,
+                                       # hosted-mode auth, verifier evidence binding, failure-class presentation;
+                                       # the verifier groups re-run the simulator, so uv must be on PATH — no chain
+                                       # and no keys needed)
 (cd web && npm run demo -- --reset --evidence ../evidence/local)      # seller -> verifier -> chain -> buyer, 2 orders
 (cd web && npm run test:integration)   # 7 tests against the demo database + local chain
 (cd web && npm run ledger)             # evidence/local/ledger.json for a GUARD-style pipeline (operator artifact)
@@ -149,12 +196,16 @@ The UI has a "Run pipeline" button that does what `npm run demo` does, with a li
 - Simulator: nominal suite 6/6 SUCCESS (clearance 0.318–0.394 m, target 0.40 ± 0.15); grid hunt 144
   runs, 101 SUCCESS, 43 COLLISION, 0 inconclusive; bitwise repeatability across in-process and
   subprocess runs in the pinned environment (`evidence/milestone/repeatability-*.json`).
-- Web: 23 unit tests — canonical JSON (byte-identical re-serialization of Python-written run files and
+- Web: 45 unit tests — canonical JSON (byte-identical re-serialization of Python-written run files and
   reproduction of their trajectory hashes), envelope and the published tuned range (which cannot drift
-  from `controller.py` or `sim/envelope.yaml` without failing), hosted-mode access control, and the
+  from `controller.py` or `sim/envelope.yaml` without failing), hosted-mode access control, the
   verifier's evidence binding (a mislabelled controller and altered replay frames behind an intact
   declared hash are both rejected by the real verifier against a real re-run, while the honest package
-  still verifies) — and 7 integration tests (no private field leaks from any public endpoint;
+  still verifies), and the failure-class presentation the experience is built on (the sold COLLISION
+  finding and the recorded LOAD_SHED run are each narrated from their own events, severity proxy and
+  units; a run that fails both ways keeps both moments; an unregistered class still resolves; the
+  playhead opens 0.6 s before the failure and never at the parked end of the run) — and 7 integration
+  tests (no private field leaks from any public endpoint;
   retrieval rejects the wrong signer, wrong binding, nonce replay, cross-order use and expiry;
   refunded orders are not retrievable; hosted mode closes the reveal route to visitors and a real
   signed retrieval reopens it).

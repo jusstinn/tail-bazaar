@@ -3,7 +3,7 @@
 // provenance and raw metrics stay complete but live behind labelled disclosures.
 import { getJSON, getToken, HttpError, setToken, type Check, type EnvelopeDoc, type Ev, type OperatingContext, type Order, type Pkg, type RunLike, type Status } from "./api.js";
 import { addrCell, esc, eth, num, short, txCell, when } from "./format.js";
-import { armPage, badge, band, counter, disclosure, facts, rangeBars, statusTone } from "./ui.js";
+import { armPage, badge, band, counter, disclosure, facts, inTuned, rangeBars, reducedMotion, statusTone } from "./ui.js";
 import { createReplay, type Replay, type ViewMode } from "./replay.js";
 import { autoplayStop, defaultPlayhead, presentFailure, type FailurePresentation } from "../server/failure.js";
 
@@ -178,7 +178,7 @@ async function renderRevealStage(host: HTMLElement, o: Order, env: EnvelopeDoc, 
   if (!o.revealed_in_buyer_console) {
     host.innerHTML = `${stageHead("reveal", 3, "The reveal", valid
       ? "This order's package was not retrieved by the buyer agent on this instance, so there is nothing to replay here."
-      : "A refunded order never unlocks its package. The buyer paid, the delivery failed the verifier's check, the money came back — and the evidence stayed sealed. That is the point of the escrow.")}
+      : "No package was retrieved for this order on this instance, and a refunded order cannot be retrieved afterwards: once the escrow settles invalid, the delivery route refuses the buyer's signature. The buyer paid, the delivery failed the verifier's check, and the money came back.")}
       <div class="sealed reveal"><div class="sealed-mark">sealed</div><p class="prose">The private package for this order is not served. What anyone can still read is the public summary, every check the verifier ran, and the complete on-chain record below.</p></div>`;
     armPage(host);
     return;
@@ -236,12 +236,13 @@ function metricsTable(baseline: RunLike, pkg: Pkg): string {
   return `<table class="data"><thead><tr><th>Metric</th><th>Baseline</th><th>This finding</th></tr></thead><tbody>${rows.map(([k, a, b]) => `<tr><td>${esc(k)}</td><td class="mono">${esc(a)}</td><td class="mono">${esc(b)}</td></tr>`).join("")}</tbody></table>`;
 }
 
+/** Axes on which this scenario falls outside the range the controller was tuned for. An axis with no
+ *  stated tuned range, or one this scenario does not set, cannot be outside anything. */
 function outsideAxes(pkg: Pkg, env: EnvelopeDoc): string[] {
   const tuned = env.controller_tuned_range.per_parameter;
   return env.axes.filter((a) => {
-    const t = tuned[a.name] ?? {};
     const v = Number(pkg.scenario[a.name]);
-    return !(t.exactly !== undefined ? v === t.exactly : (t.min === undefined || v >= t.min) && (t.max === undefined || v <= t.max));
+    return Number.isFinite(v) && !inTuned(v, tuned[a.name] ?? {});
   }).map((a) => a.name);
 }
 
@@ -258,8 +259,12 @@ function renderReveal(host: HTMLElement, pkg: Pkg, baseline: RunLike, o: Order, 
   const mk = (label: string, v: unknown, unit: string, dec: number, note = ""): string =>
     typeof v === "number" && Number.isFinite(v) ? `<div class="metric reveal"><div class="metric-v">${counter(v, unit, dec)}</div><div class="metric-k">${esc(label)}</div>${note ? `<div class="metric-n">${esc(note)}</div>` : ""}</div>` : "";
 
+  const honest = o.delivery_check ? o.delivery_check.valid : true;
+  const revealLede = honest
+    ? `This is the run the buyer paid for, played back from the transforms recorded when it was simulated. Nothing is re-simulated in your browser. <strong>${esc(p.sentence)}</strong>`
+    : `These are the bytes the seller actually served. They do <strong>not</strong> hash to the commitment registered on chain, so the verifier refused them and the buyer was refunded — what follows is the rejected delivery, not certified evidence. It is played back from its own recorded transforms; nothing is re-simulated in your browser.`;
   host.innerHTML = `
-    ${stageHead("reveal", 3, "The reveal", `This is the run the buyer paid for, played back from the transforms recorded when it was simulated. Nothing is re-simulated in your browser. <strong>${esc(p.sentence)}</strong>`)}
+    ${stageHead("reveal", 3, "The reveal", revealLede)}
     <div class="chips-row reveal">
       ${badge(p.label, "bad")}
       ${p.also.map((a) => badge("also " + a.label.toLowerCase(), "warn")).join("")}
@@ -355,7 +360,7 @@ function replayDuration(pkg: Pkg): number {
 function mountReplay(host: HTMLElement, baseline: RunLike, failureRun: RunLike, pkg: Pkg, p: FailurePresentation): void {
   const viewport = host.querySelector<HTMLElement>("#viewport")!;
   try {
-    replay = createReplay(viewport, { baseline, failure: failureRun, failureFrames: pkg.replay.frames, presentation: p, mode: "overlay" });
+    replay = createReplay(viewport, { baseline, failure: failureRun, failureFrames: pkg.replay.frames, presentation: p, mode: "overlay", reducedMotion: reducedMotion() });
   } catch (e) {
     viewport.innerHTML = `<div class="note bad">The 3D replay is unavailable in this browser (${esc((e as Error)?.message ?? e)}). The recorded transforms are still in the package; every metric and hash below is unaffected.</div>`;
     host.querySelector(".timeline")?.remove();
@@ -401,6 +406,9 @@ function mountReplay(host: HTMLElement, baseline: RunLike, failureRun: RunLike, 
   const t0 = Number(q.get("t"));
   if (q.has("t") && Number.isFinite(t0)) { replay.setTime(t0); replay.pause(); }
   else if (q.get("paused") === "1") { replay.setTime(from); replay.pause(); }
+  // prefers-reduced-motion: do not autoplay — open ON the failure frame instead, so the reader still
+  // sees the moment without anything moving until they ask for it.
+  else if (reducedMotion()) { replay.setTime(p.moment_t_s ?? from); replay.pause(); }
   else replay.playThrough(from, to);
   setLabel();
 }
