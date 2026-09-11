@@ -75,7 +75,7 @@ export async function renderOrder(view: HTMLElement, orderId: string, st: Status
     <nav class="rail" id="rail"><div class="wrap">${STAGES.map(([id, t], i) => `<button data-goto="stage-${id}"><span>${i + 1}</span>${esc(t)}</button>`).join("")}</div></nav>
 
     ${band({ id: "stage-claim", inner: `
-      ${stageHead("claim", 1, "The sealed claim", "This is everything the buyer was allowed to see before paying. It names the controller and the verdict, and deliberately says nothing that would let anyone reconstruct the scenario.")}
+      ${stageHead("claim", 1, "The sealed claim", `This is everything the buyer was allowed to see before paying. It names the robot, what failed and who decides that, the version hash of the ${esc((s.target?.subject_label ?? "controller").toLowerCase())} and the verdict — and deliberately says nothing that would let anyone reconstruct the scenario.`)}
       <div class="two-col">
         <div>
           ${facts([
