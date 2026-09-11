@@ -176,7 +176,12 @@ export function createReplay(host: HTMLElement, opts: ReplayOptions): Replay {
     buildTrack(R, opts.failureLabel ?? "Purchased scenario", failure, failureFrames, overlayEl, { ghostRun: baseline, ghostFrames: baseline.frames, momentAt, momentLabel: contactText, momentType: presentation.moment?.type }),
   ];
   const FAILURE = 1;
-  const duration = Math.max(...tracks.map((t) => t.duration));
+  // The timeline is the PURCHASED run's own length. The ghost (and the baseline panel in split mode)
+  // is posed from its own frames and holds its last pose if it is shorter. If it is LONGER — the
+  // humanoid baseline survives the whole 15 s episode while the purchased run ends 1.2 s after the
+  // fall — the extra seconds would only stretch the scrubber and push every marker off the time it
+  // was computed on, because the page places its markers on the purchased run's duration.
+  const duration = tracks[FAILURE].duration;
 
   let mode: ViewMode = opts.mode ?? "overlay";
   let t = 0, playing = false, speed = 0.5, last = performance.now();
