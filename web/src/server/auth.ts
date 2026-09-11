@@ -1,8 +1,10 @@
 // Delivery authentication: single-use, expiring challenge bound to order id, buyer address, chain id
 // and application domain, signed by the buyer as an EIP-191 personal message. The server recovers
 // the signer, checks ON CHAIN that the order's buyer is the signer and the order is Funded or
-// Delivered, consumes the nonce, and only then returns the private package. An address or a
-// transaction hash alone never unlocks anything.
+// Delivered, consumes the nonce ATOMICALLY (see consumeChallenge: the mark-as-used is also the test
+// of whether it was unused, so concurrent redemptions of one challenge cannot both be served), and
+// only then returns the private package. An address or a transaction hash alone never unlocks
+// anything.
 import { recoverMessageAddress, type Hex } from "viem";
 import { appDomain, chainId } from "./config.js";
 import { getListingExpecting } from "./chain.js";
@@ -69,7 +71,23 @@ export function lookupSession(token: string, orderId: string | null, now = Math.
 
 export type Redeemed = { bytes: Uint8Array; signer: Hex; on_chain_status: number; delivery_hash: string | null; session: Session };
 
-export async function redeemChallenge(orderId: string, nonce: string, signature: string, now = Math.floor(Date.now() / 1000)): Promise<Redeemed> {
+/** SINGLE USE, ATOMICALLY. The nonce is marked used in ONE statement that is also the test of whether
+ *  it was still unused, and the row count is checked: SQLite applies the UPDATE as a single write, so
+ *  of any number of concurrent redemptions of the same challenge exactly one can see `changes === 1`.
+ *  Reading `used_at` first and writing it later - which is what this used to do, with several awaits
+ *  in between - left a window in which two requests with the same signed challenge both passed the
+ *  read and both went on to be served. The refusal message is the same one an already-used nonce has
+ *  always produced, because from the caller's side that is exactly what happened. */
+export function consumeChallenge(nonce: string, now: number): void {
+  const res = getDb().prepare("UPDATE challenges SET used_at = ? WHERE nonce = ? AND used_at IS NULL").run(now, nonce);
+  if (Number(res.changes) !== 1) throw new AuthError(401, "challenge already used");
+}
+
+/** The on-chain ownership lookup, injectable so the challenge state machine can be exercised without
+ *  a chain. Production callers never pass it. */
+export type RedeemDeps = { lookupOnChain?: (orderId: string) => Promise<{ buyer: string; status: number }> };
+
+export async function redeemChallenge(orderId: string, nonce: string, signature: string, now = Math.floor(Date.now() / 1000), deps: RedeemDeps = {}): Promise<Redeemed> {
   const db = getDb();
   const ch = db.prepare("SELECT * FROM challenges WHERE nonce = ?").get(nonce) as
     | { nonce: string; order_id: string; buyer: string; chain_id: number; domain: string; message: string; expires_at: number; used_at: number | null }
@@ -87,14 +105,18 @@ export async function redeemChallenge(orderId: string, nonce: string, signature:
   }
   if (signer.toLowerCase() !== ch.buyer) throw new AuthError(403, `signer ${signer} is not the challenged buyer`);
   // On-chain ownership check: the escrow's bound buyer must be the signer and the order must be funded.
-  const onChain = await getListingExpecting(orderId as Hex, (l) => l.status === 2 || l.status === 3 || l.status === 4, 4, 2000);
+  const onChain = await (deps.lookupOnChain
+    ? deps.lookupOnChain(orderId)
+    : getListingExpecting(orderId as Hex, (l) => l.status === 2 || l.status === 3 || l.status === 4, 4, 2000));
   if (onChain.buyer.toLowerCase() !== signer.toLowerCase()) throw new AuthError(403, "signer is not the buyer bound to this order on chain");
   // Funded (2), Delivered (3) or SettledValid (4): a buyer who paid for a valid package may re-download it.
   if (onChain.status !== 2 && onChain.status !== 3 && onChain.status !== 4) throw new AuthError(403, `order is not funded, delivered or validly settled on chain (status ${onChain.status})`);
   const order = db.prepare("SELECT * FROM orders WHERE order_id = ?").get(orderId) as unknown as OrderRow | undefined;
   if (!order) throw new AuthError(404, "unknown order");
   if (!order.delivered_bytes) throw new AuthError(409, "the seller has not made the package available yet");
-  db.prepare("UPDATE challenges SET used_at = ? WHERE nonce = ?").run(now, nonce);
+  // Consume the nonce here: every check above has passed, nothing below can fail, and no package byte
+  // has left this function yet. Whoever loses this race is refused and is served nothing.
+  consumeChallenge(nonce, now);
   db.prepare("UPDATE orders SET retrieved_at = COALESCE(retrieved_at, ?) WHERE order_id = ?").run(nowIso(), orderId);
   // The signature proved control of the buyer key; hand back a short-lived session so the buyer's own
   // console can re-read this order's package (hosted mode) without signing again for every request.
