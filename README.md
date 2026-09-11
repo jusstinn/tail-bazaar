@@ -852,6 +852,27 @@ bought; TLS plus trusted server storage is the prototype's whole confidentiality
   re-derived from the bytes rather than believed (see "Evidence binding" above).
 - The buyer trusts the public summary because the verifier signed the registration transaction; the
   summary's terms hash is on chain.
+- **The buyer takes the terms from the chain, not from its own database.** Before ranking a listing,
+  and again immediately before funding it, the buyer recomputes the stored public summary's terms hash
+  with the same function the verifier used to register it and requires that hash, the seller, the
+  price and the package commitment to equal the on-chain listing (`checkTermsBinding` in
+  `agents/buyer.ts`). A row that disagrees is skipped with the reason printed, or refused at funding;
+  a summary edited after registration — a severity band raised, say — cannot jump the queue.
+- **The run record is bound, not only the frames.** Once the delivered frames hash to the verifier's
+  own re-run, every other run-derived section of the package — `scene`, `metrics`, `events`, `ticks`,
+  `claim`, `scenario`, initial state, termination rules, environment — must be byte-identical
+  (canonical JSON) to the verifier's own run document (`package-run-record-matches-verifier-rerun`),
+  and the claim is compared with the claim the verifier derives from *its* run, never with the
+  seller's submission. Authentic poses under a fabricated impact speed, a moved obstacle or a
+  relabelled failure class are INVALID. Only the salt, the seller address, the packaging timestamp,
+  the hunt statistics, the reproduction prose and the model's filesystem path are exempt; the list is
+  in the code (`RUN_RECORD_EXEMPT`).
+- **A reverted transaction is an error, never a recorded success.** `chain.ts` throws
+  `TxRevertedError` (hash, function, block) whenever a receipt's status is not `success`, so no agent
+  records a fund, delivery or settlement that did not happen. Every broadcast hash is written to
+  `pending_txs` *before* the receipt wait and resolved when the receipt arrives or the wait fails;
+  unresolved hashes can be reconciled against the chain later (`GET /api/txs/pending?reconcile=1`,
+  operator-only in hosted mode).
 - All three envelopes and all three severity band schemes are **illustrative assumptions**, not
   measurements of any physical robot. The cart's tuned range is its author's documented assumption;
   both policies' published conditions are transcribed from their model repositories. None is a
