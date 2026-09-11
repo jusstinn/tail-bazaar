@@ -889,6 +889,8 @@ never lets the verifier take funds.
 
 ## Limitations, stated plainly
 
+- **The contract is unaudited and this is not production software.** `FailureEscrow` has a Foundry test suite (22 tests) and verified source on Basescan, Sourcify and Blockscout, but no third-party audit. Nothing here is a safety certification.
+
 - **Adversarially selected failures are not failure frequencies.** All three hunters run bounded
   searches whose objective is to find failures. The number they find, and the ratio published as
   search cost, describe the *search*, not how often anything fails in the field. No distribution D
