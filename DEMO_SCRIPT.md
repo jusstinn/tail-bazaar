@@ -15,7 +15,7 @@ scripts/anvil-start.sh && scripts/local-deploy.sh
 scripts/server-start.sh                                             # http://127.0.0.1:3100
 ```
 
-That takes about two and a half minutes and leaves **six listings across three robots and six settled
+That takes about four minutes and leaves **eight listings across four robots and eight settled
 orders**, one of them deliberately refunded. Open these six tabs:
 
 | # | Tab | URL |
@@ -25,6 +25,7 @@ orders**, one of them deliberately refunded. Open these six tabs:
 | 3 | Cart finding, refunded | `#/orders/<cart order that SETTLED_INVALID>` |
 | 4 | Humanoid finding | `#/orders/<humanoid order>` |
 | 5 | Arm finding | `#/orders/<the arm order whose severity band is high>` |
+| 5b | G1 finding | `#/orders/<the g1 order>` — on this machine `#/orders/0x4a426a67cd7ed3a088b871f1eec5a3e2933c5563ed20eb056291361620dc16bf` |
 | 6 | Base Sepolia | `https://sepolia.basescan.org/address/0xfadf11662C46c0214B0A40938a26FB8f0CD785A3` |
 
 `curl -s localhost:3100/api/listings | jq -r '.[] | "\(.target_id) \(.public_summary.severity.band) \(.status) \(.listing_id)"'`
@@ -148,6 +149,18 @@ If time allows, the honest negative — it is the most persuasive thing on the p
 > forty-eight. Moving it five centimetres, twenty-five out of twenty-five. Latency and noise cost this
 > policy the placement, not the part — not one drop in that whole grid. What loses the part is a
 > combination nobody sweeps for by hand. That is in the README as a measured negative, not buried."
+
+## 2:40 — target 4, the Unitree G1 (tab 5b) — *a real robot, a real policy, our own predicate*
+
+Open the G1 finding. The replay opens before the shove and plays through the fall.
+
+> "This is a Unitree G1 under Unitree's own pretrained walking policy, in Unitree's own MuJoCo model,
+> drawn from its own meshes. Unitree's runner has no notion of a fall, so the predicate is ours and
+> the card says so: the pelvis drops below 0.46 m or tilts past 60 degrees. It survives every shove up
+> to 24 newton-seconds from any direction; 28 from the side is the mildest fall the hunter found, and
+> 80 milliseconds of control latency puts it down with no noise at all. Compare the Gymnasium
+> mannequin: one tick of latency, an 8 newton-second shove. Same market, two very different robots,
+> and the market prices exactly that difference."
 
 ## 3:00 — buy one yourself (tab 1, marketplace) — *the market, live*
 
