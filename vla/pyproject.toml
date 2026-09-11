@@ -1,0 +1,23 @@
+[project]
+name = "tailbazaar-vla"
+version = "0.1.0"
+description = "Tail Bazaar VLA target: a pi0 vision-language-action policy (openpi) driving simulated bimanual arms in MuJoCo, perturbed until it drops the cube."
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "gym-aloha>=0.1.1",
+    "gymnasium>=0.29",
+    "imageio[ffmpeg]>=2.34",
+]
+
+# NOT declared here on purpose:
+#   openpi-client  - installed from the openpi checkout (packages/openpi-client)
+#   jax/torch/etc  - live only in openpi's own venv on the GPU host
+# This project is the CLIENT half. See README.md for the two-venv layout.
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["vla_bazaar"]

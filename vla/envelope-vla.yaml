@@ -1,0 +1,155 @@
+# Tail Bazaar — VLA target operating envelope (theta), in the same GUARD-shaped axis form as
+# sim/envelope.yaml so a VLA failure ledger could be consumed by the same estimator later.
+#
+# TARGET: a Physical Intelligence pi0 vision-language-action policy (openpi) driving a simulated
+# bimanual ALOHA (ViperX 300 S) arm pair in MuJoCo on the transfer-cube task.
+#
+# THIS IS ALOHA-SIM STANDING IN FOR YAM. openpi at commit 215abfb contains NO YAM / I2RT config,
+# checkpoint or MuJoCo model (a word-boundary grep for `yam` and `i2rt` over the whole repo,
+# excluding .venv and third_party, returns zero hits). YAM is an I2RT bimanual hardware arm; it
+# cannot be simulated without a model, and none ships here. ALOHA sim is openpi's own documented
+# simulation example (examples/aloha_sim) and is what these numbers were measured on.
+#
+# EVERYTHING HERE IS AN ILLUSTRATIVE ASSUMPTION for a demonstration. None of these bounds is
+# measured on a physical robot, and no distribution D is stated: `marginal` and `scale` are present
+# for schema compatibility with GUARD and left null, exactly as in sim/envelope.yaml.
+#
+# THE BASELINE CAVEAT THAT GOVERNS THIS WHOLE FILE. The pi0_aloha_sim checkpoint does NOT succeed
+# reliably at nominal: measured success was 3/6 unperturbed episodes (see evidence/vla/README.md).
+# A single failing episode at a perturbed point is therefore NOT evidence that the perturbation
+# caused the failure. Admissibility below requires a PAIRED comparison against the same seed's
+# nominal outcome, which is a materially weaker claim than the deterministic cart target makes.
+
+envelope_id: tb-vla-envelope-1
+envelope_revision: tb-vla-envelope-1.0
+scene_revision: 1
+target_id: openpi-pi0-aloha-sim-transfer-cube
+policy_id: pi0_aloha_sim
+policy_provenance:
+  repo: https://github.com/Physical-Intelligence/openpi
+  commit: 215abfb217dbac7d5f1273282331b9b1866c0479
+  checkpoint: gs://openpi-assets/checkpoints/pi0_aloha_sim
+  checkpoint_bytes: 12027780000        # 11.2 GiB as reported by gsutil
+  config: pi0_aloha_sim
+  licence: Apache-2.0 (openpi code and released checkpoints)
+  env: gym-aloha AlohaTransferCube-v0 (MuJoCo 2.3.7, dm-control 1.0.14), Apache-2.0
+control_tick_ms: 20                    # gym_aloha.constants.DT = 0.02 -> 50 Hz
+action_horizon: 10                     # policy queried once per 10 control ticks
+max_steps: 300                         # gym_aloha registration max_episode_steps
+inference_ms_warm_median: 165          # measured, NVIDIA A10 24 GB, bf16 JAX
+
+# Success is the ENVIRONMENT'S OWN signal, never a detector we invented:
+#   gym_aloha TransferCubeTask.get_reward, max_reward = 4
+#   AlohaEnv.step sets terminated = is_success = (reward == 4)
+success_signal: gym_aloha info["is_success"] == True, i.e. task reward reaches 4/4
+mechanical_predicate: >
+  DROPPED requires the cube to have been genuinely lifted (the task's own reward >= 2: held by the
+  right gripper finger AND not touching the table) and then for geom `red_box` to re-contact geom
+  `table` while touching neither gripper finger. This is the one predicate added on top of the
+  environment's signal, and it only separates a drop from a policy that never picked the cube up.
+
+outcome_classes:
+  - SUCCESS         # env reported is_success / reward 4
+  - DROPPED         # lifted, then fell back to the table out of both grippers
+  - NOT_COMPLETED   # ran out of steps without reaching reward 4 and without a recorded drop
+  - INCONCLUSIVE    # policy server error, env construction failure, or unpaired baseline
+
+severity_metric:
+  name: drop_impact_speed
+  units: m/s
+  definition: >
+    Norm of the cube's free-joint linear velocity on the first control tick at which the drop
+    predicate above fires. Recorded alongside drop_height (metres fallen from the peak height
+    reached while lifted). Both are measured quantities read out of MuJoCo, not scores.
+
+admissibility:
+  paired_baseline_required: true
+  rule: >
+    A scenario is admissible only if the SAME seed reaches SUCCESS at the nominal point and a
+    non-SUCCESS outcome at the perturbed point. Because sim + GPU inference is not bit-reproducible
+    (see reproducibility below), a finding should be replayed before it is trusted; a finding that
+    does not reproduce on replay is INCONCLUSIVE, not a failure.
+  duplicate_rule: same outcome class AND normalized L-infinity distance < 0.05 in axis space
+
+reproducibility:
+  trajectory_bit_identical: false
+  note: >
+    gym-aloha registers these envs with nondeterministic=True in its own source ("Even after
+    seeding, the rendered observations are slightly different"). pi0 inference runs in JAX on the
+    A10 in bf16, where kernel reduction order is not pinned. Measured findings are in
+    evidence/vla/README.md. What IS reproducible is recorded per scenario: the cube pose, the seed,
+    the axis values, the SHA-256 of the observation stream, and the SHA-256 of the realised action
+    trace, which can be replayed open-loop without the policy server.
+
+axes:
+  - name: box_mass_scale
+    low: 0.2
+    high: 20.0
+    nominal: 1.0
+    marginal: null
+    scale: null
+    units: dimensionless (multiplies the cube's 0.05 kg body mass; inertia scaled with it)
+    group: physical
+
+  - name: box_friction_scale
+    low: 0.02
+    high: 5.0
+    nominal: 1.0
+    marginal: null
+    scale: null
+    units: dimensionless (multiplies the red_box sliding friction coefficient, nominal 1.0)
+    group: physical
+
+  - name: box_pos_dx
+    low: -0.06
+    high: 0.06
+    nominal: 0.0
+    marginal: null
+    scale: null
+    units: m (offset added to the cube x sampled from gym_aloha.utils.sample_box_pose, [0.0, 0.2])
+    group: physical
+
+  - name: box_pos_dy
+    low: -0.06
+    high: 0.06
+    nominal: 0.0
+    marginal: null
+    scale: null
+    units: m (offset added to the cube y sampled from sample_box_pose, [0.4, 0.6])
+    group: physical
+
+  - name: cam_dz
+    low: -0.15
+    high: 0.35
+    nominal: 0.0
+    marginal: null
+    scale: null
+    units: m (the `top` observation camera raised/lowered from its nominal z of 0.8)
+    group: visual
+
+  - name: light_scale
+    low: 0.2
+    high: 3.0
+    nominal: 1.0
+    marginal: null
+    scale: null
+    units: dimensionless (multiplies every light's diffuse component, nominal 0.3, clipped to 1.0)
+    group: visual
+
+  - name: action_noise
+    low: 0.0
+    high: 0.2
+    nominal: 0.0
+    marginal: null
+    scale: null
+    units: std of gaussian noise added to each of the 14 normalized joint commands
+    group: systems
+
+  - name: latency_steps
+    low: 0
+    high: 10
+    nominal: 0
+    marginal: null
+    scale: null
+    units: control ticks the commanded action is held stale (1 tick = 20 ms)
+    group: systems
