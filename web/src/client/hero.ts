@@ -299,12 +299,9 @@ export function mountHero(root: HTMLElement): void {
     if (entrance && hero) {
         // The wordmark overlay that used to sit over the hero during the entrance is gone: on some
         // layouts it landed at the left edge of the viewport and stayed there. The copy still fades in.
-        hero.classList.add('hero-enter');
-        host.disabled = true;
-        hero.addEventListener('animationend', onEntranceEnd);
-        // If the animationend never reaches us (a throttled tab, a stylesheet that dropped the
-        // animation), finish anyway so the copy is visible and the wave button works.
-        window.setTimeout(() => { if (hero.classList.contains('hero-enter')) finishEntrance(true); }, 2600);
+        // No staged entrance: the copy and the robot are on screen at once, and the robot greets with a
+        // wave. The fade-in sequence read as a loading screen on first visit.
+        finishEntrance(true);
     }
     draw();
     sync();
