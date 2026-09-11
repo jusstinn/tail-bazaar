@@ -2,19 +2,21 @@
 
 Recorded against the **local server** (`http://127.0.0.1:3100`), with the Base Sepolia order pages
 open in a second tab so the explorer links on screen are real transactions. One target per beat;
-every failure is visibly on screen, never only described.
+**every beat has a failure visibly on screen**, never only described.
 
 ## Before recording
 
 ```bash
 export PATH="$HOME/.foundry/bin:$PATH"
 scripts/anvil-start.sh && scripts/local-deploy.sh
-(cd sim && uv run python -m tailbazaar_sim.humanoid.cli policy)     # warms sim/.cache; no network later
+(cd sim && uv run python -m tailbazaar_sim.humanoid.cli policy && \
+           uv run python -m tailbazaar_sim.arm.cli policy)          # warms sim/.cache; no network later
 (cd web && npm run build && npm run demo -- --reset --evidence ../evidence/local)
 scripts/server-start.sh                                             # http://127.0.0.1:3100
 ```
 
-That leaves four listings across both robots and four settled orders. Open these five tabs:
+That takes about two and a half minutes and leaves **six listings across three robots and six settled
+orders**, one of them deliberately refunded. Open these six tabs:
 
 | # | Tab | URL |
 |---|---|---|
@@ -22,11 +24,13 @@ That leaves four listings across both robots and four settled orders. Open these
 | 2 | Cart finding, valid | `#/orders/<cart order that SETTLED_VALID>` |
 | 3 | Cart finding, refunded | `#/orders/<cart order that SETTLED_INVALID>` |
 | 4 | Humanoid finding | `#/orders/<humanoid order>` |
-| 5 | Base Sepolia | `https://sepolia.basescan.org/address/0xfadf11662C46c0214B0A40938a26FB8f0CD785A3` |
+| 5 | Arm finding | `#/orders/<the arm order whose severity band is high>` |
+| 6 | Base Sepolia | `https://sepolia.basescan.org/address/0xfadf11662C46c0214B0A40938a26FB8f0CD785A3` |
 
-`curl -s localhost:3100/api/listings | jq -r '.[] | "\(.target_id) \(.status) \(.listing_id)"'`
-prints the ids. Browser at 1440 px wide, zoom 100 %. Nothing needs to be clicked twice: each finding
-page autoplays through its own failure when it loads.
+`curl -s localhost:3100/api/listings | jq -r '.[] | "\(.target_id) \(.public_summary.severity.band) \(.status) \(.listing_id)"'`
+prints the ids and bands; `curl -s localhost:3100/api/orders | jq -r '.[] | "\(.status) \(.order_id)"'`
+maps them to orders. Browser at 1440 px wide, zoom 100 %. Nothing needs to be clicked twice: each
+finding page autoplays through its own failure when it loads.
 
 ---
 
@@ -35,17 +39,19 @@ page autoplays through its own failure when it loads.
 > "Someone finds the conditions where a robot controller fails. You buy the recipe sealed, and an
 > independent verifier re-runs it before any money moves."
 
-Scroll to **"Two robots. Two different meanings of 'it failed'."** Read the two cards, slowly enough
-that both land:
+Scroll to **"Three robots. Three different meanings of 'it failed'."** Read the three cards, slowly
+enough that each lands:
 
 > "A warehouse cart that is supposed to stop short of an obstacle — failure is the simulator's own
-> contact flag. And a pretrained humanoid balance policy that is supposed to keep walking — failure
-> is Gymnasium's own health predicate, the torso leaving the height band the environment calls
-> healthy. This project implements no failure detector of its own for either one."
+> contact flag. A pretrained humanoid balance policy that is supposed to keep walking — failure is
+> Gymnasium's own health predicate, the torso leaving the height band the environment calls healthy.
+> And a pretrained arm that is supposed to place a part on a goal — *not placed* is Gymnasium-Robotics'
+> own success flag, and *dropped* is the one predicate we wrote ourselves, because the environment
+> scores placement and not custody. The card says so, in the same place as the other two."
 
-Point at the hero counter: **232 simulations run by hunters, 2 sweeps.**
+Point at the hero counter: **304 simulations run by hunters, 3 sweeps.**
 
-## 0:20 — target 1, the cart (tab 2)
+## 0:20 — target 1, the cart (tab 2) — *the collision on screen*
 
 Open the valid cart finding. It opens 0.6 s before impact and plays through once.
 
@@ -60,7 +66,7 @@ from the **"What this finding cost to find"** panel:
 
 Scroll to **"What was different"**: sensor delay 200 ms, floor friction 0.3.
 
-## 0:50 — the sealed claim (tab 2, scroll up to stage 1)
+## 0:45 — the sealed claim (tab 2, scroll up to stage 1)
 
 > "Here is everything the buyer was allowed to see *before* paying: which robot, which failure class
 > and who decides it, the controller's version hash, the verifier's verdict, a coarse severity band,
@@ -69,36 +75,26 @@ Scroll to **"What was different"**: sensor delay 200 ms, floor friction 0.3.
 
 Open **"Show the sealed summary and its hashes"** for one second — the commitment and terms hash.
 
-## 1:05 — the purchase (tab 2, stage 2)
+## 1:00 — the purchase and the settlement (tab 2, stages 2, 4 and 5)
 
 > "The buyer's agent funded the escrow with the exact price, before seeing any of it. Two deadlines
 > were fixed at that moment. If either the seller or the verifier goes quiet, anyone can call
 > `claimTimeout` and the buyer is refunded in full."
 
-Switch to **tab 5** for two seconds: the contract on Base Sepolia, real transactions.
-
-## 1:20 — reveal and replay (tab 2, stage 3)
-
-Press **"Replay the first contact"**.
-
-> "This is played back from the transforms recorded when it was simulated. Nothing is re-simulated in
-> your browser."
-
-Scroll to the **range bars**: the marker sits outside the tuned range on two axes and inside the
-searched envelope on every axis.
-
-> "So this is not 'the controller is broken'. It is a measured boundary of how far the operating
-> range can be widened before it stops working."
-
-## 1:50 — settlement (tab 2, stages 4 and 5)
-
-Open **"Show the verifier's checks"**.
+Switch to **tab 6** for two seconds: the contract on Base Sepolia, real transactions. Back on tab 2,
+open **"Show the verifier's checks"**:
 
 > "The verifier re-ran the scenario itself, recomputed the trajectory hash from the bytes it was
 > handed, checked that those frames are a physically possible trajectory of this scene, and compared
 > all of it with its own run. Then it settled valid and the seller withdrew."
 
-## 2:05 — the refund path (tab 3)
+Scroll to the **range bars** on the way past:
+
+> "The marker sits outside the tuned range on two axes and inside the searched envelope on every axis.
+> So this is not 'the controller is broken'. It is a measured boundary of how far the operating range
+> can be widened before it stops working."
+
+## 1:30 — the refund path (tab 3) — *the commitment mismatch on screen*
 
 > "The second cart listing was delivered tampered — the seller moved one axis back to nominal after
 > the commitment was registered and still asserted the original hash."
@@ -108,7 +104,7 @@ Point at the red **COMMITMENT MISMATCH** line and the refund in the story:
 > "The bytes did not hash to the commitment on chain. Settled invalid, the buyer withdrew a full
 > refund, the seller was paid nothing. The buyer does not get the package either."
 
-## 2:25 — target 2, the humanoid (tab 4)
+## 1:50 — target 2, the humanoid (tab 4) — *the fall on screen*
 
 Let it autoplay. The ghost keeps walking; the purchased run goes down.
 
@@ -120,22 +116,50 @@ Let it autoplay. The ghost keeps walking; the purchased run goes down.
 
 Point at the HUD: **torso 0.50 m, healthy ≥ 1.00 m.**
 
-> "That verdict is the environment's own health predicate, not ours. And the verifier re-ran it with
-> the humanoid's own simulator — same binding rules, its own physical-plausibility ceiling derived
-> from its own envelope."
+> "That verdict is the environment's own health predicate, not ours. The verifier re-ran it with the
+> humanoid's own simulator — same binding rules, its own plausibility ceiling derived from its own
+> envelope. 88 simulations, 53 falls."
 
-If time allows, one sentence on the search panel: 88 simulations, 53 falls.
+## 2:15 — target 3, the arm (tab 5) — *the dropped part on screen*
+
+Let it autoplay, then press **"Side by side"**. Left: the part held at the goal. Right: the part on
+the floor.
+
+> "Third robot, same machinery. A published pick-and-place policy that places the block in about ten
+> control steps, every episode. One axis moved — grip friction from the shipped 1.0 down to 0.25 —
+> and it lifts the part, carries it to within five point three centimetres of the goal, and lets go
+> fifteen centimetres above the table. The block clears the table edge and hits the *floor* at
+> 3.15 metres per second."
+
+Point at the HUD on the right panel: **not held · on the floor · 0.68 m from the goal**, and at the
+two scrubber marks, *the release* and *impact*.
+
+> "Two marks, because they are two different instants: the release is when both gripper pads lost
+> contact while the part was airborne and away from the goal, and it is only confirmed as a drop if
+> the grasp is not regained over the next three control ticks. Without that window an earlier sweep
+> would have sold a part that was still firmly pinched as a dropped part. Seventy-two simulations
+> here: four drops, four not-placed."
+
+If time allows, the honest negative — it is the most persuasive thing on the page:
+
+> "And what *doesn't* break it: making the part ten times heavier placed it forty-eight times out of
+> forty-eight. Moving it five centimetres, twenty-five out of twenty-five. Latency and noise cost this
+> policy the placement, not the part — not one drop in that whole grid. What loses the part is a
+> combination nobody sweeps for by hand. That is in the README as a measured negative, not buried."
 
 ## 2:50 — close (tab 1, the limits band)
 
 > "Why a market at all? The team that tuned a controller for 40 milliseconds of sensor delay is the
-> team that never tests 200. Tail search cost explodes past a handful of axes. And hunters build a
-> prior buyers cannot.
+> team that never tests 200. The team that would test payload mass is the team that finds 48 out of
+> 48. Tail search cost explodes past a handful of axes, and hunters build a prior buyers cannot.
 >
 > And the honest limits: these failures are adversarially selected, so they are not failure
 > frequencies. The physics needs calibration against real robots. There is one verifier and it is
-> trusted. Nothing here is audited. The humanoid's policy checkpoint declares no licence, and we do
-> not assert one for it."
+> trusted. Nothing here is audited. Neither pretrained policy declares a licence, and we do not
+> assert one for them. And there was a fourth target — a vision-language-action policy — that ran,
+> produced findings, and is deliberately *not* listed, because it is nondeterministic and this
+> verifier certifies only what it can bind by an exact hash. That is in the README with the numbers
+> and with what a reproduction-rate market would need instead."
 
 ---
 
@@ -148,8 +172,20 @@ If time allows, one sentence on the search panel: 88 simulations, 53 falls.
   commitment registered before payment, the trajectory hash recomputed from those frames equals the
   verifier's own re-run, and the frames are a physically possible trajectory of that scene. An
   external reviewer broke an earlier version by rewriting the frames, recomputing every hash, and
-  forcing an environment mismatch; that attack is now a test on both targets.
-- **"What if the environments differ?"** INCONCLUSIVE, and nothing is paid. Metrics that agree across
-  two environments say something about the scenario and nothing about which frames were delivered.
-- **"How hard is a third robot?"** One entry in `web/src/server/targets.ts` and one replay renderer.
-  No agent, route, ledger row or page has a per-robot special case.
+  forcing an environment mismatch; that attack is now a test on all three targets.
+- **"What if the environments differ?"** INCONCLUSIVE, and nothing is paid. That is not hypothetical:
+  the same scenario on macOS arm64 and on Linux x86_64 gives identical outcomes and *different*
+  trajectory hashes on all three robots. Metrics that agree across two environments say something
+  about the scenario and nothing about which frames were delivered, so the verifier abstains and the
+  hosted pipeline runs hunter and verifier on the same host.
+- **"Is the arm's drop detector a fudge?"** It is the one predicate in this project that is ours, and
+  the marketplace card says so next to the two that are not. It is mechanical — MuJoCo's own contact
+  list, both finger pads, a fixed 0.03 m airborne margin, and the environment's own success flag — and
+  the three-tick confirmation window exists because the first sweep produced a "drop" of a part that
+  was rising steadily at a constant 0.67 m/s and still pinched. Withdrawn proposals stay in the run
+  document and on the scrubber.
+- **"How hard was the third robot?"** One entry in `web/src/server/targets.ts`, one envelope mirror
+  and one replay renderer. No agent, route, ledger row or page has a per-robot special case.
+- **"Can I just read this on the hosted URL?"** Yes for the orders the host publishes: a short
+  `DEMO_PUBLIC_ORDERS` list is served without a token, badged **"DEMONSTRATION FIXTURE, published in
+  the repository, not a secret"**. Every other order still returns 401.

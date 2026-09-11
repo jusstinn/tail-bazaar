@@ -40,7 +40,7 @@ function colourFor(body: string, fingers: Set<string>): number {
 }
 
 function material(colour: number, ghost: boolean): THREE.MeshLambertMaterial {
-  return new THREE.MeshLambertMaterial(ghost ? { color: COL.ghost, transparent: true, opacity: 0.22, depthWrite: false } : { color: colour });
+  return new THREE.MeshLambertMaterial(ghost ? { color: COL.ghost, transparent: true, opacity: 0.3, depthWrite: false } : { color: colour });
 }
 
 /** One MJCF primitive as a mesh posed in its body's local frame. A mesh geom is drawn at MuJoCo's own
@@ -106,11 +106,16 @@ function goalMarker(at: [number, number, number], half: number, colour: number, 
   return g;
 }
 
+/** What the ghost draws. A full translucent second arm is a grey blob across half the frame and buys
+ *  nothing: the comparison is about the PART and the HAND that should have kept hold of it, so the
+ *  ghost bench is the table, the block and the gripper assembly. The failure run is drawn whole. */
+const GHOST_BODIES = new Set(["table0", "object0", "robot0:gripper_link", "robot0:l_gripper_finger_link", "robot0:r_gripper_finger_link"]);
+
 export const ARM_RENDERER: SceneRenderer = {
   id: "arm-3d",
   // The part is what must never leave the frame: the whole claim is about where it ends up.
   anchorBody: "object0",
-  ghostLaneOffset: 0.95,
+  ghostLaneOffset: 0.85,
   aspect: { overlay: 0.46, split: 0.40 },
   swatches: [
     { color: hex(COL.part), label: "the part being carried" },
@@ -165,6 +170,7 @@ export const ARM_RENDERER: SceneRenderer = {
       if (!p?.body) continue;
       if (p.role === "visual_marker") continue; // the mocap gizmo: 2 m bars that collide with nothing
       if (!bodies.has(p.body)) continue;        // e.g. the world's floor plane, drawn statically above
+      if (ghost && !GHOST_BODIES.has(p.body)) continue;
       const colour = colourFor(p.body, fingers);
       let mat = mats.get(colour);
       if (!mat) { mat = material(colour, ghost); mats.set(colour, mat); }
@@ -182,8 +188,11 @@ export const ARM_RENDERER: SceneRenderer = {
     return { x: p[0], y: p[1], z: p[2] };
   },
 
+  /** Framed to hold the whole bench at once: the arm, the table, the goal, the ghost one bench over
+   *  and the patch of floor the part can reach. The part is 5 cm across, so the failure ring and the
+   *  callout — not the part's own size — are what carry it at this distance. */
   camera(a) {
-    return { pos: [a.x + 1.62, a.y - 0.28, a.z + 0.92], look: [a.x + 0.16, a.y + 0.36, a.z + 0.16] };
+    return { pos: [a.x + 1.12, a.y - 1.3, a.z + 1.12], look: [a.x - 0.06, a.y + 0.36, a.z + 0.22] };
   },
 
   /** The mark sits on the part, which is the body the drop predicate is about. */
@@ -200,8 +209,13 @@ export const ARM_RENDERER: SceneRenderer = {
     // by the run itself; neither is a hard-coded tick.
     const dt = Number(run.frames?.dt_s) || 0.04;
     const tk = ticks[Math.min(Math.max(Math.round(t / dt) - 1, 0), ticks.length - 1)];
-    const z = tableTop(run);
-    const airborne = Number(tk.object_z_m) - z;
-    return `<b>${t.toFixed(2)} s</b><span class="${tk.grasped ? "" : "hud-alert"}">${tk.grasped ? "held" : "not held"}</span><span>${airborne > 0 ? `${airborne.toFixed(2)} m over the table` : "on the table"}</span><span>${n2(tk.object_goal_distance_m)} m from the goal</span><span>${n2(tk.object_speed_mps)} m/s</span>`;
+    // Where the part is, against the two surfaces the run itself publishes. A block below the table
+    // top is on the floor, which for this target is the whole point and must never read as "on the
+    // table" — so the resting height is read from the scene, not assumed.
+    const rest = Number(sc(run).object_resting_z_m);
+    const z = Number(tk.object_z_m);
+    const above = z - (Number.isFinite(rest) ? rest : tableTop(run) + 0.025);
+    const where = above > 0.015 ? `${above.toFixed(2)} m over the table` : z < tableTop(run) ? "on the floor" : "on the table";
+    return `<b>${t.toFixed(2)} s</b><span class="${tk.grasped ? "" : "hud-alert"}">${tk.grasped ? "held" : "not held"}</span><span class="${where === "on the floor" ? "hud-alert" : ""}">${where}</span><span>${n2(tk.object_goal_distance_m)} m from the goal</span><span>${n2(tk.object_speed_mps)} m/s</span>`;
   },
 };

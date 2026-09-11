@@ -107,7 +107,7 @@ export async function renderMarket(view: HTMLElement, st: Status): Promise<void>
 
     ${band({
       id: "robots", eyebrow: "What is on the market", inner: `
-      <h2 class="section-title reveal">${esc(countWord(shown.length).replace(/^./, (x) => x.toUpperCase()))} robots. ${esc(countWord(shown.length))} different meanings of "it failed".</h2>
+      <h2 class="section-title reveal">${esc(countWord(shown.length).replace(/^./, (x) => x.toUpperCase()))} robots. ${esc(countWord(shown.length).replace(/^./, (x) => x.toUpperCase()))} different meanings of "it failed".</h2>
       <p class="prose reveal">Almost none of these failure classes is invented here. The cart's collision is the simulator's own contact flag; the humanoid's fall is Gymnasium's own health predicate; the arm's <em>not placed</em> is Gymnasium-Robotics' own success flag at its own episode horizon — all read straight off the environment. The one exception is stated rather than hidden: the arm's <em>dropped</em> is this project's own predicate, because the environment scores placement and not custody. It is mechanical, it reads MuJoCo's own contact list, and the card below says exactly what it is so a reader can disagree with it on the evidence.</p>
       <div class="tcards">${shown.map((t) => targetCard(t, envs)).join("")}</div>
       <p class="fineprint reveal">${esc(market.note)}</p>`,
