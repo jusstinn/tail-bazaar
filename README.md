@@ -68,7 +68,8 @@ a wireframe cannot answer the only question this failure asks — is the part in
 reads three things out of the run rather than assuming them: the `role` field, so MuJoCo's mocap
 gizmo (three 2 m bars that collide with nothing) is skipped instead of drawing a coordinate cross
 through every frame; `box_half_extent_m` plus its own `proxy` note, because the arm's links are meshes
-a from-data viewer cannot tessellate while the part, the pads, the table and the floor are exact boxes
+the run document cannot carry (each link shows that box only until the robot's own STL, served beside
+the page, replaces it) while the part, the pads, the table and the floor are exact boxes
 and planes; and the goal, which is a *site* rather than a body and so travels beside the frames — it
 is drawn as an open cage at the environment's own success threshold, never a solid, because a filled
 box at the goal would read as an obstacle. Its ghost is the bench, the part and the gripper, not a
@@ -219,6 +220,7 @@ by hash and never edited. The scene is Gymnasium-Robotics' shipped `fetch/pick_a
 compiled unmodified: a Fetch arm driven by a **mocap weld** on its end effector, a table whose top
 sits at z = 0.400 m, a 5 cm cube resting on it, and a goal the environment samples itself — in the
 air about half the time.
+The replay draws the arm from the robot's own link meshes — the 15 Fetch STLs the environment's MJCF names, copied verbatim from Gymnasium-Robotics into `web/public/meshes/fetch/` with their licence notice — posed under each recorded body at the MJCF geom frame; the part, the pads and the table stay the exact boxes the run publishes.
 
 | | |
 |---|---|
