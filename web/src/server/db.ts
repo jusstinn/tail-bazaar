@@ -69,6 +69,13 @@ export function getDb(): DatabaseSync {
       block_number INTEGER,
       chain_mode TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS sessions (
+      token TEXT PRIMARY KEY,
+      order_id TEXT NOT NULL,
+      buyer TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      expires_at INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS retrievals (
       order_id TEXT PRIMARY KEY,
       package_bytes BLOB NOT NULL,

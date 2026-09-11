@@ -17,6 +17,76 @@ export const ENVELOPE: Record<(typeof PARAM_ORDER)[number], { min: number; max: 
 
 export const NOMINAL_SCENARIO: Scenario = { sensor_delay_ms: 20, actuator_delay_ms: 20, floor_friction: 0.8, payload_kg: 20.0 };
 
+// ---------------------------------------------------------------- operating context (P3 framing)
+// The controller's TUNED RANGE, transcribed from the "Design assumptions" paragraph of the docstring
+// in sim/tailbazaar_sim/controller.py. That file is the authority and is never edited (its SHA-256 is
+// the controller version id in every evidence document), so this is a mirror, checked by a test.
+export const CONTROLLER_TUNED_RANGE: Record<(typeof PARAM_ORDER)[number], { min?: number; max?: number; exactly?: number }> = {
+  sensor_delay_ms: { max: 40 },
+  actuator_delay_ms: { max: 20 },
+  floor_friction: { min: 0.6 },
+  payload_kg: { exactly: 20.0 },
+};
+export const TUNED_RANGE_PROSE = "sensor latency <= 40 ms, actuator latency <= 20 ms, floor friction >= 0.6, payload 20 kg";
+export const SEARCHED_ENVELOPE_PROSE = "sensor latency 0-300 ms, actuator latency 0-100 ms, floor friction 0.2-1.0, payload 5-60 kg";
+export const TUNED_RANGE_SOURCE = "sim/tailbazaar_sim/controller.py, docstring section 'Design assumptions'";
+export const PRODUCT_QUESTION =
+  "Can this controller be deployed in a wider operating range than it was tuned for, and where exactly does it stop working?";
+export const OPERATING_CONTEXT_NOTE =
+  "The searched envelope is deliberately wider than the range the controller was tuned for, so a finding outside the tuned range is not a defect report: it is a measured boundary of the deployable range. The controller checks none of its tuned-range assumptions at runtime. Both ranges are illustrative design assumptions, not measurements of a physical robot.";
+
+/** Where a scenario sits relative to both ranges, per parameter. Post-purchase only: this is derived
+ *  from the exact parameters and therefore never appears in a pre-purchase summary. */
+export function rangePosition(scn: Scenario): { parameter: string; value: number; unit: string; tuned_range: string; in_tuned_range: boolean; searched_envelope: string }[] {
+  return PARAM_ORDER.map((k) => {
+    const t = CONTROLLER_TUNED_RANGE[k];
+    const spec = ENVELOPE[k];
+    const v = Number(scn[k]);
+    const inTuned = t.exactly !== undefined ? v === t.exactly : (t.min === undefined || v >= t.min) && (t.max === undefined || v <= t.max);
+    const tuned = t.exactly !== undefined ? `= ${t.exactly}` : t.min !== undefined ? `>= ${t.min}` : `<= ${t.max}`;
+    return { parameter: k, value: v, unit: spec.unit, tuned_range: tuned, in_tuned_range: inTuned, searched_envelope: `${spec.min} - ${spec.max}` };
+  });
+}
+
+/** GUARD-shaped axis rows (configs/guard_theta.yaml: name, low, high, nominal, marginal, scale, units,
+ *  group). `marginal`/`scale` are deliberately null: Tail Bazaar runs a bounded deterministic grid
+ *  search over these axes and does not sample from a distribution, so declaring one here would invent
+ *  a modelling decision that belongs to whoever states D. See sim/envelope.yaml. */
+export const ENVELOPE_AXES = [
+  { name: "sensor_delay_ms", low: 0, high: 300, nominal: 20, marginal: null, scale: null, units: "ms", group: "systems", quantization: "quantized to the 20 ms control tick", tuned_range: "<= 40" },
+  { name: "actuator_delay_ms", low: 0, high: 100, nominal: 20, marginal: null, scale: null, units: "ms", group: "systems", quantization: "quantized to the 20 ms control tick", tuned_range: "<= 20" },
+  { name: "floor_friction", low: 0.2, high: 1.0, nominal: 0.8, marginal: null, scale: null, units: "coefficient", group: "physical", quantization: "3 decimal places", tuned_range: ">= 0.6" },
+  { name: "payload_kg", low: 5.0, high: 60.0, nominal: 20.0, marginal: null, scale: null, units: "kg", group: "physical", quantization: "1 decimal place", tuned_range: "= 20" },
+] as const;
+
+/** Public document served by GET /api/envelope: constants only, identical for every listing. */
+export const ENVELOPE_DOC = {
+  envelope_id: ENVELOPE_ID,
+  yaml: "sim/envelope.yaml (same axis shape as GUARD configs/guard_theta.yaml)",
+  axes: ENVELOPE_AXES,
+  nominal_scenario: NOMINAL_SCENARIO,
+  control_tick_ms: DT_CTRL_MS,
+  duplicate_rule: `normalized L-infinity distance < ${DUPLICATE_DISTANCE}`,
+  controller_tuned_range: { prose: TUNED_RANGE_PROSE, source: TUNED_RANGE_SOURCE, per_parameter: CONTROLLER_TUNED_RANGE },
+  searched_envelope: { prose: SEARCHED_ENVELOPE_PROSE },
+  product_question: PRODUCT_QUESTION,
+  note: OPERATING_CONTEXT_NOTE,
+  distribution: "No distribution D over these axes is stated or estimated. The search is a bounded deterministic grid; adversarially selected failures are not failure frequencies.",
+  verdicts: { VALID: "re-simulated and bound to the delivered evidence", INVALID: "rejected (not reproducible, out of envelope, duplicate, or evidence not bound to the verified run)", INCONCLUSIVE: "numerical divergence or metrics outside tolerance; never pays" },
+};
+
+/** The compact operating context carried inside every public summary. Prose only, no parameter
+ *  identifiers and no per-listing positioning, so it cannot narrow down the hidden scenario. */
+export function operatingContext() {
+  return {
+    controller_tuned_range: TUNED_RANGE_PROSE,
+    searched_envelope: SEARCHED_ENVELOPE_PROSE,
+    question: PRODUCT_QUESTION,
+    note: OPERATING_CONTEXT_NOTE,
+    reference: "GET /api/envelope (published axes, same shape as GUARD configs/guard_theta.yaml)",
+  };
+}
+
 export function checkAdmissible(scn: Record<string, unknown>): string[] {
   const problems: string[] = [];
   for (const k of PARAM_ORDER) {

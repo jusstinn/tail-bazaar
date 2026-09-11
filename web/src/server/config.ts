@@ -43,6 +43,22 @@ export const chainLabel = chainMode === "testnet" ? "Base Sepolia (public testne
 
 export const port = Number(env("PORT", "3100"));
 export const publicBaseUrl = env("PUBLIC_BASE_URL", `http://127.0.0.1:${port}`);
+
+/** HOSTED MODE. Setting PUBLIC_BASE_URL means "this instance is reachable at a public URL", and every
+ *  route that can return private package bytes, private scenario parameters, private trajectories or
+ *  salts then requires authentication (see requirePrivateAccess in index.ts). Unset (the default in
+ *  .env.example) keeps LOCAL DEMONSTRATION MODE exactly as it was: the buyer console reveals packages
+ *  the local buyer agent already retrieved to anyone who can reach 127.0.0.1.
+ *  Read at call time, not at import time, so a test (or an operator) can toggle it. */
+export function hostedMode(): boolean {
+  return (process.env.PUBLIC_BASE_URL ?? "").trim() !== "";
+}
+
+/** Optional operator bearer token. Empty means "no operator path exists" (hosted mode then only
+ *  honours buyer sessions from the signed-challenge retrieval route). Never logged. */
+export function operatorToken(): string {
+  return (process.env.OPERATOR_TOKEN ?? "").trim();
+}
 export const appDomain = env("APP_DOMAIN", "tail-bazaar.local");
 export const buyerBudgetWei = BigInt(env("BUYER_BUDGET_WEI", "2000000000000000"));
 export const listingPriceWei = BigInt(env("LISTING_PRICE_WEI", chainMode === "testnet" ? "200000000000000" : "1000000000000000"));

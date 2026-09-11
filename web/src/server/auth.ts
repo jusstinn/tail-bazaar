@@ -10,6 +10,8 @@ import { getDb, nowIso, type OrderRow } from "./db.js";
 import { randomSaltHex } from "./canonical.js";
 
 export const CHALLENGE_TTL_S = 300;
+/** How long the buyer session issued by a successful retrieval stays valid (hosted mode). */
+export const SESSION_TTL_S = 3600;
 
 export class AuthError extends Error {
   constructor(public status: number, message: string) {
@@ -44,7 +46,28 @@ export function createChallenge(orderId: string, buyer: string): { nonce: string
   return { nonce, message, expires_at: expiresAt, chain_id: chainId, domain: appDomain };
 }
 
-export type Redeemed = { bytes: Uint8Array; signer: Hex; on_chain_status: number; delivery_hash: string | null };
+export type Session = { token: string; expires_at: number };
+
+/** Issue a buyer session for an order. Only ever called after a signed challenge has been redeemed,
+ *  i.e. after the signer proved control of the key the escrow records as this order's buyer. */
+export function issueSession(orderId: string, buyer: string, now = Math.floor(Date.now() / 1000)): Session {
+  const token = randomSaltHex().slice(2);
+  const expiresAt = now + SESSION_TTL_S;
+  getDb().prepare("INSERT INTO sessions(token, order_id, buyer, created_at, expires_at) VALUES (?,?,?,?,?)").run(token, orderId, buyer.toLowerCase(), nowIso(), expiresAt);
+  return { token, expires_at: expiresAt };
+}
+
+/** A session row if `token` is a live session, optionally required to be bound to `orderId`. */
+export function lookupSession(token: string, orderId: string | null, now = Math.floor(Date.now() / 1000)): { order_id: string; buyer: string } | null {
+  if (!/^[0-9a-f]{64}$/.test(token)) return null;
+  const row = getDb().prepare("SELECT order_id, buyer, expires_at FROM sessions WHERE token = ?").get(token) as { order_id: string; buyer: string; expires_at: number } | undefined;
+  if (!row) return null;
+  if (row.expires_at < now) return null;
+  if (orderId !== null && row.order_id !== orderId) return null;
+  return { order_id: row.order_id, buyer: row.buyer };
+}
+
+export type Redeemed = { bytes: Uint8Array; signer: Hex; on_chain_status: number; delivery_hash: string | null; session: Session };
 
 export async function redeemChallenge(orderId: string, nonce: string, signature: string, now = Math.floor(Date.now() / 1000)): Promise<Redeemed> {
   const db = getDb();
@@ -73,5 +96,8 @@ export async function redeemChallenge(orderId: string, nonce: string, signature:
   if (!order.delivered_bytes) throw new AuthError(409, "the seller has not made the package available yet");
   db.prepare("UPDATE challenges SET used_at = ? WHERE nonce = ?").run(now, nonce);
   db.prepare("UPDATE orders SET retrieved_at = COALESCE(retrieved_at, ?) WHERE order_id = ?").run(nowIso(), orderId);
-  return { bytes: new Uint8Array(order.delivered_bytes), signer, on_chain_status: onChain.status, delivery_hash: order.delivery_hash };
+  // The signature proved control of the buyer key; hand back a short-lived session so the buyer's own
+  // console can re-read this order's package (hosted mode) without signing again for every request.
+  const session = issueSession(orderId, signer, now);
+  return { bytes: new Uint8Array(order.delivered_bytes), signer, on_chain_status: onChain.status, delivery_hash: order.delivery_hash, session };
 }
