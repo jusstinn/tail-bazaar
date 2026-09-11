@@ -5,7 +5,7 @@
 // transaction hash alone never unlocks anything.
 import { recoverMessageAddress, type Hex } from "viem";
 import { appDomain, chainId } from "./config.js";
-import { getListing } from "./chain.js";
+import { getListingExpecting } from "./chain.js";
 import { getDb, nowIso, type OrderRow } from "./db.js";
 import { randomSaltHex } from "./canonical.js";
 
@@ -64,7 +64,7 @@ export async function redeemChallenge(orderId: string, nonce: string, signature:
   }
   if (signer.toLowerCase() !== ch.buyer) throw new AuthError(403, `signer ${signer} is not the challenged buyer`);
   // On-chain ownership check: the escrow's bound buyer must be the signer and the order must be funded.
-  const onChain = await getListing(orderId as Hex);
+  const onChain = await getListingExpecting(orderId as Hex, (l) => l.status === 2 || l.status === 3 || l.status === 4, 4, 2000);
   if (onChain.buyer.toLowerCase() !== signer.toLowerCase()) throw new AuthError(403, "signer is not the buyer bound to this order on chain");
   // Funded (2), Delivered (3) or SettledValid (4): a buyer who paid for a valid package may re-download it.
   if (onChain.status !== 2 && onChain.status !== 3 && onChain.status !== 4) throw new AuthError(403, `order is not funded, delivered or validly settled on chain (status ${onChain.status})`);

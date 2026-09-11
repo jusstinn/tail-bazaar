@@ -65,9 +65,29 @@ export async function balanceOf(account: Hex): Promise<bigint> {
   return publicClient.getBalance({ address: account });
 }
 
+/** Public RPCs are load-balanced and a backend can lag a block behind a receipt we just saw; retry reads. */
+export async function retry<T>(fn: () => Promise<T>, tries = 6, delayMs = 2500): Promise<T> {
+  let last: unknown;
+  for (let i = 0; i < tries; i++) {
+    try { return await fn(); } catch (e) { last = e; if (i < tries - 1) await new Promise((r) => setTimeout(r, delayMs)); }
+  }
+  throw last;
+}
+
+/** Read a listing until `expect` holds (or return the last read after `tries`). */
+export async function getListingExpecting(listingId: Hex, expect: (l: OnChainListing) => boolean, tries = 8, delayMs = 2500): Promise<OnChainListing> {
+  let l = await getListing(listingId);
+  for (let i = 1; i < tries && !expect(l); i++) {
+    await new Promise((r) => setTimeout(r, delayMs));
+    l = await getListing(listingId);
+  }
+  return l;
+}
+
 async function write(account: Account, functionName: string, args: unknown[], value?: bigint): Promise<TxResult> {
   const wallet = walletFor(account);
-  const { request } = await publicClient.simulateContract({ account, address: requireEscrow(), abi: escrowAbi as any, functionName, args, value } as any);
+  // Simulation may fail transiently against a lagging backend; retry it. The broadcast itself is never retried.
+  const { request } = await retry(() => publicClient.simulateContract({ account, address: requireEscrow(), abi: escrowAbi as any, functionName, args, value } as any), 6, 3000);
   const hash = await wallet.writeContract(request as any);
   const receipt = await publicClient.waitForTransactionReceipt({ hash, confirmations: 1, timeout: 180_000 });
   return { hash, block_number: Number(receipt.blockNumber), status: receipt.status, gas_used: receipt.gasUsed.toString(), chain_mode: chainMode, chain_id: chainId };

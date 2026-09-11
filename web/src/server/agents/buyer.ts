@@ -9,7 +9,7 @@
 import type { Hex } from "viem";
 import { keccakHex, isCanonical } from "../canonical.js";
 import { buyerBudgetWei, chainMode, roles } from "../config.js";
-import { escrow, getListing, walletFor } from "../chain.js";
+import { escrow, getListing, getListingExpecting, walletFor } from "../chain.js";
 import { addEvent, getDb, nowIso, publicListing, type ListingRow, type OrderRow } from "../db.js";
 import { checkAdmissible } from "../envelope.js";
 
@@ -22,7 +22,7 @@ export async function selectListing(policy: BuyerPolicy, log: (m: string) => voi
   const considered: { listing_id: string; eligible: boolean; why: string; row?: ListingRow; band?: string }[] = [];
   for (const row of rows) {
     const s = JSON.parse(row.public_summary);
-    const onChain = await getListing(row.listing_id as Hex);
+    const onChain = row.status === "LISTED" ? await getListingExpecting(row.listing_id as Hex, (l) => l.status === 1) : await getListing(row.listing_id as Hex);
     const price = BigInt(row.price_wei);
     let why = "eligible";
     if (onChain.status !== 1) why = `on-chain status is ${onChain.status} (not Listed)`;

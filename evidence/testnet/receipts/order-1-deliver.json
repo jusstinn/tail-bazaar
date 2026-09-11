@@ -1,0 +1,24 @@
+{
+  "chain_mode": "testnet",
+  "chain_id": 84532,
+  "hash": "0x16cf64957cb537bf2692dfd68dd77487b32c9ae3480b93f52ddf49957d1899d8",
+  "block_number": 46670045,
+  "status": "success",
+  "from": "0x28daa9f3f9468382ffed53cc339418403337cded",
+  "to": "0xfadf11662c46c0214b0a40938a26fb8f0cd785a3",
+  "gas_used": "53577",
+  "effective_gas_price": "6000000",
+  "value": "0",
+  "input": "0x4c69bf7833596e9766aa7f555f0b143cac5caaac90476bed0ae4903d5930425e6ffe7e2176f1bcb4bf668acef7f39260e92998735c73358a7885dde127226a7649c9657b",
+  "logs": [
+    {
+      "address": "0xfadf11662c46c0214b0a40938a26fb8f0cd785a3",
+      "topics": [
+        "0x872024bb4356ecd19dc9cbc3cf9c28c766da9ea9e1276f6e463216e81acd3c92",
+        "0x33596e9766aa7f555f0b143cac5caaac90476bed0ae4903d5930425e6ffe7e21"
+      ],
+      "data": "0x76f1bcb4bf668acef7f39260e92998735c73358a7885dde127226a7649c9657b"
+    }
+  ],
+  "explorer": "https://sepolia.basescan.org/tx/0x16cf64957cb537bf2692dfd68dd77487b32c9ae3480b93f52ddf49957d1899d8"
+}

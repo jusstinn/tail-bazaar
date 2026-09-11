@@ -124,10 +124,23 @@ with explorer links. Test-only addresses (keys stay in the gitignored `.env`):
 - seller `0x28dAA9F3F9468382fFeD53cc339418403337cDeD`
 - buyer `0x1B27C90FcD738E960D3D505682EC2732A08c7f99`
 
-**Status:** see `evidence/testnet/` — if it contains only this note, the wallet had not been funded
-when the build pass ended and no testnet transaction exists yet. A local anvil run never satisfies
-the assignment's testnet requirement; the UI labels every local transaction "LOCAL ANVIL" and shows
-explorer links only for real Base Sepolia hashes.
+**Status: deployed and exercised on Base Sepolia (chain id 84532).**
+
+- FailureEscrow: [`0xfadf11662C46c0214B0A40938a26FB8f0CD785A3`](https://sepolia.basescan.org/address/0xfadf11662C46c0214B0A40938a26FB8f0CD785A3)
+  — deployment tx [`0x1bbee5a5…f84fbc7d`](https://sepolia.basescan.org/tx/0x1bbee5a525cdeb642cb7058c3b26b4d1662fbd2549d22ea161c81394f84fbc7d),
+  block 46669937; source verified on Basescan, Sourcify and Blockscout (logs in `evidence/testnet/`).
+- Order 1 (valid): register → fund → markDelivered → settle(true) → seller withdraw; order 2 (tampered
+  delivery): register → fund → markDelivered → buyer requestRecheck → settle(false) → buyer refund
+  withdraw. All 14 transaction receipts (deploy, two top-ups, 12 flow transactions) are in
+  `evidence/testnet/receipts/`, and `evidence/testnet/TESTNET.md` lists every hash with explorer links.
+  Final state read back with `cast`: listing 1 = SettledValid, listing 2 = SettledInvalid, escrow
+  balance 0, `settledOrders(seller)` = 1.
+- Screenshots of the UI in testnet mode: `evidence/ui/testnet-*.png`.
+
+A local anvil run never satisfies the assignment's testnet requirement; the UI labels every local
+transaction "LOCAL ANVIL" and shows explorer links only for real Base Sepolia hashes. To browse the
+testnet orders locally: `CHAIN_MODE=testnet scripts/server-start.sh` (each chain mode has its own
+SQLite database under `web/data/`).
 
 ## Contract: `FailureEscrow` (native ETH, one listing = one order)
 

@@ -1,0 +1,23 @@
+{
+  "chain": "base-sepolia",
+  "chain_id": 84532,
+  "address": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3",
+  "deploy_tx": "0x1bbee5a525cdeb642cb7058c3b26b4d1662fbd2549d22ea161c81394f84fbc7d",
+  "block": 46669937,
+  "verifier": "0xe592C7DA96Cc42344952C452377eBCc7Cc0982AE",
+  "delivery_window_s": 3600,
+  "settlement_window_s": 7200,
+  "deployed_at": "2026-09-11T06:30:07.319Z",
+  "gas_used": "1045016",
+  "effective_gas_price_wei": "6000000",
+  "explorer_contract": "https://sepolia.basescan.org/address/0xfadf11662C46c0214B0A40938a26FB8f0CD785A3",
+  "explorer_tx": "https://sepolia.basescan.org/tx/0x1bbee5a525cdeb642cb7058c3b26b4d1662fbd2549d22ea161c81394f84fbc7d",
+  "note": "address/tx recovered from chain after the first script run aborted before writing this file (deployer nonce 0)",
+  "verification": {
+    "sourcify": "ok",
+    "blockscout": "ok",
+    "basescan": "ok",
+    "sourcify_url": "https://repo.sourcify.dev/contracts/full_match/84532/0xfadf11662C46c0214B0A40938a26FB8f0CD785A3/",
+    "blockscout_url": "https://base-sepolia.blockscout.com/address/0xfadf11662C46c0214B0A40938a26FB8f0CD785A3?tab=contract"
+  }
+}

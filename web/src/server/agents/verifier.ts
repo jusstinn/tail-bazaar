@@ -14,7 +14,7 @@ import path from "node:path";
 import type { Hex } from "viem";
 import { commitment, dumps, dumpsBytes, isCanonical, keccakHex } from "../canonical.js";
 import { chainId, chainMode, dataDir, escrowAddress, roles } from "../config.js";
-import { escrow, getListing, settledOrders } from "../chain.js";
+import { escrow, getListingExpecting, settledOrders } from "../chain.js";
 import { addEvent, getDb, nowIso, type ListingRow, type OrderRow } from "../db.js";
 import { checkAdmissible, ENVELOPE_ID, isDuplicate, severityBand, type Scenario } from "../envelope.js";
 import { fingerprint, runScenario, type RunDoc } from "../sim.js";
@@ -162,7 +162,7 @@ export async function verifierCheckDeliveryAndSettle(order: OrderRow, log: (m: s
   const db = getDb();
   const listing = db.prepare("SELECT * FROM listings WHERE listing_id = ?").get(order.listing_id) as unknown as ListingRow;
   const priv = db.prepare("SELECT package_bytes, verification FROM private_packages WHERE listing_id = ?").get(order.listing_id) as { package_bytes: Uint8Array; verification: string };
-  const onChain = await getListing(order.listing_id as Hex);
+  const onChain = await getListingExpecting(order.listing_id as Hex, (l) => l.status === 3);
   const checks: DeliveryCheck["checks"] = [];
   const delivered = order.delivered_bytes ? new Uint8Array(order.delivered_bytes) : new Uint8Array();
   const deliveredHash = keccakHex(delivered);

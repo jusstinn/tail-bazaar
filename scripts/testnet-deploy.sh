@@ -13,9 +13,8 @@
 # Re-runnable: every step is idempotent or appends new orders.
 . "$(dirname "$0")/env.sh"
 require_keys
-EV="$ROOT/evidence/testnet"; mkdir -p "$EV/receipts"
+export EV="$ROOT/evidence/testnet"; mkdir -p "$EV/receipts"
 EXPLORER="https://sepolia.basescan.org"
-MIN_VERIFIER_WEI=2000000000000000   # 0.002 ETH: deploy + 2 top-ups + ~12 transactions at Base Sepolia gas prices
 SELLER_TOPUP_WEI=300000000000000    # 0.0003 ETH (gas for markDelivered + withdraw)
 BUYER_TOPUP_WEI=800000000000000     # 0.0008 ETH (two purchases at 0.0002 ETH + gas)
 
@@ -30,9 +29,27 @@ echo "Base Sepolia RPC: $RPC (chain id $BASE_SEPOLIA_CHAIN_ID)"
 
 VB="$(cast balance --rpc-url "$RPC" "$VERIFIER_ADDRESS")"
 echo "verifier/deployer $VERIFIER_ADDRESS balance: $VB wei ($(cast from-wei "$VB") ETH)"
-if [ "$(node -e 'console.log(BigInt(process.argv[1]) < BigInt(process.argv[2]) ? 1 : 0)' "$VB" "$MIN_VERIFIER_WEI")" = "1" ]; then
+# Requirement computed from what is still left to do: deployment gas (if not deployed), the top-ups
+# that have not happened yet, and a gas margin for the verifier's own transactions.
+DEPLOY_GAS_WEI=700000000000000     # 0.0007 ETH allowance for ~1.05M gas (generous at Base Sepolia prices)
+GAS_MARGIN_WEI=100000000000000     # 0.0001 ETH for registerListing x2 + settle x2 (+ margin)
+NEED="$GAS_MARGIN_WEI"
+DEPLOYED=0
+if [ -f "$EV/deployment.json" ]; then
+  EXISTING="$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).address||"")' "$EV/deployment.json")"
+  if [ -n "$EXISTING" ] && [ "$(cast code --rpc-url "$RPC" "$EXISTING")" != "0x" ]; then DEPLOYED=1; fi
+fi
+[ "$DEPLOYED" = "1" ] || NEED="$(node -e 'console.log((BigInt(process.argv[1])+BigInt(process.argv[2])).toString())' "$NEED" "$DEPLOY_GAS_WEI")"
+for pair in "$SELLER_ADDRESS:$SELLER_TOPUP_WEI" "$BUYER_ADDRESS:$BUYER_TOPUP_WEI"; do
+  a="${pair%%:*}"; w="${pair##*:}"; b="$(cast balance --rpc-url "$RPC" "$a")"
+  if [ "$(node -e 'console.log(BigInt(process.argv[1]) < BigInt(process.argv[2]) ? 1 : 0)' "$b" "$w")" = "1" ]; then
+    NEED="$(node -e 'console.log((BigInt(process.argv[1])+BigInt(process.argv[2])).toString())' "$NEED" "$w")"
+  fi
+done
+echo "still required in the verifier wallet: $NEED wei ($(cast from-wei "$NEED") ETH)"
+if [ "$(node -e 'console.log(BigInt(process.argv[1]) < BigInt(process.argv[2]) ? 1 : 0)' "$VB" "$NEED")" = "1" ]; then
   cat <<MSG
-UNFUNDED: the verifier/deployer wallet holds less than $(cast from-wei "$MIN_VERIFIER_WEI") ETH on Base Sepolia.
+UNFUNDED: the verifier/deployer wallet holds less than $(cast from-wei "$NEED") ETH on Base Sepolia.
 Nothing was deployed. Send Base Sepolia test ETH (about 0.003 ETH total is enough) to:
   verifier/deployer  $VERIFIER_ADDRESS   (deploys, registers listings, settles, tops up the other two)
   seller             $SELLER_ADDRESS   (funded automatically by this script from the verifier wallet)

@@ -1,0 +1,33 @@
+{
+  "schema": "tb-summary-1",
+  "format": "tb-cjson-1",
+  "controller": {
+    "hash": "sha256:7620971c1ea6d527fbe9b91c026a921b7f23abee8cb274ea136022c60d169760",
+    "id": "stop-before-obstacle-v1"
+  },
+  "envelope_id": "tb-envelope-1",
+  "admissible": true,
+  "claim_kind": "controller collides with the obstacle under admissible conditions inside the published envelope",
+  "verification": {
+    "status": "VERIFIED",
+    "method": "exact-trajectory-hash",
+    "verifier_version": "tb-verifier-1",
+    "verifier": "0xe592C7DA96Cc42344952C452377eBCc7Cc0982AE",
+    "environment_fingerprint": "0xdf8e9156e211e7786d8e44136d2b78f30c6b47a92392bbefd77707a1f5384de3",
+    "verified_at": "2026-09-11T06:32:47.062Z"
+  },
+  "severity": {
+    "proxy": "impact_speed_mps",
+    "band": "low",
+    "definition": "impact speed band: low < 0.5 m/s, medium 0.5-1.0 m/s, high > 1.0 m/s (proxy only, not a damage estimate)"
+  },
+  "seller": "0x28dAA9F3F9468382fFeD53cc339418403337cDeD",
+  "seller_settled_orders_at_listing": 0,
+  "price_wei": "200000000000000",
+  "chain": {
+    "mode": "testnet",
+    "chain_id": 84532,
+    "escrow": "0xfadf11662C46c0214B0A40938a26FB8f0CD785A3"
+  },
+  "hidden": "exact scenario parameters, trajectory, replay frames and reproduction command are in the private package only"
+}

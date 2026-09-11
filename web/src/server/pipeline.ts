@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Hex } from "viem";
-import { balanceOf, publicClient, requireEscrow, saveReceipt, verifierOf, withdrawable } from "./chain.js";
+import { balanceOf, publicClient, requireEscrow, retry, saveReceipt, verifierOf, withdrawable } from "./chain.js";
 import { buyerBudgetWei, chainId, chainMode, dataDir, listingPriceWei, publicBaseUrl, roleAddresses, roles } from "./config.js";
 import { addEvent, getDb, nowIso, publicListing, publicOrder, type ListingRow, type OrderRow } from "./db.js";
 import { ENVELOPE_ID, NOMINAL_SCENARIO } from "./envelope.js";
@@ -65,7 +65,8 @@ export async function runDemoPipeline(opts: { evidenceDir?: string | null; baseU
     if (onChainVerifier.toLowerCase() !== addrs.verifier.toLowerCase()) throw new Error(`escrow verifier ${onChainVerifier} is not our verifier ${addrs.verifier}`);
     L(`preflight: chain mode ${chainMode} (chain id ${chainId}), escrow ${escrowAddr}, block ${await publicClient.getBlockNumber()}`);
     for (const [role, a] of Object.entries(addrs)) {
-      const b = await balanceOf(a as Hex);
+      // a just-confirmed top-up may not be visible on every RPC backend yet: retry zero balances briefly
+      const b = await retry(async () => { const x = await balanceOf(a as Hex); if (x === 0n) throw new Error("zero"); return x; }, 8, 2500).catch(() => 0n);
       L(`preflight: ${role} ${a} balance ${b} wei`);
       if (b === 0n) throw new Error(`${role} wallet ${a} has no ${chainMode === "testnet" ? "Base Sepolia test ETH" : "local ether"}`);
     }
@@ -127,7 +128,10 @@ export async function runDemoPipeline(opts: { evidenceDir?: string | null; baseU
         addEvent(order.listing_id, "buyer", "refund_withdrawn", { amount_wei: order.price_wei, block: w.block_number }, chainMode, w.hash, w.block_number);
         await receipts(`order-${n}-withdraw-buyer`, w.hash);
       }
-      L(`order ${n}: ${settled.check.valid ? "VALID -> seller paid" : "INVALID -> buyer refunded"}; escrow withdrawable now seller=${await withdrawable(addrs.seller as Hex)} buyer=${await withdrawable(addrs.buyer as Hex)}`);
+      // read the credited party's balance until the withdraw is visible (lagging RPC backends)
+      const credited = (settled.check.valid ? addrs.seller : addrs.buyer) as Hex;
+      const left = await retry(async () => { const x = await withdrawable(credited); if (x !== 0n) throw new Error("not yet"); return x; }, 8, 2500).catch(() => withdrawable(credited));
+      L(`order ${n}: ${settled.check.valid ? "VALID -> seller paid" : "INVALID -> buyer refunded"}; ${settled.check.valid ? "seller" : "buyer"} withdrawable after withdraw = ${left} wei`);
       if (evidenceDir) fs.writeFileSync(path.join(evidenceDir, `order-${n}.json`), JSON.stringify({ order: publicOrder(fresh()), listing: publicListing(db.prepare("SELECT * FROM listings WHERE listing_id = ?").get(order.listing_id) as unknown as ListingRow), events: db.prepare("SELECT * FROM events WHERE listing_id = ? ORDER BY id").all(order.listing_id) }, null, 2) + "\n");
     }
     if (evidenceDir && chainMode === "testnet") writeTestnetMd(evidenceDir, orders);
