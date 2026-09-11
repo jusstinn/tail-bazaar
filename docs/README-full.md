@@ -40,9 +40,9 @@ YAML, simulator entry point and CLI shape, failure classes, severity proxy and u
 physical-plausibility derivation, and a replay-renderer id. Adding the third robot was one entry
 there plus one renderer; no agent, route, ledger row or page needed a special case.
 
-![the part on the floor beside the table, against the baseline that placed it](evidence/ui/replay-arm-split.png)
-![the fall, with the surviving nominal run drawn as a ghost](evidence/ui/replay-humanoid-impact.png)
-![the moment of contact, with the nominal baseline drawn as a ghost](evidence/ui/replay-cart-impact.png)
+![the part on the floor beside the table, against the baseline that placed it](../evidence/ui/replay-arm-split.png)
+![the fall, with the surviving nominal run drawn as a ghost](../evidence/ui/replay-humanoid-impact.png)
+![the moment of contact, with the nominal baseline drawn as a ghost](../evidence/ui/replay-cart-impact.png)
 
 ## The experience
 
@@ -220,7 +220,7 @@ repository**, so none is asserted here on its behalf. **Anyone redistributing th
 resolve the licence with the publisher first.**
 
 Full provenance, the nominal suite, every hunt and the repeatability checks:
-[`evidence/humanoid/README.md`](evidence/humanoid/README.md).
+[`evidence/humanoid/README.md`](../evidence/humanoid/README.md).
 
 ### Target 3 — the manipulator pick-and-place policy (`tb-arm-envelope-1`)
 
@@ -340,7 +340,7 @@ recorded so a future fix fails loudly. Every run document carries the shim's `sc
 block.
 
 Full provenance, the nominal suite, every hunt, the drop-predicate hardening and the repeatability
-checks: [`evidence/arm/README.md`](evidence/arm/README.md).
+checks: [`evidence/arm/README.md`](../evidence/arm/README.md).
 
 ### Target 4 — the Unitree G1 walking policy (`tb-g1-envelope-1`)
 
@@ -424,9 +424,9 @@ extend this design rather than a patch on it.
 
 A fourth target that was explored and honestly not shipped, with the reason and the fix stated, is
 worth more here than a fourth listing. The six nominal episode videos, the success-versus-failure
-filmstrip ([`success_vs_failure.png`](evidence/vla/success_vs_failure.png)), the divergence record
-([`determinism.json`](evidence/vla/determinism.json)) and every run document are in
-[`evidence/vla/`](evidence/vla/README.md).
+filmstrip ([`success_vs_failure.png`](../evidence/vla/success_vs_failure.png)), the divergence record
+([`determinism.json`](../evidence/vla/determinism.json)) and every run document are in
+[`evidence/vla/`](../evidence/vla/README.md).
 
 ## Reproducibility across machines, and why exact-hash binding is paired with a fingerprint
 
