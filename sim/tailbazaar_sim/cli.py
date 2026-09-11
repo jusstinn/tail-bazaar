@@ -1,7 +1,7 @@
 """Command line for the simulator. All output goes under the directory given by --out.
 
   nominal              run the nominal test suite               -> nominal-suite.json
-  hunt [--mode grid|random --n N --seed S]                      -> hunt-<mode>.json
+  hunt [--mode grid|grid-load|random|random-load --n N --seed S] -> hunt-<mode>.json
   run --scenario JSON --name NAME                               -> runs/NAME.json (+ render)
   repeat --scenario JSON [--n 3]                                -> repeatability-<hash>.json
   render --run runs/NAME.json                                   -> NAME.gif, NAME-metrics.png
@@ -54,13 +54,19 @@ def cmd_nominal(args: argparse.Namespace) -> int:
 def cmd_hunt(args: argparse.Namespace) -> int:
     res = hunt(mode=args.mode, n=args.n, seed=args.seed, verbose=not args.quiet)
     res["environment"] = environment_pin()
-    out = Path(args.out) / f"hunt-{args.mode}{'' if args.mode == 'grid' else '-seed' + str(args.seed)}.json"
+    suffix = "" if args.mode.startswith("grid") else "-seed" + str(args.seed)
+    out = Path(args.out) / f"hunt-{args.mode}{suffix}.json"
     write_json(out, res)
     c = res["counts"]
-    print(f"search cost: {res['search_cost']}  success={c['success']} collision={c['collision']} inconclusive={c['inconclusive']}")
-    print(f"distinct findings after duplicate rule: {len(res['selected'])}; near-duplicates: {len(res['near_duplicates'])}")
-    for s in res["selected"][:5]:
-        print("  finding:", s)
+    print(f"search cost: {res['search_cost']}  success={c['success']} collision={c['collision']} "
+          f"load_shed={c['load_shed']} (both={c['collision_and_load_shed']}) inconclusive={c['inconclusive']}")
+    total_selected = sum(len(v) for v in res["selected_by_class"].values())
+    print(f"distinct findings after the class-aware duplicate rule: {total_selected}; near-duplicates: {len(res['near_duplicates'])}")
+    for key in sorted(res["selected_by_class"]):
+        keep = res["selected_by_class"][key]
+        print(f"  class {key}: {len(keep)} distinct")
+        for s in keep[:3]:
+            print("    finding:", s)
     print("wrote", out)
     return 0
 
@@ -113,7 +119,12 @@ def cmd_repeat(args: argparse.Namespace) -> int:
     for i in range(args.n):
         r = run_scenario(scn)
         hashes.append(r["trajectory_hash"])
-        metrics.append({k: r["metrics"].get(k) for k in ("outcome", "final_clearance_m", "impact_speed_mps", "stopping_distance_m", "first_contact_t_s", "sim_steps")})
+        metrics.append({k: r["metrics"].get(k) for k in (
+            "outcome", "chassis_outcome", "primary_failure_class", "final_clearance_m", "impact_speed_mps",
+            "stopping_distance_m", "first_contact_t_s", "sim_steps",
+            "load_shed", "load_shed_t_s", "load_shed_criterion", "load_shed_direction",
+            "load_slip_at_shed_m", "load_rel_speed_at_shed_mps", "load_speed_at_shed_mps", "load_slip_max_m",
+        )})
     # fresh process
     code = (
         "import json,sys; from tailbazaar_sim.simulate import run_scenario; "
@@ -149,7 +160,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("nominal").set_defaults(fn=cmd_nominal)
     h = sub.add_parser("hunt")
-    h.add_argument("--mode", default="grid", choices=["grid", "random"])
+    h.add_argument("--mode", default="grid", choices=["grid", "grid-load", "random", "random-load"])
     h.add_argument("--n", type=int, default=40)
     h.add_argument("--seed", type=int, default=1)
     h.add_argument("--quiet", action="store_true")

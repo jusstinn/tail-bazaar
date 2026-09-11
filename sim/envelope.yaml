@@ -24,11 +24,20 @@
 # tuned for, so a reader can see immediately whether a finding sits inside the controller's design
 # assumptions or outside them. The searched envelope is deliberately wider than the tuned range: the
 # product question is where the controller stops working as the operating range is widened.
+#
+# REVISION tb-envelope-1.1 (LOAD_SHED). The `load_friction` axis and a second failure class were added
+# under the SAME envelope_id: the four original axes, their ranges, the admissibility rules and the
+# duplicate metric are unchanged, and an old four-axis scenario stays admissible (the new axis is
+# optional and is read at its nominal value). What DID change is the scene: the load used to be welded
+# to the chassis and is now a free rigid body resting on the deck, so scene revision 2 does not
+# reproduce the trajectory hashes of scene revision 1.
 
 envelope_id: tb-envelope-1
+envelope_revision: tb-envelope-1.1
+scene_revision: 2         # 1 = load welded to the chassis; 2 = load rests on the deck
 controller_id: stop-before-obstacle-v1
 control_tick_ms: 20        # 50 Hz; both latency axes are quantized to one control tick
-duplicate_rule: normalized L-infinity distance < 0.05
+duplicate_rule: same failure-class set AND normalized L-infinity distance < 0.05
 distribution_D: null       # not stated, not estimated; see the note above
 
 continuous:
@@ -53,6 +62,29 @@ continuous:
     group: physical
     places: 1
     tuned_range: "= 20"
+  # Sliding friction of the chassis-deck/load contact pair. The load is a free rigid body seated on the
+  # deck; this coefficient is the only thing holding it there, so it is what decides LOAD_SHED. Added in
+  # envelope revision tb-envelope-1.1 and OPTIONAL in an input scenario (omitted means nominal), which is
+  # what keeps four-axis scenarios written against tb-envelope-1 admissible.
+  # The low bound 0.1 is a smooth, wet deck against a plastic tote; the high bound 1.0 a rubber-faced
+  # deck. The controller's docstring says nothing about how the load is secured, so no tuned range can
+  # be transcribed for this axis — reported as "not stated" rather than invented. What CAN be derived
+  # from controller.py without editing it is the grip its own braking set points demand of a load held
+  # only by friction (mu = a / g, g = 9.81):
+  #   A_TRIGGER = 3.0 m/s^2 (planned stop)    -> 0.306
+  #   A_FULL    = 6.0 m/s^2 (saturated brake) -> 0.612
+  # so the nominal deck grip 0.6 has roughly a 2x margin on a planned stop and is right at the edge of
+  # an emergency stop. Those two numbers are arithmetic, not thresholds anyone chose.
+  - name: load_friction
+    low: 0.1
+    high: 1.0
+    nominal: 0.6
+    marginal: null
+    scale: null
+    units: coefficient
+    group: physical
+    places: 3
+    tuned_range: "not stated"
 
   # --- systems ----------------------------------------------------------------
   # Latency of the exteroceptive obstacle-distance measurement as the controller sees it.
@@ -82,6 +114,22 @@ continuous:
 
 discrete: []               # no stratified axes in this envelope
 
+# Failure classes. Both are decided by MuJoCo contacts and body state in sim/tailbazaar_sim/simulate.py;
+# nothing assigns an outcome directly. A run can carry COLLISION, LOAD_SHED, both, or neither, and the
+# run document reports them in the explicit `failure_classes` array and `primary_failure_class` string.
+failure_classes:
+  - name: COLLISION
+    detected_by: a contact between any cart geom and the obstacle geom
+    severity_proxy: impact_speed_mps
+  - name: LOAD_SHED
+    detected_by: >-
+      the carried load left the deck, by whichever of three criteria fires first, evaluated every
+      physics step in the chassis frame: slip (planar displacement from the seated position exceeds
+      0.15 m = CHASSIS_HALF[0] - LOAD_HALF[0], the deck margin ahead of the load), separation (no
+      chassis/load contact for 0.10 s = five control ticks), footprint (the load centre of mass leaves
+      the 0.40 x 0.25 m deck rectangle; a backstop, strictly looser than slip at this geometry)
+    severity_proxy: load_rel_speed_at_shed_mps
+
 # Limit state and severity, in GUARD's field names (guard/severity.py):
 #   limit_state_margin_m   g(theta), the minimum recorded range to the obstacle; failure when contact
 #                          occurs. The simulator records `min_range_m` and the boolean `collision`
@@ -90,6 +138,9 @@ discrete: []               # no stratified axes in this envelope
 #                          number, and `collision` is the authoritative failure flag.
 #   impact_speed_mps       speed at first contact (the severity proxy that is actually measured)
 #   impact_kinetic_energy_j  0.5 * total_mass_kg * impact_speed_mps^2, GUARD's impact energy in joules
+# For LOAD_SHED the analogous pair is `load_slip_max_m` (how far the load travelled on the deck) and
+# `load_rel_speed_at_shed_mps` (the load's speed relative to the chassis when it left), with
+# `load_shed_relative_kinetic_energy_j` = 0.5 * payload_kg * that speed squared.
 # No biomechanical tier is assigned. GUARD's ISO/TS 15066 thresholds are marked
 # PLACEHOLDER_UNVERIFIED there, and Tail Bazaar does not add dollar values or damage estimates.
 
