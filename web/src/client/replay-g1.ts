@@ -7,7 +7,7 @@
 // and TWO frames: the compiled one (`pos_m`/`quat_wxyz`, which folds in MuJoCo's re-centring of the
 // mesh and is where the proxy box belongs) and the MJCF one (`mesh_frame_pos_m`/`mesh_frame_quat_wxyz`,
 // the frame the raw STL vertices live in). The box is drawn first and swapped for the robot's OWN link
-// mesh — the STL its MJCF names, served beside the page from /meshes/g1/ (decimated copies; see the
+// mesh — the STL its MJCF names, served beside the page from /meshes/g1/ (verbatim copies; see the
 // README.txt there) — the moment it loads. A link whose mesh never arrives keeps its honest box. Only
 // the geoms the run labels `visual` are drawn: every link carries the same mesh twice (once for
 // collision, once for display) plus a few collision-only cylinders and the eight foot spheres.
@@ -122,10 +122,10 @@ const fallTilt = (run: RunLike): number => threshold(run, "fall_tilt_deg", 60);
 export const G1_RENDERER: SceneRenderer = {
   id: "g1-3d",
   anchorBody: "pelvis",
-  ghostLaneOffset: 1.1,
+  ghostLaneOffset: 1.8, // a side shove carries the purchased robot up to a metre sideways, so the ghost lane sits further out than the humanoid's
   aspect: { overlay: 0.44, split: 0.38 },
   swatches: [
-    { color: hex(COL.body), label: "purchased run, drawn from the robot's own link meshes (the G1 STLs its MJCF names, decimated for the page, posed under each recorded body; a link shows its bounding box only until its mesh has loaded)" },
+    { color: hex(COL.body), label: "purchased run, drawn from the robot's own link meshes (the G1 STLs its MJCF names, verbatim from Unitree, posed under each recorded body; a link shows its bounding box only until its mesh has loaded)" },
     { color: hex(COL.ghost), label: "baseline ghost — the same policy at the publisher's deployment configuration, which keeps walking, drawn one lane over", translucent: true },
     { color: hex(COL.line), label: "the fall-height line: THIS PROJECT'S predicate calls it a fall when the pelvis drops below it (or tilts past 60°); Unitree's runner has no fall flag of its own", thin: true },
   ],
