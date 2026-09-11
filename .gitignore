@@ -36,3 +36,6 @@ contracts/broadcast/
 # os / editors
 .DS_Store
 *.swp
+
+# local chain state (pids, logs, local deployment address)
+.local/
