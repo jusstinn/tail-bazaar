@@ -1,7 +1,7 @@
 // "How settlement works": what the verifier actually checks, what each verdict does to the money,
 // what the deadlines do, and why a complaint is not a refund. Short prose and one state diagram —
 // the details a specialist wants sit behind disclosures.
-import { getJSON, type EnvelopeDoc, type Status } from "./api.js";
+import { getJSON, type EnvelopesDoc, type Status } from "./api.js";
 import { esc } from "./format.js";
 import { armPage, band, disclosure, rangeBars } from "./ui.js";
 
@@ -34,11 +34,12 @@ function stateDiagram(): string {
 const VERDICTS: [string, string, string, string][] = [
   ["VALID", "ok", "The seller is credited with the price and withdraws it.", "The verifier re-ran the scenario, the delivered bytes hash to the commitment registered on chain, and the evidence matches the claim it advertised. The buyer keeps the package."],
   ["INVALID", "bad", "The buyer is credited with a full refund and withdraws it. The seller is paid nothing.", "Something the verifier can check did not hold: the bytes do not hash to the commitment, the replay frames do not reproduce the trajectory the verifier itself ran, the controller named in the package is not the controller that was re-run, or the evidence contradicts the advertised claim."],
-  ["INCONCLUSIVE", "warn", "Nothing is released. It is a refusal to certify, not a failed delivery.", "The verifier could not reach a decision — typically the re-run diverged in an environment that is not bit-identical to the one the claim was produced in. An inconclusive verdict never pays."],
+  ["INCONCLUSIVE", "warn", "Nothing is released. It is a refusal to certify, not a failed delivery.", "The verifier could not BIND the delivered evidence to anything it ran — typically the seller's environment pin is not the verifier's own, so no hash can tie the delivered frames to the re-run. Metrics that happen to agree across two different environments say something about the scenario and nothing about which frames were delivered, so they never certify. An inconclusive verdict never pays."],
 ];
 
 export async function renderRules(view: HTMLElement, _st: Status): Promise<void> {
-  const env = await getJSON<EnvelopeDoc>("/api/envelope");
+  const envs = await getJSON<EnvelopesDoc>("/api/envelope");
+  const env = envs.targets[0];
   view.innerHTML = `
     <section class="band hero">
       <div class="wrap">
@@ -52,9 +53,10 @@ export async function renderRules(view: HTMLElement, _st: Status): Promise<void>
       eyebrow: "Step one", inner: `
       <h2 class="section-title reveal">The verifier does not read the seller's numbers.<br>It runs the scenario again.</h2>
       <div class="prose-col">
-        <p class="prose reveal">When a finding is submitted, the verifier loads the same controller file and the same scene into <strong>its own pinned environment</strong> — a specific MuJoCo build, NumPy and Python version, integrator, timestep and locked dependency set — and simulates the claimed conditions from scratch. What it compares afterwards is its own trajectory, not the seller's.</p>
-        <p class="prose reveal">Then it recomputes the identifiers from the bytes it was handed. The SHA-256 of the controller named in the package must equal the controller it just ran, so a real failure of one version cannot be sold under another version's name. The trajectory hash is <em>recomputed</em> as <span class="mono">keccak256</span> over the canonical replay frames and compared both with the value the package declares and with the verifier's own re-run, so frames altered behind an intact declared hash are caught. A declared hash is never taken on trust.</p>
-        <p class="prose reveal">Finally it checks the claim itself: conditions admissible inside the published envelope, the outcome and severity band the listing advertises, and not a near-duplicate of a finding already sold. Only then does it register the listing — and since only the verifier's address may register, the listing's existence <em>is</em> its statement that it re-ran the scenario and computed the commitment itself.</p>
+        <p class="prose reveal">When a finding is submitted, the verifier loads the same artefact and the same scene into <strong>its own pinned environment</strong> — a specific MuJoCo build, NumPy and Python version, timestep and locked dependency set — and simulates the claimed conditions from scratch, <strong>with that robot's own simulator</strong>: the cart's CLI for a cart finding, the humanoid's for a humanoid one. What it compares afterwards is its own trajectory, not the seller's.</p>
+        <p class="prose reveal">Then it recomputes the identifiers from the bytes it was handed. The digest of the artefact named in the package must equal the one it just ran — the SHA-256 of the controller file for the cart, the digest of the six actor tensors of the pinned policy checkpoint for the humanoid — so a real failure of one version cannot be sold under another version's name. The trajectory hash is <em>recomputed</em> as <span class="mono">keccak256</span> over the canonical replay frames and compared both with the value the package declares and with the verifier's own re-run, so frames altered behind an intact declared hash are caught. A declared hash is never taken on trust.</p>
+        <p class="prose reveal">It also reads the delivered frames as a trajectory and asks whether this scene could have produced them at all. The speed ceiling is derived per robot from its own published envelope and the scene the run carries — for the cart, the fastest anything can move under gravity plus the most friction the envelope admits over the simulator's own divergence bound; for the humanoid, the same plus the largest velocity change the published push axis can impart to the lightest admissible body. It is an impossibility line, not a tolerance.</p>
+        <p class="prose reveal">Finally it checks the claim itself: conditions admissible inside that robot's published envelope, a failure class that robot actually has, the severity band the listing advertises, and not a near-duplicate of a finding already sold for that robot. Only then does it register the listing — and since only the verifier's address may register, the listing's existence <em>is</em> its statement that it re-ran the scenario and computed the commitment itself.</p>
         <p class="prose reveal">Both checks run a second time on the bytes the seller actually serves at delivery, because the bytes delivered and the bytes verified are not the same event.</p>
       </div>`,
     })}
@@ -82,18 +84,21 @@ export async function renderRules(view: HTMLElement, _st: Status): Promise<void>
 
     ${band({
       eyebrow: "What is actually being sold", inner: `
-      <h2 class="section-title reveal">${esc(env.product_question)}</h2>
-      <p class="prose reveal">The controller's author documented the conditions it was tuned for. The hunter searches a deliberately wider range. A finding outside the tuned range is therefore a measured boundary of the deployable range, not a defect report.</p>
-      ${rangeBars(env, null)}
-      <p class="fineprint reveal">Tuned range source: ${esc(env.controller_tuned_range.source)}. ${esc(env.note)}</p>
-      ${disclosure("Show the published envelope in full", `<table class="data"><thead><tr><th>Axis</th><th>Group</th><th>Tuned for</th><th>Searched</th><th>Nominal</th><th>Units</th></tr></thead><tbody>${env.axes.map((a) => `<tr><td class="mono">${esc(a.name)}</td><td>${esc(a.group)}</td><td class="mono">${esc(a.tuned_range)}</td><td class="mono">${esc(a.low)} – ${esc(a.high)}</td><td class="mono">${esc(a.nominal)}</td><td>${esc(a.units)} <span class="muted">(${esc(a.quantization)})</span></td></tr>`).join("")}</tbody></table><p class="fineprint">${esc(env.distribution)}</p><p class="fineprint">Duplicate rule: ${esc(env.duplicate_rule)}. Envelope id <span class="mono">${esc(env.envelope_id)}</span>, published as <span class="mono">${esc(env.yaml)}</span> and served by <span class="mono">GET /api/envelope</span>.</p>`, "GUARD axis shape, served as JSON")}`,
+      <h2 class="section-title reveal">One published envelope per robot, in the same shape.</h2>
+      <p class="prose reveal">Each robot's author documented the conditions it was built for. The hunter searches a deliberately wider range. A finding outside those conditions is therefore a measured boundary of the deployable range, not a defect report.</p>
+      ${envs.targets.map((e) => `
+        <h3 class="sub reveal">${esc(e.label ?? e.target_id)} — <span class="mono">${esc(e.envelope_id)}</span></h3>
+        <blockquote class="pull reveal">${esc(e.product_question)}</blockquote>
+        ${rangeBars(e, null)}
+        <p class="fineprint reveal">Source: ${esc(e.controller_tuned_range.source)}. ${esc(e.note)}</p>
+        ${disclosure(`Show the ${esc(e.short_label ?? e.target_id)} envelope in full`, `<table class="data"><thead><tr><th>Axis</th><th>Group</th><th>${esc(e.controller_tuned_range.verb)}</th><th>Searched</th><th>Nominal</th><th>Units</th></tr></thead><tbody>${e.axes.map((a) => `<tr><td class="mono">${esc(a.name)}</td><td>${esc(a.group)}</td><td class="mono">${esc(a.tuned_range)}</td><td class="mono">${esc(a.low)} – ${esc(a.high)}</td><td class="mono">${esc(a.nominal)}</td><td>${esc(a.units)} <span class="muted">(${esc(a.quantization)})</span></td></tr>`).join("")}</tbody></table><p class="fineprint">Failure classes: ${e.failure_classes.map((c) => `<strong>${esc(c.label)}</strong> (${esc(c.detected_by)}), severity proxy <span class="mono">${esc(c.severity_proxy)}</span> in ${esc(c.severity_units)}`).join("; ")}.</p><p class="fineprint">${esc(e.distribution)}</p><p class="fineprint">Duplicate rule: ${esc(e.duplicate_rule)}. Published as <span class="mono">${esc(e.yaml)}</span> and served by <span class="mono">GET /api/envelope</span>; the simulator entry point is <span class="mono">${esc(e.sim_entry_point ?? "")}</span>.</p>`, "GUARD axis shape, served as JSON")}`).join("")}`,
     })}
 
     ${band({
       eyebrow: "Limits", tone: "quiet", inner: `
       <div class="two-col">
         <p class="prose reveal">The contract enforces authorisation, payment, deadlines and a single terminal settlement. It cannot check that a package is semantically correct — that is the verifier's judgement, and verifier error or collusion is not prevented, only made visible, because every check it ran is published after settlement.</p>
-        <p class="prose reveal">Bit-identical reproduction is claimed only for the pinned environment. On a different machine the verifier falls back to comparing metrics within a stated tolerance and says so in the method field; a seed alone is never assumed to guarantee reproducibility. Severity is an impact-speed proxy, not a damage estimate, and no failure frequency is claimed or implied.</p>
+        <p class="prose reveal">Bit-identical reproduction is claimed only for the pinned environment. On a machine whose environment pin differs the verifier does not fall back to anything: it cannot bind the delivered replay to what it ran, so it returns INCONCLUSIVE and nothing is paid. A seed alone is never assumed to guarantee reproducibility. Severity is a kinematic proxy per robot — impact speed for the cart, torso impact speed for the humanoid — not a damage estimate, and no failure frequency is claimed or implied.</p>
       </div>`,
     })}`;
   armPage(view);

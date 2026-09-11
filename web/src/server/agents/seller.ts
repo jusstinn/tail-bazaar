@@ -1,125 +1,168 @@
-// SELLER AGENT (local demonstration mode): runs the bounded hunter, packages findings, submits them to
-// the verifier, and delivers packages to funded orders. Deterministic policy: submit the top-ranked
-// distinct collisions from the grid hunt (mildest conditions first). It never edits the controller.
+// SELLER AGENT (local demonstration mode): runs the bounded hunter FOR ONE TARGET, packages findings,
+// submits them to the verifier, and delivers packages to funded orders. Deterministic policy: submit
+// the top-ranked distinct failures from that target's hunt (mildest conditions first). It never edits
+// the controller, the policy or the scene.
 import path from "node:path";
 import type { Hex } from "viem";
 import { commitment, dumpsBytes, randomSaltHex } from "../canonical.js";
 import { dataDir, roles, chainMode } from "../config.js";
 import { escrow } from "../chain.js";
 import { addEvent, getDb, nowIso, type OrderRow } from "../db.js";
-import { ENVELOPE, NOMINAL_SCENARIO, isDuplicate, severityBand, type Scenario } from "../envelope.js";
-import { hunt, runScenario, type HuntDoc, type RunDoc } from "../sim.js";
+import { hunt, runScenario, type RunDoc } from "../sim.js";
+import { targetFor, type Claim, type HuntSummary, type Scenario, type Subject, type TargetSpec } from "../targets.js";
 
 export const SELLER_OUT = path.join(dataDir, "sim", "seller");
-export const SUBMISSION_SCHEMA = "tb-submission-1";
-export const PACKAGE_SCHEMA = "tb-package-1";
+export const SUBMISSION_SCHEMA = "tb-submission-2";
+export const PACKAGE_SCHEMA = "tb-package-2";
 
-export type Finding = { rank: number; scenario: Scenario; run: RunDoc; runBytes: Uint8Array; runFile: string };
+/** Per-target output directory, so two targets never overwrite each other's run documents. */
+export const sellerOutFor = (t: TargetSpec): string => path.join(SELLER_OUT, t.id);
+
+export type Finding = { rank: number; target: TargetSpec; scenario: Scenario; run: RunDoc; runBytes: Uint8Array; runFile: string };
+
+/** What a hunt cost and what it produced, as an AGGREGATE. Never a per-listing pre-purchase
+ *  disclosure: it travels inside the private package and is shown only after payment. */
+export type HunterRecord = {
+  id: string; mode: string; target_id: string;
+  search_cost: HuntSummary["search_cost"];
+  counts: HuntSummary["counts"];
+  distinct_findings: number; near_duplicates: number;
+};
+
 export type Submission = {
-  schema: string; seller: string; submitted_at: string; controller: { id: string; hash: string }; envelope_id: string;
+  schema: string; seller: string; submitted_at: string; target_id: string;
+  controller: Subject; envelope_id: string;
   scenario: Scenario; claim: Claim; environment: Record<string, unknown>; trajectory_hash: string; mjcf_hash: string | null;
-  metrics: Record<string, unknown>; events: unknown[]; hunter: { id: string; mode: string; search_cost: HuntDoc["search_cost"]; counts: HuntDoc["counts"] };
+  metrics: Record<string, unknown>; events: unknown[]; hunter: HunterRecord;
   package_commitment: string;
 };
-export type Claim = { outcome: string; impact_speed_mps: number | null; first_contact_t_s: number | null; severity_band: string };
 
-export function claimFromRun(run: RunDoc): Claim {
-  const impact = (run.metrics.impact_speed_mps as number | null) ?? null;
-  return { outcome: run.outcome, impact_speed_mps: impact, first_contact_t_s: (run.metrics.first_contact_t_s as number | null) ?? null, severity_band: severityBand(impact).band };
+export type { Claim };
+
+export function claimFromRun(target: TargetSpec, run: RunDoc): Claim {
+  return target.claimFromRun(run);
 }
 
-export function changedConditions(scn: Scenario) {
-  return (Object.keys(ENVELOPE) as (keyof Scenario)[])
-    .filter((k) => scn[k] !== NOMINAL_SCENARIO[k])
-    .map((k) => ({ parameter: k, nominal: NOMINAL_SCENARIO[k], value: scn[k], unit: ENVELOPE[k].unit }));
+export function changedConditions(target: TargetSpec, scn: Scenario) {
+  return target.changedConditions(scn);
 }
 
-/** The private package: everything a buyer needs to reproduce and replay the failure. Includes a random salt. */
-export function buildPrivatePackage(run: RunDoc, seller: string, salt: string = randomSaltHex()) {
+/** The private package: everything a buyer needs to reproduce and replay the failure. Includes a
+ *  random salt, and the AGGREGATE search cost of the hunt that found it (post-purchase only). */
+export function buildPrivatePackage(target: TargetSpec, run: RunDoc, seller: string, hunter: HunterRecord, salt: string = randomSaltHex()) {
   return {
     schema: PACKAGE_SCHEMA,
     format: "tb-cjson-1",
     salt_hex: salt,
     seller,
     created_at: nowIso(),
-    controller: run.controller,
+    target_id: target.id,
+    target_label: target.label,
+    controller: target.subjectOf(run),
     envelope_id: run.envelope_id,
     engine: run.engine,
     environment: run.environment,
     scene: run.scene,
     termination_rules: run.termination_rules ?? null,
     scenario: run.scenario,
-    nominal_scenario: NOMINAL_SCENARIO,
-    changed_conditions: changedConditions(run.scenario),
-    claim: claimFromRun(run),
+    nominal_scenario: target.nominal_scenario,
+    changed_conditions: target.changedConditions(run.scenario),
+    claim: target.claimFromRun(run),
     metrics: run.metrics,
     events: run.events,
+    hunter,
     initial_state: run.initial_state ?? null,
     initial_state_check: run.initial_state_check ?? null,
     ticks: run.ticks,
-    replay: { frames: run.frames, trajectory_hash: run.trajectory_hash, mjcf_hash: run.mjcf_hash ?? null },
+    replay: { frames: run.frames, trajectory_hash: run.trajectory_hash, mjcf_hash: run.mjcf_hash ?? null, renderer: target.replay_renderer },
     reproduce: {
-      command: `uv run python -m tailbazaar_sim.cli --out OUT run --name finding --scenario '${JSON.stringify(run.scenario)}'`,
-      note: "Reproduction is expected to be bit-identical only in the pinned environment (uv.lock hash in environment.uv_lock_sha256, same MuJoCo build, CPU architecture, single thread).",
+      command: target.reproduceCommand(run.scenario),
+      note: "Reproduction is expected to be bit-identical only in the pinned environment (uv.lock hash in environment.uv_lock_sha256, same engine build, CPU architecture, single thread).",
     },
   };
 }
 
-export async function sellerDiscover(log: (m: string) => void, maxFindings = 2): Promise<{ hunt: HuntDoc; huntFile: string; findings: Finding[] }> {
-  log("seller: running bounded grid hunt over sensor delay x floor friction (controller unchanged, envelope enforced)");
-  const h = await hunt(SELLER_OUT, "grid");
-  const c = h.doc.counts;
-  log(`seller: hunt done: ${h.doc.search_cost.simulations} simulations, ${h.doc.search_cost.sim_steps} physics steps, ${h.doc.search_cost.wall_time_s}s wall; success=${c.success} collision=${c.collision} inconclusive=${c.inconclusive}; distinct findings=${h.doc.selected.length}, near-duplicates=${h.doc.near_duplicates.length}`);
+export async function sellerDiscover(target: TargetSpec, log: (m: string) => void, maxFindings = 2): Promise<{ hunter: HunterRecord; huntFile: string; findings: Finding[] }> {
+  const outDir = sellerOutFor(target);
+  log(`seller[${target.id}]: running the bounded ${target.sim.hunt_mode} hunt over the published envelope (${target.envelope_id}); the ${target.subject_noun} is never edited`);
+  const h = await hunt(target, outDir);
+  const c = h.summary.counts;
+  const hunter: HunterRecord = {
+    id: h.summary.hunter_id, mode: h.summary.mode, target_id: target.id,
+    search_cost: h.summary.search_cost, counts: c,
+    distinct_findings: h.summary.selected.length, near_duplicates: h.summary.near_duplicates,
+  };
+  log(`seller[${target.id}]: hunt done: ${c.simulations} simulations, ${h.summary.search_cost.sim_steps} physics steps, ${h.summary.search_cost.wall_time_s}s wall; failures=${c.failures} survived=${c.survived} inconclusive=${c.inconclusive}; by class ${JSON.stringify(c.by_class)}; distinct findings=${hunter.distinct_findings}, near-duplicates=${hunter.near_duplicates}`);
   // Seller memory: never resubmit a scenario that is an approximate duplicate (published rule) of one
-  // it already submitted; the verifier's ledger would reject it anyway.
+  // it already submitted FOR THIS TARGET; the verifier's ledger would reject it anyway.
   const db = getDb();
   db.exec("CREATE TABLE IF NOT EXISTS seller_submissions (commitment TEXT PRIMARY KEY, scenario TEXT NOT NULL, submitted_at TEXT NOT NULL)");
-  const prior = (db.prepare("SELECT scenario FROM seller_submissions").all() as { scenario: string }[]).map((r) => JSON.parse(r.scenario) as Scenario);
+  ensureColumn(db, "seller_submissions", "target_id", "TEXT");
+  const prior = (db.prepare("SELECT scenario FROM seller_submissions WHERE target_id = ? OR target_id IS NULL").all(target.id) as { scenario: string }[])
+    .map((r) => JSON.parse(r.scenario) as Scenario)
+    .filter((s) => target.checkAdmissible(s).length === 0);
   const findings: Finding[] = [];
   let skipped = 0;
-  for (const sel of h.doc.selected) {
+  for (const sel of h.summary.selected) {
     if (findings.length >= maxFindings) break;
-    if (prior.some((p) => isDuplicate(p, sel.scenario))) { skipped++; continue; }
+    if (prior.some((p) => target.isDuplicate(p, sel.scenario))) { skipped++; continue; }
     const name = `finding-${findings.length + 1}`;
-    const r = await runScenario(SELLER_OUT, name, sel.scenario);
-    log(`seller: re-ran ${name} with full recording: ${r.doc.outcome}, impact ${r.doc.metrics.impact_speed_mps} m/s at t=${r.doc.metrics.first_contact_t_s}s, trajectory ${r.doc.trajectory_hash.slice(0, 18)}...`);
-    findings.push({ rank: findings.length + 1, scenario: sel.scenario, run: r.doc, runBytes: r.bytes, runFile: r.file });
+    const r = await runScenario(target, outDir, name, sel.scenario);
+    const claim = target.claimFromRun(r.doc);
+    log(`seller[${target.id}]: re-ran ${name} with full recording: ${r.doc.outcome}, ${claim.severity_proxy} ${claim.severity_value} ${claim.severity_units} at t=${claim.moment_t_s}s, trajectory ${r.doc.trajectory_hash.slice(0, 18)}...`);
+    findings.push({ rank: findings.length + 1, target, scenario: sel.scenario, run: r.doc, runBytes: r.bytes, runFile: r.file });
   }
-  if (skipped) log(`seller: skipped ${skipped} finding(s) already submitted in earlier runs (seller memory, duplicate rule)`);
-  return { hunt: h.doc, huntFile: h.file, findings };
+  if (skipped) log(`seller[${target.id}]: skipped ${skipped} finding(s) already submitted in earlier runs (seller memory, duplicate rule)`);
+  return { hunter, huntFile: h.file, findings };
 }
 
-export function buildSubmission(f: Finding, huntDoc: HuntDoc, packageDoc: ReturnType<typeof buildPrivatePackage>): { submission: Submission; packageBytes: Uint8Array; packageCommitment: Hex } {
+function ensureColumn(db: ReturnType<typeof getDb>, table: string, column: string, type: string): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+}
+
+export function buildSubmission(f: Finding, hunter: HunterRecord, packageDoc: ReturnType<typeof buildPrivatePackage>): { submission: Submission; packageBytes: Uint8Array; packageCommitment: Hex } {
+  const target = f.target;
   const packageBytes = dumpsBytes(packageDoc);
   const packageCommitment = commitment(packageDoc);
-  getDb().prepare("INSERT OR IGNORE INTO seller_submissions(commitment, scenario, submitted_at) VALUES (?,?,?)").run(packageCommitment, JSON.stringify(f.run.scenario), nowIso());
+  const db = getDb();
+  db.exec("CREATE TABLE IF NOT EXISTS seller_submissions (commitment TEXT PRIMARY KEY, scenario TEXT NOT NULL, submitted_at TEXT NOT NULL)");
+  ensureColumn(db, "seller_submissions", "target_id", "TEXT");
+  db.prepare("INSERT OR IGNORE INTO seller_submissions(commitment, scenario, submitted_at, target_id) VALUES (?,?,?,?)").run(packageCommitment, JSON.stringify(f.run.scenario), nowIso(), target.id);
   const submission: Submission = {
     schema: SUBMISSION_SCHEMA,
     seller: roles.seller().address,
     submitted_at: nowIso(),
-    controller: f.run.controller,
+    target_id: target.id,
+    controller: target.subjectOf(f.run),
     envelope_id: f.run.envelope_id,
     scenario: f.run.scenario,
-    claim: claimFromRun(f.run),
+    claim: target.claimFromRun(f.run),
     environment: f.run.environment,
     trajectory_hash: f.run.trajectory_hash,
     mjcf_hash: f.run.mjcf_hash ?? null,
     metrics: f.run.metrics,
     events: f.run.events,
-    hunter: { id: huntDoc.hunter_id, mode: huntDoc.mode, search_cost: huntDoc.search_cost, counts: huntDoc.counts },
+    hunter,
     package_commitment: packageCommitment,
   };
   return { submission, packageBytes, packageCommitment };
 }
 
 /** Produce the bytes the seller actually serves for an order. `tamper` is a LOCAL DEMONSTRATION switch
- *  that simulates a dishonest seller: the scenario inside the package is altered after the commitment
- *  was registered, so the delivered bytes no longer hash to the on-chain commitment. */
+ *  that simulates a dishonest seller: one axis of the scenario inside the package is moved back to the
+ *  nominal operating point after the commitment was registered, so the package now claims the failure
+ *  happened under milder conditions than it did — and the delivered bytes no longer hash to the
+ *  on-chain commitment. Which axis is read from the target's own changed-conditions list, so the
+ *  demonstration works for any target without a special case. */
 export function deliveredBytesFor(packageBytes: Uint8Array, tamper: boolean): Uint8Array {
   if (!tamper) return packageBytes;
   const doc = JSON.parse(Buffer.from(packageBytes).toString("utf8"));
-  doc.scenario = { ...doc.scenario, sensor_delay_ms: NOMINAL_SCENARIO.sensor_delay_ms }; // claims a collision under nominal latency
-  doc.tampered_by_demo = "LOCAL DEMONSTRATION: scenario altered after commitment";
+  const target = targetFor(doc.target_id);
+  const changed = target.changedConditions(doc.scenario ?? {});
+  const axis = changed[0];
+  if (axis) doc.scenario = { ...doc.scenario, [axis.parameter]: axis.nominal };
+  doc.tampered_by_demo = `LOCAL DEMONSTRATION: ${axis ? axis.parameter : "the scenario"} altered after commitment`;
   return dumpsBytes(doc);
 }
 

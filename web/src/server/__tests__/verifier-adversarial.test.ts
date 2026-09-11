@@ -32,6 +32,8 @@ delete process.env.PUBLIC_BASE_URL;
 const { verifySubmission, verifyAndList, checkReplayPlausibility, replayLimitsFrom, SIM_POSITION_BOUND_M } = await import("../agents/verifier.js");
 const { buildPrivatePackage, claimFromRun, SUBMISSION_SCHEMA } = await import("../agents/seller.js");
 const { commitment, keccakHex, dumpsBytes } = await import("../canonical.js");
+const { TARGETS } = await import("../targets.js");
+const CART = TARGETS.cart;
 const { ENVELOPE_ID } = await import("../envelope.js");
 const { getDb } = await import("../db.js");
 const { runScenario } = await import("../sim.js");
@@ -41,6 +43,7 @@ const SELLER = "0x28dAA9F3F9468382fFeD53cc339418403337cDeD";
 const SALT = ("0x" + "a7".repeat(32)) as `0x${string}`;
 const SCENARIO: Scenario = { sensor_delay_ms: 200, actuator_delay_ms: 20, floor_friction: 0.3, payload_kg: 20.0 };
 const quiet = () => {};
+const HUNTER_RECORD = { id: "test-fixture", mode: "grid", target_id: "cart", search_cost: { simulations: 1, sim_steps: 0, wall_time_s: 0 }, counts: { simulations: 1, failures: 1, survived: 0, inconclusive: 0, by_class: { COLLISION: 1 } }, distinct_findings: 1, near_duplicates: 0 };
 
 /** Everything the seller asserts about a package, exactly as agents/seller.ts assembles it. The
  *  overrides are the forger's levers: what environment is claimed, and what trajectory hash. */
@@ -50,23 +53,24 @@ function submissionFor(run: RunDoc, pkgDoc: Record<string, any>, over: { environ
     schema: SUBMISSION_SCHEMA,
     seller: SELLER,
     submitted_at: new Date().toISOString(),
+    target_id: "cart",
     controller: pkgDoc.controller,
     envelope_id: ENVELOPE_ID,
     scenario: run.scenario,
-    claim: claimFromRun(run),
+    claim: claimFromRun(CART, run),
     environment: over.environment ?? run.environment,
     trajectory_hash: over.trajectory_hash ?? run.trajectory_hash,
     mjcf_hash: run.mjcf_hash ?? null,
     metrics: run.metrics,
     events: run.events,
-    hunter: { id: "test-fixture", mode: "grid", search_cost: { simulations: 1, sim_steps: 0, wall_time_s: 0 }, counts: { success: 0, collision: 1, inconclusive: 0 } },
+    hunter: HUNTER_RECORD,
     package_commitment: commitment(pkgDoc),
   };
   return { sub, bytes };
 }
 
-const fixture = await runScenario(path.join(tmp, "seller"), "adversarial-fixture", SCENARIO);
-const honestPackage = buildPrivatePackage(fixture.doc, SELLER, SALT) as unknown as Record<string, any>;
+const fixture = await runScenario(CART, path.join(tmp, "seller"), "adversarial-fixture", SCENARIO);
+const honestPackage = buildPrivatePackage(CART, fixture.doc, SELLER, HUNTER_RECORD, SALT) as unknown as Record<string, any>;
 const clone = (): Record<string, any> => JSON.parse(JSON.stringify(honestPackage));
 const named = (res: { checks: { name: string; ok: boolean; detail?: string }[] }, name: string) => res.checks.find((c) => c.name === name);
 const rows = (table: string) => Number((getDb().prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number | bigint }).n);

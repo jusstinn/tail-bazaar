@@ -4,12 +4,14 @@
 // resolved envelope/controller configuration the web layer ran with.
 import { execFileSync } from "node:child_process";
 import { commitment } from "./canonical.js";
-import { CONTROLLER_TUNED_RANGE, DUPLICATE_DISTANCE, ENVELOPE, ENVELOPE_ID, NOMINAL_SCENARIO } from "./envelope.js";
+import { TARGET_IDS, TARGETS } from "./targets.js";
 import { REPO_ROOT } from "./config.js";
 
 export type Provenance = {
   git_sha: string | null;
   git_dirty: boolean | null;
+  /** One entry per target in the registry. */
+  envelope_ids: string[];
   envelope_id: string;
   envelope_config_hash: string;
   captured_at: string;
@@ -23,14 +25,15 @@ function git(args: string[]): string | null {
   }
 }
 
-/** keccak256 over the canonical bytes of the resolved envelope + controller configuration. */
-export const ENVELOPE_CONFIG_HASH = commitment({
-  envelope_id: ENVELOPE_ID,
-  envelope: ENVELOPE,
-  nominal_scenario: NOMINAL_SCENARIO,
-  duplicate_distance: DUPLICATE_DISTANCE,
-  controller_tuned_range: CONTROLLER_TUNED_RANGE,
-});
+/** keccak256 over the canonical bytes of EVERY target's resolved envelope configuration, so the hash
+ *  changes if any published axis, nominal point, duplicate rule or published range moves. */
+export const ENVELOPE_IDS = TARGET_IDS.map((id) => TARGETS[id].envelope_id);
+export const ENVELOPE_CONFIG_HASH = commitment(
+  Object.fromEntries(TARGET_IDS.map((id) => {
+    const d = TARGETS[id].envelope_doc;
+    return [id, { envelope_id: d.envelope_id, axes: d.axes, nominal_scenario: d.nominal_scenario, duplicate_rule: d.duplicate_rule, published_range: d.controller_tuned_range.per_parameter }];
+  })),
+);
 
 let cache: { at: number; value: Provenance } | null = null;
 
@@ -41,7 +44,8 @@ export function provenance(maxAgeMs = 5000): Provenance {
   const value: Provenance = {
     git_sha: sha,
     git_dirty: status === null ? null : status !== "",
-    envelope_id: ENVELOPE_ID,
+    envelope_ids: ENVELOPE_IDS,
+    envelope_id: ENVELOPE_IDS.join(" + "),
     envelope_config_hash: ENVELOPE_CONFIG_HASH,
     captured_at: new Date().toISOString(),
   };

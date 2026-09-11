@@ -1,10 +1,11 @@
 // The finding page, told in five stages: the sealed claim, the purchase, the reveal, the evidence,
 // the settlement. Each stage leads with one plain sentence; hashes, canonical JSON, envelopes,
 // provenance and raw metrics stay complete but live behind labelled disclosures.
-import { getJSON, getToken, HttpError, setToken, type Check, type EnvelopeDoc, type Ev, type OperatingContext, type Order, type Pkg, type RunLike, type Status } from "./api.js";
+import { envelopeFor, getJSON, getToken, HttpError, setToken, type Check, type EnvelopeDoc, type EnvelopesDoc, type Ev, type OperatingContext, type Order, type Pkg, type RunLike, type Status } from "./api.js";
 import { addrCell, esc, eth, num, short, txCell, when } from "./format.js";
 import { armPage, badge, band, counter, disclosure, facts, inTuned, rangeBars, reducedMotion, statusTone } from "./ui.js";
 import { createReplay, type Replay, type ViewMode } from "./replay.js";
+import { targetView, type TargetView } from "./target-view.js";
 import { autoplayStop, defaultPlayhead, presentFailure, type FailurePresentation } from "../server/failure.js";
 
 let replay: Replay | null = null;
@@ -37,9 +38,12 @@ function stageHead(id: string, n: number, title: string, sentence: string): stri
 
 // ------------------------------------------------------------------ page
 export async function renderOrder(view: HTMLElement, orderId: string, st: Status): Promise<void> {
-  const [o, env] = await Promise.all([getJSON<Order>(`/api/orders/${orderId}`), getJSON<EnvelopeDoc>("/api/envelope")]);
+  const [o, envs] = await Promise.all([getJSON<Order>(`/api/orders/${orderId}`), getJSON<EnvelopesDoc>("/api/envelope")]);
   const l = o.listing!;
   const s = l.public_summary;
+  const targetId = s.target?.id ?? l.target_id ?? "cart";
+  const tv = targetView(targetId);
+  const env = envelopeFor(envs, targetId);
   const ctx: OperatingContext = s.operating_context ?? {
     controller_tuned_range: env.controller_tuned_range.prose, searched_envelope: env.searched_envelope.prose,
     question: env.product_question, note: env.note, reference: "GET /api/envelope",
@@ -48,11 +52,9 @@ export async function renderOrder(view: HTMLElement, orderId: string, st: Status
   const valid = o.status === "SETTLED_VALID";
   const verdict = s.verification.verdict ?? s.verification.status;
 
-  const headline = valid
-    ? "The cart was supposed to stop.<br>Under these conditions it did not."
-    : "The seller delivered bytes<br>that did not match the seal.";
+  const headline = valid ? tv.headline : "The seller delivered bytes<br>that did not match the seal.";
   const lede = valid
-    ? `A hunter agent found conditions inside the published operating range where this controller fails, and a verifier re-ran them and agreed. A buyer paid <strong>${esc(eth(l.price_wei))}</strong> into escrow before being allowed to look at any of it. Everything below is what happened next, in the order it happened.`
+    ? `A hunter agent found conditions inside the published operating range where this ${esc(s.target?.subject_label?.toLowerCase() ?? "controller")} fails, and a verifier re-ran them with the same simulator and agreed. A buyer paid <strong>${esc(eth(l.price_wei))}</strong> into escrow before being allowed to look at any of it. Everything below is what happened next, in the order it happened.`
     : `A buyer paid <strong>${esc(eth(l.price_wei))}</strong> into escrow for this finding. What the seller then served did not hash to the commitment registered on chain, so the verifier settled the order invalid and the escrow refunded the buyer in full. This is the refund path, demonstrated deliberately.`;
 
   view.innerHTML = `
@@ -62,6 +64,7 @@ export async function renderOrder(view: HTMLElement, orderId: string, st: Status
         <h1 class="display reveal">${headline}</h1>
         <p class="lede reveal">${lede}</p>
         <div class="cta-row reveal">
+          ${badge(s.target?.label ?? "Warehouse cart", "target target-" + esc(targetId))}
           ${badge(o.chain_mode === "testnet" ? "Base Sepolia" : "Local anvil", o.chain_mode === "testnet" ? "testnet" : "local")}
           ${badge(o.status.replace(/_/g, " ").toLowerCase(), statusTone(o.status))}
           ${o.on_chain ? badge("on chain: " + o.on_chain.status, statusTone(o.on_chain.status)) : ""}
@@ -76,7 +79,9 @@ export async function renderOrder(view: HTMLElement, orderId: string, st: Status
       <div class="two-col">
         <div>
           ${facts([
-            ["Controller", `${esc(s.controller.id)}<div class="sub-mono mono">${esc(s.controller.hash)}</div>`],
+            ["Robot", `${esc(s.target?.label ?? "Warehouse cart")}<div class="sub-mono">${esc(s.target?.machine ?? "a braking warehouse cart carrying a payload")}</div>`],
+            [s.target?.subject_label ?? "Controller", `${esc(s.controller.id)}<div class="sub-mono mono">${esc(s.controller.hash)}</div>`],
+            ["Failure class", `${badge(s.failure_class?.label ?? "Collision", "bad")}<div class="sub-mono">${esc(s.failure_class?.detected_by ?? "the simulator's own contact flag")}</div>`],
             ["Claim", esc(s.claim_kind)],
             ["Verified by", `${badge(verdict, verdict === "VALID" ? "ok" : "bad")} <span class="muted">${esc(s.verification.method ?? "")}</span><div class="sub-mono">re-simulated in the verifier's own environment · ${esc(s.verification.verifier_version)}</div>`],
             ["Severity", `${badge(s.severity.band, "chip-" + s.severity.band)} <span class="muted">${esc(s.severity.definition)}</span>`],
@@ -87,7 +92,7 @@ export async function renderOrder(view: HTMLElement, orderId: string, st: Status
         <div>
           <h3 class="sub reveal">What stayed hidden until payment</h3>
           <p class="prose reveal">${esc(s.hidden)}.</p>
-          <p class="prose reveal">The buyer knew the question it was buying an answer to — <em>${esc(ctx.question)}</em> — and that the controller was tuned for ${esc(ctx.controller_tuned_range)} while the hunter searched ${esc(ctx.searched_envelope)}. Those two ranges are the same for every listing, so stating them reveals nothing about this one.</p>
+          <p class="prose reveal">The buyer knew the question it was buying an answer to — <em>${esc(ctx.question)}</em> — and that the ${esc(ctx.controller_tuned_range_label ?? "range it was tuned for")} is ${esc(ctx.controller_tuned_range)} while the hunter searched ${esc(ctx.searched_envelope)}. Those two ranges are the same for every listing of this robot, so stating them reveals nothing about this one.</p>
           ${disclosure("Show the sealed summary and its hashes", `${facts([
             ["Commitment", `<span class="mono">${esc(l.commitment)}</span><div class="sub-mono">keccak256 of the canonical private package, which carries a random 32-byte salt</div>`],
             ["Terms hash", `<span class="mono">${esc(l.terms_hash)}</span><div class="sub-mono">keccak256 of this public summary; listing id = keccak256(commitment ‖ terms hash)</div>`],
@@ -153,7 +158,7 @@ export async function renderOrder(view: HTMLElement, orderId: string, st: Status
 
   armPage(view);
   wireRail();
-  await renderRevealStage(document.getElementById("reveal-wrap")!, o, env, valid);
+  await renderRevealStage(document.getElementById("reveal-wrap")!, o, env, valid, tv, targetId);
 }
 
 function wireRail(): void {
@@ -179,7 +184,7 @@ function wireRail(): void {
 }
 
 // ------------------------------------------------------------------ stage 3
-async function renderRevealStage(host: HTMLElement, o: Order, env: EnvelopeDoc, valid: boolean): Promise<void> {
+async function renderRevealStage(host: HTMLElement, o: Order, env: EnvelopeDoc, valid: boolean, view: TargetView, targetId: string): Promise<void> {
   const head = stageHead("reveal", 3, "The reveal", "");
   if (!o.revealed_in_buyer_console) {
     host.innerHTML = `${stageHead("reveal", 3, "The reveal", valid
@@ -191,8 +196,8 @@ async function renderRevealStage(host: HTMLElement, o: Order, env: EnvelopeDoc, 
   }
   host.innerHTML = `${head}<p class="lede reveal">Loading the purchased package and the public baseline run…</p>`;
   try {
-    const [pkg, baseline] = await Promise.all([getJSON<Pkg>(`/api/orders/${o.order_id}/reveal`), getJSON<RunLike>("/api/runs/baseline")]);
-    renderReveal(host, pkg, baseline, o, env);
+    const [pkg, baseline] = await Promise.all([getJSON<Pkg>(`/api/orders/${o.order_id}/reveal`), getJSON<RunLike>(`/api/runs/baseline?target=${encodeURIComponent(targetId)}`)]);
+    renderReveal(host, pkg, baseline, o, env, view);
   } catch (e) {
     if (e instanceof HttpError && (e.status === 401 || e.status === 403)) renderLocked(host, o, env);
     else throw e;
@@ -225,21 +230,26 @@ function changedChips(pkg: Pkg): string {
   return `<div class="chips reveal">${pkg.changed_conditions.map((c) => `<div class="chg"><span class="chg-p mono">${esc(c.parameter)}</span><span class="chg-v"><s>${esc(String(c.nominal))}</s> → <strong>${esc(String(c.value))}</strong> ${esc(c.unit === "1" ? "" : c.unit)}</span></div>`).join("") || `<div class="chg">nothing changed (nominal)</div>`}</div>`;
 }
 
-function metricsTable(baseline: RunLike, pkg: Pkg): string {
-  const rows: [string, unknown, unknown][] = [
-    ["outcome", baseline.metrics.outcome, pkg.metrics.outcome],
-    ["top speed (m/s)", num(baseline.metrics.v_max_mps), num(pkg.metrics.v_max_mps)],
-    ["brake onset (s)", num(baseline.metrics.brake_onset_t_s, 2), num(pkg.metrics.brake_onset_t_s, 2)],
-    ["stopping distance (m)", num(baseline.metrics.stopping_distance_m), pkg.metrics.stopping_distance_m === null ? "undefined (did not stop)" : num(pkg.metrics.stopping_distance_m)],
-    ["final clearance (m)", num(baseline.metrics.final_clearance_m), num(pkg.metrics.final_clearance_m)],
-    ["first contact (s)", "—", num(pkg.metrics.first_contact_t_s, 3)],
-    ["impact speed (m/s)", "—", num(pkg.metrics.impact_speed_mps)],
-    ["impact kinetic energy (J)", "—", num(pkg.metrics.impact_kinetic_energy_j, 1)],
-    ["brake onset → impact (m)", "—", num(pkg.metrics.distance_brake_onset_to_impact_m)],
-    ["peak deceleration (m/s²)", num(baseline.metrics.peak_decel_mps2, 2), num(pkg.metrics.peak_decel_mps2, 2)],
-    ["total mass (kg)", num(baseline.metrics.total_mass_kg, 1), num(pkg.metrics.total_mass_kg, 1)],
-  ];
+function metricsTable(view: TargetView, baseline: RunLike, pkg: Pkg): string {
+  const rows = view.metrics(baseline, pkg);
   return `<table class="data"><thead><tr><th>Metric</th><th>Baseline</th><th>This finding</th></tr></thead><tbody>${rows.map(([k, a, b]) => `<tr><td>${esc(k)}</td><td class="mono">${esc(a)}</td><td class="mono">${esc(b)}</td></tr>`).join("")}</tbody></table>`;
+}
+
+/** SEARCH COST, post-purchase and as an AGGREGATE: how many simulations the hunt ran and how many of
+ *  them produced this finding's failure class. It is a property of the search, not of the scenario —
+ *  no parameter, no value and no range of this finding is narrowed by it — and it is shown only after
+ *  the package has been paid for and revealed. */
+function searchCostBlock(pkg: Pkg, p: FailurePresentation): string {
+  const h = pkg.hunter;
+  if (!h) return "";
+  const k = h.counts.by_class?.[p.class_id];
+  const cost = h.search_cost;
+  const rate = cost.simulations > 0 && typeof k === "number" ? ` — ${((k / cost.simulations) * 100).toFixed(0)} % of the sweep` : "";
+  return `<div class="searchcost reveal">
+    <div class="sc-head">What this finding cost to find</div>
+    <p class="prose">The hunter ran <strong>${esc(cost.simulations)} simulations</strong> in this sweep${typeof k === "number" ? `, and <strong>${esc(k)}</strong> of them produced <span class="mono">${esc(p.class_id)}</span>${rate}` : ""}. ${esc(cost.sim_steps.toLocaleString())} physics steps, ${esc(cost.wall_time_s)} s of wall time, ${esc(h.distinct_findings)} distinct findings after the duplicate rule and ${esc(h.near_duplicates)} near-duplicates dropped. Search mode <span class="mono">${esc(h.mode)}</span>, hunter <span class="mono">${esc(h.id)}</span>.</p>
+    <p class="fineprint">This is an aggregate over the whole sweep, published after purchase. It says nothing about which conditions were tried: a count of simulations narrows no scenario. Adversarially selected failures are not failure frequencies — this ratio describes the hunter's search, not how often anything fails in the field.</p>
+  </div>`;
 }
 
 /** Axes on which this scenario falls outside the range the controller was tuned for. An axis with no
@@ -252,14 +262,9 @@ function outsideAxes(pkg: Pkg, env: EnvelopeDoc): string[] {
   }).map((a) => a.name);
 }
 
-function renderReveal(host: HTMLElement, pkg: Pkg, baseline: RunLike, o: Order, env: EnvelopeDoc): void {
+function renderReveal(host: HTMLElement, pkg: Pkg, baseline: RunLike, o: Order, env: EnvelopeDoc, view: TargetView): void {
   const failureRun: RunLike = { scenario: pkg.scenario, scene: pkg.scene, metrics: pkg.metrics, events: pkg.events, ticks: pkg.ticks, frames: pkg.replay.frames, trajectory_hash: pkg.replay.trajectory_hash, controller: pkg.controller, environment: pkg.environment, outcome: pkg.claim?.outcome };
   const p: FailurePresentation = presentFailure(failureRun, baseline);
-  const bOnset = baseline.events.find((e: any) => e.type === "brake_onset");
-  const fOnset = pkg.events.find((e: any) => e.type === "brake_onset");
-  const obs = pkg.scene.obstacle_front_x_m as number;
-  const trueRangeAtOnset = fOnset ? obs - fOnset.x_front_m : null;
-  const bTrueRangeAtOnset = bOnset ? obs - bOnset.x_front_m : null;
   const hashMatch = o.delivery_check ? o.delivery_check.valid : null;
 
   const mk = (label: string, v: unknown, unit: string, dec: number, note = ""): string =>
@@ -267,7 +272,7 @@ function renderReveal(host: HTMLElement, pkg: Pkg, baseline: RunLike, o: Order, 
 
   const honest = o.delivery_check ? o.delivery_check.valid : true;
   const revealLede = honest
-    ? `This is the run the buyer paid for, played back from the transforms recorded when it was simulated. Nothing is re-simulated in your browser. <strong>${esc(p.sentence)}</strong>`
+    ? `This is the run the buyer paid for, played back from the body transforms recorded when it was simulated. Nothing is re-simulated in your browser. <strong>${esc(p.sentence)}</strong>`
     : `These are the bytes the seller actually served. They do <strong>not</strong> hash to the commitment registered on chain, so the verifier refused them and the buyer was refunded — what follows is the rejected delivery, not certified evidence. It is played back from its own recorded transforms; nothing is re-simulated in your browser.`;
   host.innerHTML = `
     ${stageHead("reveal", 3, "The reveal", revealLede)}
@@ -286,9 +291,7 @@ function renderReveal(host: HTMLElement, pkg: Pkg, baseline: RunLike, o: Order, 
           <button data-mode="split">Side by side</button>
         </div>
         <div class="legend">
-          <span><i class="sw sw-fail"></i>purchased run</span>
-          <span><i class="sw sw-ghost"></i>baseline ghost — same controller, nominal conditions, drawn one lane over</span>
-          <span><i class="sw sw-stop"></i>where the baseline stopped</span>
+          ${view.renderer.swatches.map((w) => `<span><i class="sw${w.thin ? " sw-thin" : ""}" style="background:${esc(w.color)}${w.translucent ? ";opacity:.45" : ""}"></i>${esc(w.label)}</span>`).join("")}
         </div>
       </div>
       <div id="viewport"></div>
@@ -309,38 +312,34 @@ function renderReveal(host: HTMLElement, pkg: Pkg, baseline: RunLike, o: Order, 
     </div>
 
     <div class="stat-strip">
-      ${p.headline_quantity ? mk(`${p.moment_label} · ${p.headline_quantity.label}`, p.headline_quantity.value, p.headline_quantity.unit, 3) : ""}
-      ${mk("clearance left", pkg.metrics.final_clearance_m, "m", 3, "distance to the obstacle when the run ended")}
-      ${mk("baseline clearance", baseline.metrics.final_clearance_m, "m", 3, `target ${num(baseline.metrics.target_clearance_m, 2)} m`)}
-      ${mk("brake onset to impact", pkg.metrics.distance_brake_onset_to_impact_m, "m", 3, "distance travelled after the brakes came on")}
+      ${view.stats(pkg, baseline, p).map((st) => mk(st.label, st.value, st.unit, st.dec, st.note ?? "")).join("")}
     </div>
+
+    ${searchCostBlock(pkg, p)}
 
     <div class="two-col wide-left">
       <div>
         <h3 class="sub reveal">What was different</h3>
         ${changedChips(pkg)}
-        <p class="prose reveal">${fOnset
-          ? `The controller started braking at <span class="mono">${num(fOnset.t_s, 2)} s</span> while moving at <span class="mono">${num(fOnset.speed_mps, 2)} m/s</span>. Its range measurement was ${esc(String(pkg.scenario.sensor_delay_ms))} ms stale, so it believed the obstacle was <span class="mono">${num(fOnset.range_used_m, 2)} m</span> away when the true distance was already <span class="mono">${num(trueRangeAtOnset, 2)} m</span>${bOnset ? `. With nominal sensing the same controller braked at ${num(bOnset.t_s, 2)} s with ${num(bTrueRangeAtOnset, 2)} m still in hand` : ""}.`
-          : `The controller never braked before the failure.`}
-          ${p.moment_t_s !== null ? ` ${esc(p.sentence)} It happened at <span class="mono">${num(p.moment_t_s, 3)} s</span>${p.headline_quantity ? `, with ${esc(p.headline_quantity.label)} <span class="mono">${esc(p.headline_quantity.text)}</span>` : ""}.` : ""}
-          The baseline, same controller under nominal conditions, stopped with <span class="mono">${num(baseline.metrics.final_clearance_m, 3)} m</span> to spare.</p>
-        ${p.quantities.length ? `<p class="fineprint reveal">Recorded at ${esc(p.moment_label)}: ${p.quantities.map((q) => `${esc(q.label)} ${esc(q.text)}`).join(" · ")}${p.attributes.length ? ` · ${p.attributes.map((a) => `${esc(a.label)} ${esc(a.value)}`).join(" · ")}` : ""}. Failure class <span class="mono">${esc(p.classes.join(", "))}</span>, read from the run document.</p>` : ""}
+        <p class="prose reveal">${view.narrate(pkg, baseline, p)}</p>
+        ${p.quantities.length || p.severity_quantities.length ? `<p class="fineprint reveal">Recorded at ${esc(p.moment_label)}: ${p.quantities.map((q) => `${esc(q.label)} ${esc(q.text)}`).join(" · ")}${p.severity_moment ? `; at ${esc(p.severity_label)}: ${p.severity_quantities.map((q) => `${esc(q.label)} ${esc(q.text)}`).join(" · ")}` : ""}${p.attributes.length ? ` · ${p.attributes.map((a) => `${esc(a.label)} ${esc(a.value)}`).join(" · ")}` : ""}. Failure class <span class="mono">${esc(p.classes.join(", "))}</span>, read from the run document.</p>` : ""}
         ${p.also.length ? `<p class="prose reveal">This run failed in more than one way. ${p.also.map((a) => `<strong>${esc(a.label)}</strong>${a.t_s !== null ? ` at <span class="mono">${num(a.t_s, 3)} s</span>` : ""}`).join(", ")} — marked on the timeline above alongside ${esc(p.moment_label)}.</p>` : ""}
       </div>
       <div>
         <h3 class="sub reveal">Where this finding sits</h3>
         <p class="prose reveal">${outsideAxes(pkg, env).length === 0
-          ? "Every parameter of this scenario is inside the range the controller was tuned for: this failure is inside its own design assumptions."
-          : `Outside the range the controller was tuned for on ${outsideAxes(pkg, env).map((n) => `<span class="mono">${esc(n)}</span>`).join(" and ")}, and inside the published searched envelope on every axis. It is a measured boundary of how far the operating range can be widened — not evidence that the controller is broken where it was designed to work.`}</p>
+          ? `Every parameter of this scenario is inside the ${esc(env.controller_tuned_range.label)}: this failure is inside its own published assumptions.`
+          : `Outside the ${esc(env.controller_tuned_range.label)} on ${outsideAxes(pkg, env).map((n) => `<span class="mono">${esc(n)}</span>`).join(" and ")}, and inside the published searched envelope on every axis. It is a measured boundary of how far the operating range can be widened — not evidence that it is broken where it was designed to work.`}</p>
       </div>
     </div>
     ${rangeBars(env, pkg.scenario)}
 
-    ${disclosure("Show the full metric comparison", metricsTable(baseline, pkg), "baseline versus this finding")}
+    ${disclosure("Show the full metric comparison", metricsTable(view, baseline, pkg), "baseline versus this finding")}
     ${disclosure("Show hashes, scenario and reproduction", `${facts([
       ["Scenario", `<span class="mono">${esc(JSON.stringify(pkg.scenario))}</span>`],
       ["Nominal", `<span class="mono">${esc(JSON.stringify(pkg.nominal_scenario))}</span>`],
-      ["Controller hash", `<span class="mono">${esc(pkg.controller.hash)}</span>`],
+      ["Target", `<span class="mono">${esc(pkg.target_id ?? "cart")}</span> · ${esc(pkg.target_label ?? "warehouse cart")}`],
+      ["Subject hash", `<span class="mono">${esc(pkg.controller.hash)}</span>`],
       ["Trajectory hash", `<span class="mono">${esc(pkg.replay.trajectory_hash)}</span><div class="sub-mono">baseline ${esc(baseline.trajectory_hash)}</div>`],
       ["Salt", `<span class="mono">${esc(pkg.salt_hex)}</span>`],
       ["Reproduce", `<pre class="json">${esc(pkg.reproduce.command)}</pre><div class="sub-mono">${esc(pkg.reproduce.note)}</div>`],
@@ -355,7 +354,7 @@ function renderReveal(host: HTMLElement, pkg: Pkg, baseline: RunLike, o: Order, 
     ]), "what would have to match to reproduce this bit for bit")}`;
 
   armPage(host);
-  mountReplay(host, baseline, failureRun, pkg, p);
+  mountReplay(host, baseline, failureRun, pkg, p, view);
 }
 
 function replayDuration(pkg: Pkg): number {
@@ -363,10 +362,10 @@ function replayDuration(pkg: Pkg): number {
   return d.length ? d[d.length - 1][0] : 1;
 }
 
-function mountReplay(host: HTMLElement, baseline: RunLike, failureRun: RunLike, pkg: Pkg, p: FailurePresentation): void {
+function mountReplay(host: HTMLElement, baseline: RunLike, failureRun: RunLike, pkg: Pkg, p: FailurePresentation, view: TargetView): void {
   const viewport = host.querySelector<HTMLElement>("#viewport")!;
   try {
-    replay = createReplay(viewport, { baseline, failure: failureRun, failureFrames: pkg.replay.frames, presentation: p, mode: "overlay", reducedMotion: reducedMotion() });
+    replay = createReplay(viewport, { renderer: view.renderer, baseline, failure: failureRun, failureFrames: pkg.replay.frames, presentation: p, mode: "overlay", reducedMotion: reducedMotion(), baselineLabel: view.baselineLabel, failureLabel: view.failureLabel });
   } catch (e) {
     viewport.innerHTML = `<div class="note bad">The 3D replay is unavailable in this browser (${esc((e as Error)?.message ?? e)}). The recorded transforms are still in the package; every metric and hash below is unaffected.</div>`;
     host.querySelector(".timeline")?.remove();

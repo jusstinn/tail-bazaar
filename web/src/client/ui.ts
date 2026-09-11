@@ -66,7 +66,10 @@ export function inTuned(v: number, t: TunedSpec): boolean {
 /** One axis as a range bar: the searched envelope is the whole track, the range the controller was
  *  tuned for is the shaded band inside it, and (post-purchase only) a marker shows where this
  *  finding sits. */
-export function rangeBar(axis: Axis, tuned: TunedSpec, finding?: number | null): string {
+export type RangeCopy = { label: string; verb: string; unstated: string };
+const DEFAULT_COPY: RangeCopy = { label: "range the controller was tuned for", verb: "tuned for", unstated: "no tuned range stated for this axis" };
+
+export function rangeBar(axis: Axis, tuned: TunedSpec, finding?: number | null, copy: RangeCopy = DEFAULT_COPY): string {
   const lo = axis.low, hi = axis.high;
   const stated = tunedStated(tuned);
   const tLo = tuned.exactly !== undefined ? tuned.exactly : tuned.min !== undefined ? tuned.min : lo;
@@ -84,7 +87,7 @@ export function rangeBar(axis: Axis, tuned: TunedSpec, finding?: number | null):
       ${hasFinding ? `<div class="rb-find ${ok ? "ok" : "out"}" style="left:${pct(finding as number, lo, hi).toFixed(2)}%"><span>${esc(finding)}</span></div>` : ""}
     </div>
     <div class="rb-scale"><span>${esc(lo)}</span><span class="rb-unit">${esc(unit)}</span><span>${esc(hi)}</span></div>
-    <div class="rb-note">searched ${esc(lo)}–${esc(hi)} · ${stated ? `tuned for ${esc(axis.tuned_range)}` : "no tuned range stated for this axis"}${hasFinding ? ` · this finding <strong class="${ok ? "" : "alert"}">${esc(finding)}</strong>` : ""}</div>
+    <div class="rb-note">searched ${esc(lo)}–${esc(hi)} · ${stated ? `${esc(copy.verb)} ${esc(axis.tuned_range)}` : esc(copy.unstated)}${hasFinding ? ` · this finding <strong class="${ok ? "" : "alert"}">${esc(finding)}</strong>` : ""}</div>
   </div>`;
 }
 
@@ -93,8 +96,13 @@ export function rangeBars(env: EnvelopeDoc, scenario?: Record<string, number> | 
     const v = scenario ? Number(scenario[name]) : NaN;
     return Number.isFinite(v) ? v : null;
   };
-  return `<div class="rb-grid">${env.axes.map((a) => rangeBar(a, env.controller_tuned_range.per_parameter[a.name] ?? {}, at(a.name))).join("")}</div>
-  <div class="rb-legend"><span><i class="sw sw-tuned"></i>range the controller was tuned for</span><span><i class="sw sw-track"></i>envelope the hunter searched</span><span><i class="sw sw-nominal"></i>nominal operating point</span>${scenario ? `<span><i class="sw sw-find"></i>where this finding sits</span>` : ""}</div>`;
+  const copy: RangeCopy = {
+    label: env.controller_tuned_range.label ?? DEFAULT_COPY.label,
+    verb: env.controller_tuned_range.verb ?? DEFAULT_COPY.verb,
+    unstated: env.controller_tuned_range.unstated ?? DEFAULT_COPY.unstated,
+  };
+  return `<div class="rb-grid">${env.axes.map((a) => rangeBar(a, env.controller_tuned_range.per_parameter[a.name] ?? {}, at(a.name), copy)).join("")}</div>
+  <div class="rb-legend"><span><i class="sw sw-tuned"></i>${esc(copy.label)}</span><span><i class="sw sw-track"></i>envelope the hunter searched</span><span><i class="sw sw-nominal"></i>nominal operating point</span>${scenario ? `<span><i class="sw sw-find"></i>where this finding sits</span>` : ""}</div>`;
 }
 
 // ------------------------------------------------------------------ motion

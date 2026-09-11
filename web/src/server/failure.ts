@@ -17,7 +17,7 @@
 export type RunEvent = { type: string; t_s: number; [k: string]: unknown };
 
 /** Events that are steps on the way to a failure, not the failure itself. */
-export const CUE_EVENTS = new Set(["brake_onset", "stopped", "start", "cruise", "hold"]);
+export const CUE_EVENTS = new Set(["brake_onset", "stopped", "start", "cruise", "hold", "push_start", "push_end"]);
 
 const CUE_LABELS: Record<string, string> = {
   brake_onset: "brake onset",
@@ -25,6 +25,8 @@ const CUE_LABELS: Record<string, string> = {
   start: "start",
   cruise: "cruise",
   hold: "hold",
+  push_start: "push starts",
+  push_end: "push ends",
 };
 
 /** Suffix → unit. Longest suffix wins, so `_mps2` beats `_mps` and `_mps` beats `_s`. */
@@ -35,6 +37,7 @@ const UNIT_SUFFIXES: [string, string][] = [
   ["_deg", "°"],
   ["_ms", "ms"],
   ["_nm", "N·m"],
+  ["_ns", "N·s"],
   ["_pct", "%"],
   ["_j", "J"],
   ["_m", "m"],
@@ -42,9 +45,12 @@ const UNIT_SUFFIXES: [string, string][] = [
   ["_n", "N"],
 ];
 
-/** Copy for the classes that exist today. Anything absent falls through to the generic path.
- *  `headline_key` names the field the simulator itself uses as that class's severity proxy. */
-const KNOWN_CLASSES: Record<string, { label: string; moment_event: string; moment_label: string; headline_key: string; sentence: string }> = {
+/** Copy for the classes that exist today, across every target. Anything absent falls through to the
+ *  generic path. `headline_key` names the field the simulator itself uses as that class's severity
+ *  proxy, and `severity_event` names the event that field is recorded on when it is NOT the failure
+ *  moment: a humanoid is declared fallen when its torso leaves the healthy band, but the impact speed
+ *  that says how hard it landed is measured later, at the first ground contact. */
+const KNOWN_CLASSES: Record<string, { label: string; moment_event: string; moment_label: string; headline_key: string; sentence: string; severity_event?: string; severity_label?: string }> = {
   COLLISION: {
     label: "Collision",
     moment_event: "first_contact",
@@ -58,6 +64,15 @@ const KNOWN_CLASSES: Record<string, { label: string; moment_event: string; momen
     moment_label: "load breaks loose",
     headline_key: "load_rel_speed_mps",
     sentence: "The payload broke loose from the cart deck instead of riding out the manoeuvre.",
+  },
+  FELL: {
+    label: "Fell",
+    moment_event: "health_predicate_fired",
+    moment_label: "the fall",
+    headline_key: "torso_impact_speed_mps",
+    severity_event: "ground_contact",
+    severity_label: "torso impact",
+    sentence: "The torso dropped out of the height band the environment calls healthy: the policy lost its balance instead of walking on.",
   },
 };
 
@@ -78,6 +93,12 @@ export type FailurePresentation = {
   moment_label: string;
   quantities: Quantity[];
   attributes: Attribute[];
+  /** The event the severity proxy is measured on, when the run records it separately from the
+   *  failure moment (the humanoid's ground contact). Null when it is the moment itself. */
+  severity_moment: RunEvent | null;
+  severity_moment_t_s: number | null;
+  severity_label: string;
+  severity_quantities: Quantity[];
   headline_quantity: Quantity | null;
   headline: string;
   markers: Marker[];
@@ -165,17 +186,20 @@ export function presentFailure(run: unknown, baseline?: unknown): FailurePresent
   // not a cue on the way there, otherwise nothing.
   const moment = momentFor(classId, events);
 
-  const numeric = moment
-    ? Object.entries(moment).filter(([k, v]) => k !== "t_s" && typeof v === "number" && Number.isFinite(v))
-    : [];
-  const quantities: Quantity[] = numeric.map(([k, v]) => quantityFrom(k, v as number));
-  const attributes: Attribute[] = moment
-    ? Object.entries(moment).filter(([k, v]) => k !== "type" && typeof v === "string").map(([k, v]) => ({ key: k, label: labelForKey(k), value: v as string }))
-    : [];
-  // The headline is the severity proxy the simulator itself uses for this class; failing that, a
-  // speed-like field, which is the one a reader can feel.
-  const headline_quantity = (known && quantities.find((q) => q.key === known.headline_key))
-    ?? quantities.find((q) => /speed/.test(q.key) || q.unit === "m/s") ?? quantities[0] ?? null;
+  const numericOf = (e: RunEvent | null): Quantity[] =>
+    e ? Object.entries(e).filter(([k, v]) => k !== "t_s" && typeof v === "number" && Number.isFinite(v)).map(([k, v]) => quantityFrom(k, v as number)) : [];
+  const quantities: Quantity[] = numericOf(moment);
+  // Where the severity proxy is actually recorded. Read from the run's own events, never assumed.
+  const severity_moment = known?.severity_event ? events.find((e) => e.type === known.severity_event) ?? null : null;
+  const severity_quantities = numericOf(severity_moment);
+  const severity_label = severity_moment ? known?.severity_label ?? labelForKey(severity_moment.type) : known ? known.moment_label : moment ? labelForKey(moment.type) : "the failure";
+  const attributes: Attribute[] = [moment, severity_moment]
+    .filter((e): e is RunEvent => !!e)
+    .flatMap((e) => Object.entries(e).filter(([k, v]) => k !== "type" && typeof v === "string").map(([k, v]) => ({ key: k, label: labelForKey(k), value: v as string })));
+  // The headline is the severity proxy the simulator itself uses for this class, taken from whichever
+  // event records it; failing that, a speed-like field, which is the one a reader can feel.
+  const headline_quantity = (known && (severity_quantities.find((q) => q.key === known.headline_key) ?? quantities.find((q) => q.key === known.headline_key)))
+    ?? quantities.find((q) => /speed/.test(q.key) || q.unit === "m/s") ?? severity_quantities[0] ?? quantities[0] ?? null;
 
   const label = known ? known.label : humanizeClass(classId);
   const moment_label = known ? known.moment_label : moment ? labelForKey(moment.type) : "the failure";
@@ -186,6 +210,7 @@ export function presentFailure(run: unknown, baseline?: unknown): FailurePresent
     markers.push({ id: e.type, t_s: e.t_s, label: CUE_LABELS[e.type] ?? labelForKey(e.type), kind: "cue" });
   }
   if (moment) markers.push({ id: "moment", t_s: moment.t_s, label: moment_label, kind: "moment" });
+  if (severity_moment && severity_moment !== moment) markers.push({ id: "severity", t_s: severity_moment.t_s, label: severity_label, kind: "secondary" });
   // a run can fail in more than one way; each extra class gets its own mark and badge
   const also = classes.slice(1).map((c) => {
     const e = KNOWN_CLASSES[c] ? events.find((x) => x.type === KNOWN_CLASSES[c].moment_event) ?? null : null;
@@ -209,6 +234,10 @@ export function presentFailure(run: unknown, baseline?: unknown): FailurePresent
     moment_label,
     quantities,
     attributes,
+    severity_moment,
+    severity_moment_t_s: severity_moment ? severity_moment.t_s : null,
+    severity_label,
+    severity_quantities,
     headline_quantity,
     headline: headline_quantity ? `${label.toUpperCase()} · ${headline_quantity.text}` : label.toUpperCase(),
     markers,

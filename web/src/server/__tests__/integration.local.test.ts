@@ -10,14 +10,21 @@ import { keccakHex } from "../canonical.js";
 import { createChallenge, redeemChallenge } from "../auth.js";
 
 const app = buildApp();
-const PRIVATE_MARKERS = ["sensor_delay_ms", "floor_friction", "payload_kg", "actuator_delay_ms", "salt_hex", "\"frames\"", "\"ticks\"", "trajectory_hash", "reproduce"];
+// Envelope-axis identifiers for BOTH targets, plus the private structures. None of these may appear
+// in any public projection. (GET /api/envelope publishes the axis names on purpose — that is the
+// point of publishing an envelope — so it is deliberately not in the list of routes checked below.)
+const PRIVATE_MARKERS = [
+  "sensor_delay_ms", "actuator_delay_ms", "floor_friction", "payload_kg", "load_friction",
+  "push_impulse_ns", "push_heading_deg", "push_time_s", "body_mass_scale", "actuator_noise_frac", "control_latency_ms", "init_seed",
+  "salt_hex", "\"frames\"", "\"ticks\"", "trajectory_hash", "reproduce",
+];
 
 function orders(): OrderRow[] {
   return getDb().prepare("SELECT * FROM orders ORDER BY created_at ASC").all() as unknown as OrderRow[];
 }
 
 test("public listing and order endpoints never expose private package fields", async () => {
-  for (const url of ["/api/listings", "/api/orders", `/api/orders/${orders()[0].order_id}`, `/api/listings/${orders()[0].listing_id}`]) {
+  for (const url of ["/api/listings", "/api/orders", "/api/market", `/api/orders/${orders()[0].order_id}`, `/api/listings/${orders()[0].listing_id}`]) {
     const res = await app.request(url);
     assert.equal(res.status, 200, url);
     const text = await res.text();
@@ -25,29 +32,89 @@ test("public listing and order endpoints never expose private package fields", a
   }
 });
 
-test("pre-purchase summary carries only the allowed fields", async () => {
+test("pre-purchase summary carries only the allowed fields, for every target", async () => {
   const res = await app.request("/api/listings");
   const rows = (await res.json()) as any[];
   assert.ok(rows.length >= 2);
-  const s = rows[0].public_summary;
-  assert.deepEqual(Object.keys(s).sort(), ["admissible", "chain", "claim_kind", "controller", "envelope_id", "format", "hidden", "operating_context", "price_wei", "schema", "seller", "seller_settled_orders_at_listing", "severity", "verification"]);
-  assert.equal(typeof rows[0].seller_settled_orders, "number");
-  // P3: the buyer's real question and both ranges are stated before purchase, in prose that names no
-  // parameter and no value of this scenario (the leak test above covers the parameter names).
-  assert.match(s.operating_context.controller_tuned_range, /sensor latency <= 40 ms/);
-  assert.match(s.operating_context.searched_envelope, /sensor latency 0-300 ms/);
-  assert.match(s.operating_context.question, /wider operating range than it was tuned for/);
-  assert.equal(s.verification.verdict, "VALID");
+  for (const row of rows) {
+    const s = row.public_summary;
+    // WHAT A BUYER SEES BEFORE PAYING: target, failure class, severity band, verification status and
+    // seller history. Nothing derived from the exact scenario parameters.
+    assert.deepEqual(Object.keys(s).sort(), ["admissible", "chain", "claim_kind", "controller", "envelope_id", "failure_class", "format", "hidden", "operating_context", "price_wei", "schema", "seller", "seller_settled_orders_at_listing", "severity", "target", "verification"]);
+    assert.deepEqual(Object.keys(s.target).sort(), ["id", "label", "machine", "replay_renderer", "subject_label"]);
+    assert.deepEqual(Object.keys(s.failure_class).sort(), ["detected_by", "id", "label"]);
+    assert.ok(["low", "medium", "high", "none"].includes(s.severity.band));
+    assert.equal(typeof row.seller_settled_orders, "number");
+    assert.equal(s.verification.verdict, "VALID");
+    // The buyer's real question and both ranges are stated before purchase, in prose that names no
+    // parameter and no value of this scenario (the leak test above covers the parameter names).
+    assert.ok(String(s.operating_context.question).length > 20);
+    assert.ok(String(s.operating_context.controller_tuned_range).length > 10);
+    assert.ok(String(s.operating_context.searched_envelope).length > 10);
+  }
 });
 
-test("the published envelope endpoint carries both ranges in GUARD's axis shape", async () => {
-  const env = (await (await app.request("/api/envelope")).json()) as any;
-  assert.equal(env.envelope_id, "tb-envelope-1");
-  assert.equal(env.axes.length, 5);
-  for (const a of env.axes) assert.deepEqual(Object.keys(a).sort(), ["group", "high", "low", "marginal", "name", "nominal", "quantization", "scale", "tuned_range", "units"]);
-  assert.deepEqual(env.axes.map((a: any) => a.group).sort(), ["physical", "physical", "physical", "systems", "systems"]);
-  assert.equal(env.axes.every((a: any) => a.marginal === null && a.scale === null), true, "no distribution D is stated");
-  assert.deepEqual(Object.keys(env.verdicts).sort(), ["INCONCLUSIVE", "INVALID", "VALID"]);
+test("the marketplace carries both targets, and each listing declares which robot it is about", async () => {
+  const rows = (await (await app.request("/api/listings")).json()) as any[];
+  const byTarget = new Set(rows.map((r) => r.public_summary.target.id));
+  assert.deepEqual([...byTarget].sort(), ["cart", "humanoid"], "both targets are on the market");
+  for (const r of rows) assert.equal(r.target_id, r.public_summary.target.id, "the listing row and its sealed summary agree");
+  const cart = rows.find((r) => r.public_summary.target.id === "cart")!;
+  const humanoid = rows.find((r) => r.public_summary.target.id === "humanoid")!;
+  assert.equal(cart.public_summary.envelope_id, "tb-envelope-1");
+  assert.equal(humanoid.public_summary.envelope_id, "tb-humanoid-envelope-1");
+  assert.equal(humanoid.public_summary.failure_class.id, "FELL");
+  assert.match(humanoid.public_summary.failure_class.detected_by, /health predicate/i);
+  assert.equal(humanoid.public_summary.target.replay_renderer, "humanoid-3d");
+});
+
+test("the published envelope endpoint carries one envelope per target in GUARD's axis shape", async () => {
+  const doc = (await (await app.request("/api/envelope")).json()) as any;
+  assert.equal(doc.schema, "tb-envelopes-1");
+  assert.deepEqual(doc.targets.map((t: any) => t.target_id), ["cart", "humanoid"]);
+  for (const env of doc.targets) {
+    for (const a of env.axes) assert.deepEqual(Object.keys(a).sort(), ["group", "high", "low", "marginal", "name", "nominal", "quantization", "scale", "tuned_range", "units"]);
+    assert.equal(env.axes.every((a: any) => a.marginal === null && a.scale === null), true, "no distribution D is stated");
+    assert.ok(env.axes.every((a: any) => ["physical", "systems", "visual"].includes(a.group)));
+    assert.deepEqual(Object.keys(env.verdicts).sort(), ["INCONCLUSIVE", "INVALID", "VALID"]);
+    assert.ok(env.failure_classes.length >= 1);
+  }
+  const cart = doc.targets[0], humanoid = doc.targets[1];
+  assert.equal(cart.envelope_id, "tb-envelope-1");
+  assert.equal(cart.axes.length, 5);
+  assert.match(cart.controller_tuned_range.prose, /sensor latency <= 40 ms/);
+  assert.equal(humanoid.envelope_id, "tb-humanoid-envelope-1");
+  assert.equal(humanoid.axes.length, 7);
+  assert.match(humanoid.controller_tuned_range.prose, /unmodified Gymnasium Humanoid-v5/);
+  // ?target= returns exactly one of them
+  const one = (await (await app.request("/api/envelope?target=humanoid")).json()) as any;
+  assert.equal(one.envelope_id, "tb-humanoid-envelope-1");
+  assert.equal((await app.request("/api/envelope?target=nope")).status, 404);
+});
+
+test("search cost is published as a market-wide aggregate, with no scenario in it", async () => {
+  const m = (await (await app.request("/api/market")).json()) as any;
+  assert.ok(m.search_cost_total.simulations > 0, "the hunters actually ran simulations");
+  assert.ok(m.search_cost_total.hunts >= 2, "at least one hunt per target");
+  const cart = m.targets.find((t: any) => t.target_id === "cart");
+  const humanoid = m.targets.find((t: any) => t.target_id === "humanoid");
+  assert.ok(cart.search_cost.simulations > 0 && humanoid.search_cost.simulations > 0);
+  assert.ok(cart.failures_by_class.COLLISION > 0, "the cart sweep produced collisions");
+  assert.ok(humanoid.failures_by_class.FELL > 0, "the humanoid sweep produced falls");
+  assert.ok(cart.listings > 0 && humanoid.listings > 0);
+});
+
+test("the failure ledger export carries the target id on every row", async () => {
+  const { buildLedger } = await import("../ledger.js");
+  const led = buildLedger();
+  assert.ok(led.findings.length >= 2);
+  for (const row of led.findings) {
+    assert.ok(["cart", "humanoid"].includes(row.target_id), `row ${row.finding_id} names a known target`);
+    assert.equal(typeof row.severity.proxy, "string");
+    assert.ok(row.severity.value === null || typeof row.severity.value === "number");
+  }
+  assert.deepEqual(Object.keys(led.findings_by_target).sort(), ["cart", "humanoid"]);
+  assert.ok(led.findings_by_target.cart > 0 && led.findings_by_target.humanoid > 0);
 });
 
 test("retrieval requires the bound buyer's signature over a fresh challenge", async () => {
@@ -118,6 +185,17 @@ test("hosted mode: the reveal route is closed to visitors and opened by a real r
     delete process.env.PUBLIC_BASE_URL;
   }
   assert.equal((await app.request(reveal)).status, 200, "unsetting PUBLIC_BASE_URL restores local demonstration mode");
+});
+
+test("the replay renderer a package declares is the one its target publishes", async () => {
+  const valid = orders().find((o) => o.status === "SETTLED_VALID")!;
+  const res = await app.request(`/api/orders/${valid.order_id}/reveal`);
+  assert.equal(res.status, 200);
+  const pkg = JSON.parse(Buffer.from(await res.arrayBuffer()).toString("utf8"));
+  const doc = (await (await app.request(`/api/envelope?target=${pkg.target_id}`)).json()) as any;
+  assert.equal(pkg.replay.renderer, doc.replay_renderer);
+  assert.ok(Array.isArray(pkg.replay.frames.data) && pkg.replay.frames.data.length > 1, "the package carries recorded transforms");
+  assert.ok(pkg.hunter && pkg.hunter.search_cost.simulations > 0, "the aggregate search cost travels post-purchase only");
 });
 
 test("a refunded order cannot be retrieved even by its buyer", async () => {

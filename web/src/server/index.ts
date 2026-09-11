@@ -23,7 +23,7 @@ import { keccakHex } from "./canonical.js";
 import { publicClient, getListing, settledOrders, STATUS_NAMES, balanceOf } from "./chain.js";
 import { appDomain, buyerBudgetWei, buyerConsoleEnabled, chainId, chainLabel, chainMode, demoTriggerEnabled, escrowAddress, explorerBase, hostedMode, operatorToken, port, publicBaseUrl, roleAddresses, WEB_ROOT } from "./config.js";
 import { getDb, listEvents, publicListing, publicOrder, type ListingRow, type OrderRow } from "./db.js";
-import { ENVELOPE_DOC } from "./envelope.js";
+import { DEFAULT_TARGET, envelopesDoc, isTargetId, TARGET_IDS, TARGETS, targetFor } from "./targets.js";
 import { provenance } from "./provenance.js";
 import { ensureBaseline, pipelineStatus, PUBLIC_OUT, runDemoPipeline } from "./pipeline.js";
 
@@ -70,6 +70,7 @@ export function buildApp() {
       chain_mode: chainMode, chain_id: chainId, chain_label: chainLabel, explorer_base: explorerBase, escrow_address: escrowAddress || null,
       latest_block: block, roles: addrs, app_domain: appDomain, buyer_budget_wei: buyerBudgetWei.toString(),
       demo_trigger_enabled: demoTriggerEnabled, buyer_console_enabled: buyerConsoleEnabled, public_base_url: publicBaseUrl,
+      targets: TARGET_IDS.map((id) => ({ id, label: TARGETS[id].label, short_label: TARGETS[id].short_label, machine: TARGETS[id].machine, one_liner: TARGETS[id].one_liner, envelope_id: TARGETS[id].envelope_id, subject_label: TARGETS[id].subject_label, failure_classes: TARGETS[id].failure_classes.map((c) => ({ id: c.id, label: c.label })), replay_renderer: TARGETS[id].replay_renderer })),
       hosted_mode: hosted, private_routes_require_auth: hosted, operator_token_configured: hosted && operatorToken() !== "",
       provenance: provenance(),
     });
@@ -140,13 +141,65 @@ export function buildApp() {
   app.get("/api/runs/baseline", async (c) => {
     const access = privateAccess(c, null);
     if (!access.ok) return c.json({ error: access.error, hosted_mode: true }, 401);
-    const { file } = await ensureBaseline();
+    const want = c.req.query("target");
+    if (want !== undefined && !isTargetId(want)) return c.json({ error: `unknown target ${want}`, known: TARGET_IDS }, 404);
+    const { file } = await ensureBaseline(targetFor(want ?? DEFAULT_TARGET));
     return new Response(fs.readFileSync(file), { headers: { "content-type": "application/json" } });
   });
 
-  // Published operating envelope and the controller's tuned range (both public constants, identical
-  // for every listing: they say nothing about any individual scenario).
-  app.get("/api/envelope", (c) => c.json(ENVELOPE_DOC));
+  // Published operating envelopes — ONE PER TARGET — and, for each, the range its author published.
+  // All of it is public constants, identical for every listing of that target: it says nothing about
+  // any individual scenario. `?target=<id>` returns just that target's document.
+  app.get("/api/envelope", (c) => {
+    const doc = envelopesDoc();
+    const want = c.req.query("target");
+    if (want === undefined) return c.json(doc);
+    const one = doc.targets.find((t) => t.target_id === want);
+    return one ? c.json(one) : c.json({ error: `unknown target ${want}`, known: TARGET_IDS }, 404);
+  });
+
+  // MARKETPLACE AGGREGATES. Search cost is published here as a market-wide total and per target:
+  // how many simulations the hunters ran and how many produced each failure class. It is an
+  // aggregate over every hunt on this instance, identical for every listing, so it narrows no hidden
+  // scenario — and it carries no scenario parameter, no trajectory and no per-listing figure.
+  app.get("/api/market", (c) => {
+    const db = getDb();
+    const rows = db.prepare("SELECT listing_id, target_id, public_summary, status FROM listings WHERE chain_mode = ?").all(chainMode) as { listing_id: string; target_id: string | null; public_summary: string; status: string }[];
+    const priv = db.prepare("SELECT p.submission FROM private_packages p JOIN listings l ON l.listing_id = p.listing_id WHERE l.chain_mode = ?").all(chainMode) as { submission: string }[];
+    const hunts = new Map<string, { target_id: string; mode: string; simulations: number; sim_steps: number; wall_time_s: number; by_class: Record<string, number> }>();
+    for (const r of priv) {
+      try {
+        const sub = JSON.parse(r.submission) as { target_id?: string; hunter?: { id: string; mode: string; search_cost: { simulations: number; sim_steps: number; wall_time_s: number }; counts: { by_class?: Record<string, number> } } };
+        if (!sub.hunter) continue;
+        const key = `${sub.target_id ?? "cart"}:${sub.hunter.id}:${sub.hunter.mode}:${sub.hunter.search_cost.simulations}:${sub.hunter.search_cost.sim_steps}`;
+        hunts.set(key, { target_id: sub.target_id ?? "cart", mode: sub.hunter.mode, ...sub.hunter.search_cost, by_class: sub.hunter.counts?.by_class ?? {} });
+      } catch { /* unreadable record: left out of the aggregate rather than guessed */ }
+    }
+    const all = [...hunts.values()];
+    const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+    const perTarget = TARGET_IDS.map((id) => {
+      const mine = all.filter((h) => h.target_id === id);
+      const by_class: Record<string, number> = {};
+      for (const h of mine) for (const [k, v] of Object.entries(h.by_class)) by_class[k] = (by_class[k] ?? 0) + v;
+      return {
+        target_id: id, label: TARGETS[id].label, short_label: TARGETS[id].short_label, machine: TARGETS[id].machine, one_liner: TARGETS[id].one_liner,
+        envelope_id: TARGETS[id].envelope_id, subject_label: TARGETS[id].subject_label, replay_renderer: TARGETS[id].replay_renderer,
+        failure_classes: TARGETS[id].failure_classes,
+        listings: rows.filter((r) => (r.target_id ?? "cart") === id).length,
+        hunts: mine.length,
+        search_cost: { simulations: sum(mine.map((h) => h.simulations)), sim_steps: sum(mine.map((h) => h.sim_steps)), wall_time_s: Number(sum(mine.map((h) => h.wall_time_s)).toFixed(3)) },
+        failures_by_class: by_class,
+      };
+    });
+    return c.json({
+      schema: "tb-market-1",
+      chain_mode: chainMode,
+      listings: rows.length,
+      targets: perTarget,
+      search_cost_total: { hunts: all.length, simulations: sum(all.map((h) => h.simulations)), sim_steps: sum(all.map((h) => h.sim_steps)), wall_time_s: Number(sum(all.map((h) => h.wall_time_s)).toFixed(3)) },
+      note: "Aggregate search cost over every hunt recorded on this instance. It is a market-wide total, not a per-listing disclosure: it carries no scenario parameter and narrows no hidden finding.",
+    });
+  });
 
   app.post("/api/challenges", async (c) => {
     try {

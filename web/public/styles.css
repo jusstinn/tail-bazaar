@@ -16,7 +16,11 @@
   --amber-soft: #FEF4E2;
   --ok: #15713F;
   --ok-soft: #E8F4EC;
-  --ghost: #6B7280;
+  --ghost: #6E6A64;
+  --t-cart: #3B3833;
+  --t-cart-soft: #EAE7E2;
+  --t-humanoid: #8A6A46;
+  --t-humanoid-soft: #F2EADF;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
   --band-y: clamp(64px, 8vw, 118px);
@@ -151,8 +155,9 @@ input[type=password], input[type=text] { flex: 1; min-width: 240px; padding: 12p
 .sw-track { background: #EDEBE8; }
 .sw-nominal { width: 2px; height: 14px; border-radius: 0; background: var(--ink-3); }
 .sw-find { width: 2px; height: 14px; border-radius: 0; background: var(--alert); }
-.sw-fail { background: #2f6fd0; }
-.sw-ghost { background: rgba(107,114,128,.4); }
+.sw-fail { background: #3B3833; }
+.sw-ghost { background: rgba(110,106,100,.4); }
+.sw-thin { width: 3px; height: 14px; border-radius: 0; }
 .sw-stop { width: 2px; height: 14px; border-radius: 0; background: var(--ghost); }
 
 /* ---------------------------------------------------------------- disclosures */
@@ -338,3 +343,41 @@ footer p { max-width: 78ch; margin: 0 0 8px; }
   .vp-hud { font-size: 10.5px; gap: 10px; }
   .disc-body { padding-left: 0; }
 }
+
+/* ---------------------------------------------------- multi-target marketplace */
+/* A robot badge, one restrained warm tone per target. Never blue: blue is reserved for page chrome
+   and never appears in a viewport, so it must not be a robot's identity either. */
+.badge.target { background: #EEEDEB; color: var(--ink-2); }
+.badge.target-cart { background: var(--t-cart-soft); color: var(--t-cart); }
+.badge.target-humanoid { background: var(--t-humanoid-soft); color: var(--t-humanoid); }
+
+.tcards { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 22px; margin-top: 34px; }
+.tcard { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 26px 26px 22px; }
+.tcard-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.tcard-count { font-size: 12px; color: var(--ink-3); }
+.tcard h3 { font-size: 1.14rem; margin-bottom: 10px; }
+.tcard .prose { color: var(--ink-2); font-size: 14.5px; margin-bottom: 16px; }
+.tcard-facts { display: grid; grid-template-columns: 118px 1fr; gap: 9px 16px; margin: 0; padding-top: 16px; border-top: 1px solid var(--line); }
+.tcard-facts dt { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+.tcard-facts dd { margin: 0; font-size: 13px; color: var(--ink-2); }
+
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 30px; }
+.filters button { background: var(--card); border: 1px solid var(--line-2); border-radius: 999px; padding: 7px 14px; font: 500 13px/1 var(--sans); color: var(--ink-3); cursor: pointer; transition: background .2s var(--ease), color .2s var(--ease), border-color .2s var(--ease); }
+.filters button:hover { border-color: var(--ink-3); }
+.filters button.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+.filters .fcount { opacity: .6; margin-left: 4px; font-variant-numeric: tabular-nums; }
+.tgroup { margin-top: 30px; }
+.tgroup-head { display: flex; align-items: center; gap: 12px; font-size: 1rem; font-weight: 520; }
+.tgroup-head .muted { font-weight: 400; font-size: 14px; }
+.tgroup .findings { margin-top: 18px; }
+
+.seg-wide { margin-bottom: 26px; }
+.envpane { margin-top: 4px; }
+
+/* Post-purchase aggregate search cost. Never a pre-purchase disclosure. */
+.searchcost { margin: 30px 0 6px; padding: 22px 24px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+.sc-head { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); margin-bottom: 10px; }
+.searchcost .prose { margin-bottom: 8px; color: var(--ink-2); font-size: 15px; }
+.searchcost .fineprint { margin: 0; }
+
+.vp-hud .hud-alert { color: var(--alert); font-weight: 600; }

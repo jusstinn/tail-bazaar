@@ -18,6 +18,7 @@ export function getDb(): DatabaseSync {
       chain_mode TEXT NOT NULL,
       chain_id INTEGER NOT NULL,
       escrow_address TEXT NOT NULL,
+      target_id TEXT,
       seller TEXT NOT NULL,
       price_wei TEXT NOT NULL,
       commitment TEXT NOT NULL,
@@ -85,6 +86,7 @@ export function getDb(): DatabaseSync {
     CREATE TABLE IF NOT EXISTS ledger (
       finding_id TEXT PRIMARY KEY,
       listing_id TEXT,
+      target_id TEXT,
       controller_id TEXT NOT NULL,
       controller_hash TEXT NOT NULL,
       envelope_id TEXT NOT NULL,
@@ -104,11 +106,19 @@ export function getDb(): DatabaseSync {
       log TEXT NOT NULL
     );
   `);
+  // Additive migration for databases created before the marketplace became multi-target. A listing
+  // or ledger row with no target id is a cart row, because the cart was the only target then.
+  for (const [table, column] of [["listings", "target_id"], ["ledger", "target_id"]] as const) {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+    if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} TEXT`);
+  }
+  db.exec("UPDATE listings SET target_id = 'cart' WHERE target_id IS NULL");
+  db.exec("UPDATE ledger SET target_id = 'cart' WHERE target_id IS NULL");
   return db;
 }
 
 export type ListingRow = {
-  listing_id: string; chain_mode: string; chain_id: number; escrow_address: string; seller: string; price_wei: string;
+  listing_id: string; chain_mode: string; chain_id: number; escrow_address: string; target_id: string | null; seller: string; price_wei: string;
   commitment: string; terms_hash: string; public_summary: string; status: string; register_tx: string | null;
   demo_tamper: number; created_at: string;
 };
@@ -141,6 +151,7 @@ export function publicListing(row: ListingRow) {
     chain_mode: row.chain_mode,
     chain_id: row.chain_id,
     escrow_address: row.escrow_address,
+    target_id: row.target_id ?? "cart",
     seller: row.seller,
     price_wei: row.price_wei,
     commitment: row.commitment,
